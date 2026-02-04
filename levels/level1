@@ -1,4 +1,6 @@
-lvl attempts best
 1 0 0.0
-spike 1000 800 1
+spike 1000 800 2
+spike 3000 800 2
+spike 3050 800 2
+spike 3100 800 2
 block 1000 200 1

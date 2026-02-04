@@ -18,6 +18,8 @@ SRC = src/gd.c \
 	src/my_putstr.c \
 	src/window.c \
 	src/level.c	\
+	src/player.c \
+	src/physics.c \
 	src/utilitary.c \
 	src/music.c \
 	src/cursor.c \

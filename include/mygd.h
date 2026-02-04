@@ -1,12 +1,12 @@
 /*
-** EPITECH PROJECT, 2025
-** bscsfml
+** ALEXNEX PROJECT, 2026
+** my_gd.h
 ** File description:
-** header file for csfml bootstrap
+** header file for my_gd project
 */
 
-#ifndef BS_CSFML
-    #define BS_CSFML
+#ifndef MY_GD
+    #define MY_GD
 
     #include <SFML/Graphics/RenderWindow.h>
     #include <SFML/Graphics/Color.h>
@@ -39,12 +39,15 @@
 void my_putchar(char c);
 int my_putstr(char const *str);
 int my_put_nbr(int nb);
-char **my_str_to_word_array(char *str);
 void free_arr(char **ar);
 int set_power(int i);
 int len_int(int nb);
 char *my_strcpy(char *dest, char const *src);
 int my_stricpy(char *dest, char const *src, int i);
+
+char **my_str_to_word_array(char *str);
+char *int_to_str(int nb);
+char *float_to_str(float nb);
 
 sfVector2u create_vector(int x, int y);
 sfVector2f create_vector_f(float x, float y);
@@ -80,6 +83,7 @@ void free_editor_menu(editor_m_t *om);
 void print_editor_menu(editor_m_t *om, sfRenderWindow *w);
 editor_m_t *create_editor_menu(gd_t *gd);
 
+void free_level_button(level_button_t *lb);
 void free_level_list_menu(level_list_t *level_list);
 void print_level_list(level_list_t *level_list, sfRenderWindow *w);
 level_list_t *create_level_list(gd_t *gd);
@@ -97,5 +101,13 @@ void keyboard_events_playing(level_t **level, gd_t *gd);
 
 
 void load_level_data(char *levelname, level_t *level, gd_t *gd);
+
+
+void free_player(player_t *player);
+player_t *create_player(gd_t *gd);
+
+
+void apply_physics(gd_t *gd, level_t *level, object_list_t *obj);
+void check_collisions(gd_t *gd, level_t *level, object_list_t *obj);
 
 #endif

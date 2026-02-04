@@ -9,14 +9,30 @@
 
 void free_textures(textures_t *res)
 {
-    sfTexture_destroy(res->edi_background);
-    sfTexture_destroy(res->main_background);
-    sfTexture_destroy(res->level_background);
-    sfTexture_destroy(res->list_background);
-    sfTexture_destroy(res->opt_background);
-    sfTexture_destroy(res->play_button);
-    sfTexture_destroy(res->opt_button);
-    sfTexture_destroy(res->onli_button);
+    if (res->edi_background != NULL)
+        sfTexture_destroy(res->edi_background);
+    if (res->main_background != NULL)
+        sfTexture_destroy(res->main_background);
+    if (res->level_background != NULL)
+        sfTexture_destroy(res->level_background);
+    if (res->list_background != NULL)
+        sfTexture_destroy(res->list_background);
+    if (res->opt_background != NULL)
+        sfTexture_destroy(res->opt_background);
+    if (res->play_button != NULL)
+        sfTexture_destroy(res->play_button);
+    if (res->opt_button != NULL)
+        sfTexture_destroy(res->opt_button);
+    if (res->onli_button != NULL)
+        sfTexture_destroy(res->onli_button);
+    if (res->ground != NULL)
+        sfTexture_destroy(res->ground);
+    if (res->spike != NULL)
+        sfTexture_destroy(res->spike);
+    if (res->block != NULL)
+        sfTexture_destroy(res->block);
+    if (res->player_icon != NULL)
+        sfTexture_destroy(res->player_icon);
     free(res);
 }
 
@@ -25,13 +41,41 @@ textures_t *load_textures(void)
     textures_t *res = malloc(sizeof(textures_t));
 
     res->main_background = sfTexture_createFromFile("res/main_background.png", NULL);
+    if (res->main_background == NULL)
+        printf("Warning: Could not load res/main_background.png\n");
     res->edi_background = sfTexture_createFromFile("res/editor_background.png", NULL);
+    if (res->edi_background == NULL)
+        printf("Warning: Could not load res/editor_background.png\n");
     res->list_background = sfTexture_createFromFile("res/level_list_background.png", NULL);
+    if (res->list_background == NULL)
+        printf("Warning: Could not load res/level_list_background.png\n");
     res->opt_background = sfTexture_createFromFile("res/opt_background.png", NULL);
+    if (res->opt_background == NULL)
+        printf("Warning: Could not load res/opt_background.png\n");
     res->level_background = sfTexture_createFromFile("res/level_background.png", NULL);
+    if (res->level_background == NULL)
+        printf("Warning: Could not load res/level_background.png\n");
     res->play_button = sfTexture_createFromFile("res/play_button.png", NULL);
+    if (res->play_button == NULL)
+        printf("Warning: Could not load res/play_button.png\n");
     res->opt_button = sfTexture_createFromFile("res/param_button.png", NULL);
+    if (res->opt_button == NULL)
+        printf("Warning: Could not load res/param_button.png\n");
     res->onli_button = sfTexture_createFromFile("res/online_button.png", NULL);
+    if (res->onli_button == NULL)
+        printf("Warning: Could not load res/online_button.png\n");
+    res->ground = sfTexture_createFromFile("res/ground.png", NULL);
+    if (res->ground == NULL)
+        printf("Warning: Could not load res/ground.png\n");
+    res->spike = sfTexture_createFromFile("res/spike.png", NULL);
+    if (res->spike == NULL)
+        printf("Warning: Could not load res/spike.png\n");
+    res->block = sfTexture_createFromFile("res/block.png", NULL);
+    if (res->block == NULL)
+        printf("Warning: Could not load res/block.png\n");
+    res->player_icon = sfTexture_createFromFile("res/player_icon.png", NULL);
+    if (res->player_icon == NULL)
+        printf("Warning: Could not load res/player_icon.png\n");
     return res;
 }
 
@@ -51,10 +95,13 @@ gd_t *create_gd(void)
 
     gd->res = load_textures();
     gd->main_font = sfFont_createFromFile("res/GDfont.ttf");
+    if (gd->main_font == NULL)
+        printf("Warning: Could not load res/GDfont.ttf\n");
     gd->w = create_window(1920, 1080);
     gd->cursor = create_cursor();
     gd->event = malloc(sizeof(sfEvent));
     gd->menu = 'm';
+    gd->selected_level = 1;
     return gd;
 }
 

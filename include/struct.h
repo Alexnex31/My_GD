@@ -1,8 +1,8 @@
 /*
-** EPITECH PROJECT, 2025
-** duck.h
+** ALEXNEX PROJECT, 2026
+** struct.h
 ** File description:
-** header file to define duck struct
+** header file to define structures
 */
 
 #include "mygd.h"
@@ -32,12 +32,41 @@ typedef struct button {
     char pressed;
 } button_t;
 
+typedef struct spike {
+    sfSprite *sprite;
+    sfVector2f pos;
+    int size;
+} spike_t;
+
+typedef struct block {
+    sfSprite *sprite;
+    sfVector2f pos;
+    int size;
+} block_t;
+
 typedef struct object_list {
-    int id;
+    spike_t **spikes;
+    block_t **blocks;
+    block_t *ground;
 } object_list_t;
 
+typedef struct player {
+    sfSprite *sprite;
+    sfVector2f pos;
+    float vy;
+    float size;
+    float orientation;
+    char gamemode;
+    char state;
+    char allow_jump;
+} player_t;
+
 typedef struct level {
+    sfSprite *background;
     object_list_t *objects;
+    player_t *player;
+    float speed;
+    float shift;
     float best;
     float percent;
     int lvl;
@@ -46,14 +75,21 @@ typedef struct level {
 
 typedef struct level_button {
     char *filename;
+    char *display_name;
     float best;
     int attempts;
-    button_t *play_level;
+    int level_num;
+    button_t *play_button;
+    sfText *name_text;
+    sfText *attempts_text;
+    sfText *best_text;
 } level_button_t;
 
 typedef struct level_list {
     sfSprite *background;
     char **names;
+    level_button_t **level_buttons;
+    int nb_levels;
 } level_list_t;
 
 typedef struct editor_menu {
@@ -82,6 +118,10 @@ typedef struct textures {
     sfTexture *play_button;
     sfTexture *opt_button;
     sfTexture *onli_button;
+    sfTexture *ground;
+    sfTexture *spike;
+    sfTexture *block;
+    sfTexture *player_icon;
 } textures_t;
 
 typedef struct gd {
@@ -91,6 +131,7 @@ typedef struct gd {
     cursor_t *cursor;
     sfEvent *event;
     char menu;
+    int selected_level;
 } gd_t;
 
 #endif

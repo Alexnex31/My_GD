@@ -121,6 +121,34 @@ void go_back_list_main(level_list_t **lvl_list, gd_t *gd)
     gd->menu = 'm';
 }
 
+int check_level_button_click(level_button_t *lb, int mx, int my)
+{
+    button_t *btn = lb->play_button;
+
+    if (mx >= btn->pos.x && mx <= btn->pos.x + btn->size) {
+        if (my >= btn->pos.y && my <= btn->pos.y + btn->size) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+void handle_level_buttons_click(level_list_t **lvl_list, gd_t *gd, int mx, int my)
+{
+    int i = 0;
+
+    while (i < (*lvl_list)->nb_levels) {
+        if (check_level_button_click((*lvl_list)->level_buttons[i], mx, my)) {
+            gd->selected_level = (*lvl_list)->level_buttons[i]->level_num;
+            free_level_list_menu(*lvl_list);
+            *lvl_list = NULL;
+            gd->menu = 'P';
+            return;
+        }
+        i += 1;
+    }
+}
+
 void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
 {
     while (sfRenderWindow_pollEvent(gd->w, gd->event)) {
@@ -130,6 +158,10 @@ void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
         }
         if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeyEscape) {
             go_back_list_main(lvl_list, gd);
+            return;
+        }
+        if (gd->event->type == sfEvtMouseButtonPressed && gd->event->mouseButton.button == sfMouseLeft) {
+            handle_level_buttons_click(lvl_list, gd, gd->event->mouseButton.x, gd->event->mouseButton.y);
             return;
         }
     }
@@ -142,10 +174,11 @@ void go_back_playing_level_list(gd_t *gd, level_t **level)
     gd->menu = 'l';
 }
 
-void jump(level_t *level)
+void jump(level_t *level, gd_t *gd)
 {
     write(1, "jump\n", 5);
-    return;
+    if (level->player->allow_jump == 'y')
+        level->player->vy += 20;
 }
 
 void keyboard_events_playing(level_t **level, gd_t *gd)
@@ -160,9 +193,9 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
             return;
         }
         if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeySpace) {
-            jump(*level);
+            jump(*level, gd);
         }
         if (gd->event->type == sfEvtMouseButtonPressed)
-            jump(*level);
+            jump(*level, gd);
     }
 }

@@ -7,28 +7,50 @@
 
 #include "mygd.h"
 
-void load_block(char **arr, level_t *level, gd_t *gd)
+int load_block(char **arr, level_t *level, gd_t *gd, int nb_blocks)
 {
-    level->objects->id += 1;
+    block_t *block = malloc(sizeof(block_t));
+
+    nb_blocks += 1;
+    block->pos = (sfVector2f){atof(arr[1]), atof(arr[2])};
+    block->size = atoi(arr[3]);
+    block->sprite = sfSprite_create();
+    sfSprite_setTexture(block->sprite, gd->res->block, sfTrue);
+    sfSprite_setPosition(block->sprite, block->pos);
+    level->objects->blocks = realloc(level->objects->blocks, sizeof(block_t *) * (nb_blocks + 1));
+    level->objects->blocks[nb_blocks - 1] = block;
+    level->objects->blocks[nb_blocks] = NULL;
+    return nb_blocks;
 }
 
-void load_spike(char **arr, level_t *level, gd_t *gd)
+int load_spike(char **arr, level_t *level, gd_t *gd, int nb_spikes)
 {
-    level->objects->id += 1;
+    spike_t *spike = malloc(sizeof(spike_t));
+
+    nb_spikes += 1;
+    spike->pos = (sfVector2f){atof(arr[1]), atof(arr[2])};
+    spike->size = atoi(arr[3]);
+    spike->sprite = sfSprite_create();
+    sfSprite_setTexture(spike->sprite, gd->res->spike, sfTrue);
+    sfSprite_setPosition(spike->sprite, spike->pos);
+    level->objects->spikes = realloc(level->objects->spikes, sizeof(spike_t *) * (nb_spikes + 1));
+    level->objects->spikes[nb_spikes - 1] = spike;
+    level->objects->spikes[nb_spikes] = NULL;
+    return nb_spikes;
 }
 
-void load_object(char *line, level_t *level, gd_t *gd)
+void load_object(char *line, level_t *level, gd_t *gd, int *nb_blocks, int *nb_spikes)
 {
     char **arr = my_str_to_word_array(line);
 
     printf("object\n");
     if (strcmp(arr[0], "spike") == 0) {
-        load_spike(arr, level, gd);
+        *nb_spikes = load_spike(arr, level, gd, *nb_spikes);
         free_arr(arr);
         return;
     }
     if (strcmp(arr[0], "block") == 0) {
-        load_block(arr, level, gd);
+        *nb_blocks = load_block(arr, level, gd, *nb_blocks);
         free_arr(arr);
         return;
     }
@@ -45,12 +67,26 @@ void manage_first_line(char *line, level_t *level, gd_t *gd)
     free_arr(arr);
 }
 
+block_t *create_ground(gd_t *gd)
+{
+    block_t *ground = malloc(sizeof(block_t));
+
+    ground->pos = (sfVector2f){0, 840};
+    ground->size = 1;
+    ground->sprite = sfSprite_create();
+    sfSprite_setTexture(ground->sprite, gd->res->ground, sfTrue);
+    sfSprite_setPosition(ground->sprite, ground->pos);
+    return ground;
+}
+
 void load_level_data(char *levelname, level_t *level, gd_t *gd)
 {
     FILE *f = fopen(levelname, "r");
     char *line = NULL;
     size_t len = 0;
     ssize_t nread;
+    int nb_blocks = 0;
+    int nb_spikes = 0;
 
     if (f == NULL)
         return;
@@ -60,10 +96,13 @@ void load_level_data(char *levelname, level_t *level, gd_t *gd)
         return;
     }
     printf("loading level...\n");
+    level->objects->ground = create_ground(gd);
+    level->objects->blocks = NULL;
+    level->objects->spikes = NULL;
     manage_first_line(line, level, gd);
     nread = getline(&line, &len, f);
     while (nread > 0) {
-        load_object(line, level, gd);
+        load_object(line, level, gd, &nb_blocks, &nb_spikes);
         nread = getline(&line, &len, f);
     }
     free(line);
