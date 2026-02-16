@@ -61,16 +61,33 @@ typedef struct player {
     char allow_jump;
 } player_t;
 
+typedef struct end_level_screen {
+    sfSprite *background;
+    sfText *title_text;
+    sfText *attempts_text;
+    sfText *percent_text;
+    button_t *retry_button;
+    button_t *quit_button;
+} end_level_screen_t;
+
 typedef struct level {
     sfSprite *background;
     object_list_t *objects;
     player_t *player;
     float speed;
     float shift;
+    float level_end;
     float best;
     float percent;
     int lvl;
     int attempts;
+    int curr_attempts;
+    sfText *attempt_text;
+    sfText *percent_text;
+    sfClock *attempt_display_clock;
+    char show_attempt_text;
+    char level_completed;
+    end_level_screen_t *end_screen;
 } level_t;
 
 typedef struct level_button {
@@ -122,10 +139,21 @@ typedef struct textures {
     sfTexture *spike;
     sfTexture *block;
     sfTexture *player_icon;
+    sfTexture *end_level_background;
+    sfTexture *retry_button;
+    sfTexture *quit_button;
 } textures_t;
+
+typedef struct music {
+    sfMusic *main;
+    sfMusic *param;
+    sfMusic *editor;
+    sfMusic *level1;
+} music_t;
 
 typedef struct gd {
     textures_t *res;
+    music_t *musics;
     sfFont *main_font;
     sfRenderWindow *w;
     cursor_t *cursor;

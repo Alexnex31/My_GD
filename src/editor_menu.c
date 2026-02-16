@@ -22,6 +22,7 @@ editor_m_t *create_editor_menu(gd_t *gd)
 {
     editor_m_t *menu = malloc(sizeof(editor_m_t));
 
+    sfMusic_stop(gd->musics->main);
     menu->background = sfSprite_create();
     sfSprite_setTexture(menu->background, gd->res->edi_background, sfTrue);
     gd->menu = 'e';

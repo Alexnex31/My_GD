@@ -201,6 +201,8 @@ level_list_t *create_level_list(gd_t *gd)
     level_list_t *menu = malloc(sizeof(level_list_t));
     int i = 0;
 
+    sfMusic_stop(gd->musics->main);
+    sfMusic_stop(gd->musics->level1);
     menu->background = sfSprite_create();
     sfSprite_setTexture(menu->background, gd->res->list_background, sfTrue);
     menu->names = fill_names_list();

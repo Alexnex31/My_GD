@@ -22,6 +22,7 @@ option_m_t *create_option_menu(gd_t *gd)
 {
     option_m_t *menu = malloc(sizeof(option_m_t));
 
+    sfMusic_stop(gd->musics->main);
     menu->background = sfSprite_create();
     sfSprite_setTexture(menu->background, gd->res->opt_background, sfTrue);
     gd->menu = 'o';

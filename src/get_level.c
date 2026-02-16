@@ -13,6 +13,8 @@ int load_block(char **arr, level_t *level, gd_t *gd, int nb_blocks)
 
     nb_blocks += 1;
     block->pos = (sfVector2f){atof(arr[1]), atof(arr[2])};
+    if (atof(arr[1]) + 500 > level->level_end)
+        level->level_end = atof(arr[1]) + 500;
     block->size = atoi(arr[3]);
     block->sprite = sfSprite_create();
     sfSprite_setTexture(block->sprite, gd->res->block, sfTrue);
@@ -29,6 +31,8 @@ int load_spike(char **arr, level_t *level, gd_t *gd, int nb_spikes)
 
     nb_spikes += 1;
     spike->pos = (sfVector2f){atof(arr[1]), atof(arr[2])};
+    if (atof(arr[1]) + 500 > level->level_end)
+        level->level_end = atof(arr[1]) + 500;
     spike->size = atoi(arr[3]);
     spike->sprite = sfSprite_create();
     sfSprite_setTexture(spike->sprite, gd->res->spike, sfTrue);
@@ -43,7 +47,6 @@ void load_object(char *line, level_t *level, gd_t *gd, int *nb_blocks, int *nb_s
 {
     char **arr = my_str_to_word_array(line);
 
-    printf("object\n");
     if (strcmp(arr[0], "spike") == 0) {
         *nb_spikes = load_spike(arr, level, gd, *nb_spikes);
         free_arr(arr);
@@ -95,7 +98,6 @@ void load_level_data(char *levelname, level_t *level, gd_t *gd)
         fclose(f);
         return;
     }
-    printf("loading level...\n");
     level->objects->ground = create_ground(gd);
     level->objects->blocks = NULL;
     level->objects->spikes = NULL;
@@ -107,4 +109,45 @@ void load_level_data(char *levelname, level_t *level, gd_t *gd)
     }
     free(line);
     fclose(f);
+}
+
+void rewrite_level(level_t *level, gd_t *gd)
+{
+    FILE *f;
+    FILE *tempf;
+    char filename[256];
+    char temp_filename[256];
+    char line[500];
+    int line_num = 1;
+    int curr_line_num = 1;
+
+    if (level->percent > level->best) {
+        level->best = level->percent;
+    }
+    snprintf(filename, 256, "levels/level%d", gd->selected_level);
+    f = fopen(filename, "r");
+    if (f == NULL) {
+        printf("Error opening file.");
+        return;
+    }
+    sprintf(temp_filename, "%s.temp", filename);
+    tempf = fopen(temp_filename, "w");
+    if (tempf == NULL) {
+        printf("Error creating temporary file.");
+        fclose(f);
+        return;
+    }
+    while (fgets(line, 500, f) != NULL) {
+        if (curr_line_num == line_num) {
+            snprintf(line, 500, "%d %d %f\n", gd->selected_level, level->attempts, level->best);
+            fputs(line, tempf);
+        } else {
+            fputs(line, tempf);
+        }
+        curr_line_num++;
+    }
+    fclose(f);
+    fclose(tempf);
+    remove(filename);
+    rename(temp_filename, filename);
 }

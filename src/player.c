@@ -22,13 +22,14 @@ player_t *create_player(gd_t *gd)
 
     player->sprite = sfSprite_create();
     sfSprite_setTexture(player->sprite, gd->res->player_icon, sfTrue);
-    player->pos = (sfVector2f){300, 800};
+    sfSprite_setOrigin(player->sprite, (sfVector2f){50, 50});
+    player->pos = (sfVector2f){350, 790};
     sfSprite_setPosition(player->sprite, player->pos);
     player->vy = 0;
     player->size = 2;
     player->orientation = 0;
     player->gamemode = 'c';
     player->state = 'a';
-    player->allow_jump = 'y';
+    player->allow_jump = 'n';
     return player;
 }

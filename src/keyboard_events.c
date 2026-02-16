@@ -174,28 +174,85 @@ void go_back_playing_level_list(gd_t *gd, level_t **level)
     gd->menu = 'l';
 }
 
+void retry_level(gd_t *gd, level_t **level)
+{
+    int selected = gd->selected_level;
+    
+    free_level(*level);
+    *level = NULL;
+    gd->selected_level = selected;
+    *level = start_level(gd);
+}
+
+int check_end_screen_buttons(end_level_screen_t *end_screen, int mx, int my)
+{
+    button_t *retry = end_screen->retry_button;
+    button_t *quit = end_screen->quit_button;
+
+    if (mx >= retry->pos.x && mx <= retry->pos.x + retry->size) {
+        if (my >= retry->pos.y && my <= retry->pos.y + retry->size) {
+            return 1;
+        }
+    }
+    if (mx >= quit->pos.x && mx <= quit->pos.x + quit->size) {
+        if (my >= quit->pos.y && my <= quit->pos.y + quit->size) {
+            return 2;
+        }
+    }
+    return 0;
+}
+
+void handle_end_screen_click(level_t **level, gd_t *gd, int mx, int my)
+{
+    int result;
+
+    if ((*level)->end_screen == NULL)
+        return;
+    result = check_end_screen_buttons((*level)->end_screen, mx, my);
+    if (result == 1) {
+        rewrite_level(*level, gd);
+        retry_level(gd, level);
+    } else if (result == 2) {
+        rewrite_level(*level, gd);
+        go_back_playing_level_list(gd, level);
+    }
+}
+
 void jump(level_t *level, gd_t *gd)
 {
-    write(1, "jump\n", 5);
-    if (level->player->allow_jump == 'y')
-        level->player->vy += 20;
+    if (level->level_completed == 'y')
+        return;
+    
+    if (level->player->allow_jump == 'y') {
+        level->player->vy = 27;
+        level->player->allow_jump = 'n';
+    }
 }
 
 void keyboard_events_playing(level_t **level, gd_t *gd)
 {
     while (sfRenderWindow_pollEvent(gd->w, gd->event)) {
         if (gd->event->type == sfEvtClosed) {
+            rewrite_level(*level, gd);
             close_window(gd->w);
             return;
         }
         if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeyEscape) {
+            rewrite_level(*level, gd);
             go_back_playing_level_list(gd, level);
             return;
         }
-        if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeySpace) {
-            jump(*level, gd);
+        if ((*level)->level_completed == 'y') {
+            if (gd->event->type == sfEvtMouseButtonPressed && gd->event->mouseButton.button == sfMouseLeft) {
+                handle_end_screen_click(level, gd, gd->event->mouseButton.x, gd->event->mouseButton.y);
+                return;
+            }
+        } else {
+            if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeySpace) {
+                jump(*level, gd);
+            }
+            if (gd->event->type == sfEvtMouseButtonPressed)
+                jump(*level, gd);
         }
-        if (gd->event->type == sfEvtMouseButtonPressed)
-            jump(*level, gd);
     }
 }

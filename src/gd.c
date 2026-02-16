@@ -33,6 +33,12 @@ void free_textures(textures_t *res)
         sfTexture_destroy(res->block);
     if (res->player_icon != NULL)
         sfTexture_destroy(res->player_icon);
+    if (res->end_level_background != NULL)
+        sfTexture_destroy(res->end_level_background);
+    if (res->retry_button != NULL)
+        sfTexture_destroy(res->retry_button);
+    if (res->quit_button != NULL)
+        sfTexture_destroy(res->quit_button);
     free(res);
 }
 
@@ -76,12 +82,48 @@ textures_t *load_textures(void)
     res->player_icon = sfTexture_createFromFile("res/player_icon.png", NULL);
     if (res->player_icon == NULL)
         printf("Warning: Could not load res/player_icon.png\n");
+    res->end_level_background = sfTexture_createFromFile("res/end_level_background.png", NULL);
+    if (res->end_level_background == NULL)
+        printf("Warning: Could not load res/end_level_background.png\n");
+    res->retry_button = sfTexture_createFromFile("res/retry_button.png", NULL);
+    if (res->retry_button == NULL)
+        printf("Warning: Could not load res/retry_button.png\n");
+    res->quit_button = sfTexture_createFromFile("res/quit_button.png", NULL);
+    if (res->quit_button == NULL)
+        printf("Warning: Could not load res/quit_button.png\n");
     return res;
+}
+
+void free_musics(music_t *musics)
+{
+    if (musics == NULL)
+        return;
+    if (musics->editor != NULL)
+        sfMusic_destroy(musics->editor);
+    if (musics->main != NULL)
+        sfMusic_destroy(musics->main);
+    if (musics->param != NULL)
+        sfMusic_destroy(musics->param);
+    if (musics->level1 != NULL)
+        sfMusic_destroy(musics->level1);
+    free(musics);
+}
+
+music_t *load_musics(void)
+{
+    music_t *musics = malloc(sizeof(music_t));
+
+    musics->main = sfMusic_createFromFile("res/menuLoop.mp3");
+    musics->editor = sfMusic_createFromFile("res/back_mus.ogg");
+    musics->param = sfMusic_createFromFile("res/back_mus.ogg");
+    musics->level1 = sfMusic_createFromFile("res/back_mus.ogg");
+    return musics;
 }
 
 void free_gd(gd_t *gd)
 {
     free_textures(gd->res);
+    free_musics(gd->musics);
     sfFont_destroy(gd->main_font);
     free_cursor(gd->cursor);
     free(gd->event);
@@ -94,6 +136,7 @@ gd_t *create_gd(void)
     gd_t *gd = malloc(sizeof(gd_t));
 
     gd->res = load_textures();
+    gd->musics = load_musics();
     gd->main_font = sfFont_createFromFile("res/GDfont.ttf");
     if (gd->main_font == NULL)
         printf("Warning: Could not load res/GDfont.ttf\n");
@@ -120,6 +163,8 @@ void handle_playing(gd_t *gd, level_t **level)
     if (*level == NULL)
         *level = start_level(gd);
     print_level(gd, *level);
+    if ((*level)->level_completed == 'y')
+        print_cursor(gd->cursor, gd->w);
     keyboard_events_playing(level, gd);
 }
 

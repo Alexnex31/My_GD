@@ -91,6 +91,8 @@ level_list_t *create_level_list(gd_t *gd);
 void free_level(level_t *level);
 void print_level(gd_t *gd, level_t *level);
 level_t *start_level(gd_t *gd);
+void reset_attempt_display(level_t *level);
+int check_end_screen_buttons(end_level_screen_t *end_screen, int mx, int my);
 
 
 void keyboard_events_main_menu(main_m_t **menu, gd_t *gd);
@@ -101,6 +103,7 @@ void keyboard_events_playing(level_t **level, gd_t *gd);
 
 
 void load_level_data(char *levelname, level_t *level, gd_t *gd);
+void rewrite_level(level_t *level, gd_t *gd);
 
 
 void free_player(player_t *player);
