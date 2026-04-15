@@ -46,6 +46,7 @@ char *my_strcpy(char *dest, char const *src);
 int my_stricpy(char *dest, char const *src, int i);
 
 char **my_str_to_word_array(char *str);
+char **my_str_word_array_delim(char *str, char *delim);
 char *int_to_str(int nb);
 char *float_to_str(float nb);
 
@@ -105,6 +106,9 @@ void keyboard_events_playing(level_t **level, gd_t *gd);
 void load_level_data(char *levelname, level_t *level, gd_t *gd);
 void rewrite_level(level_t *level, gd_t *gd);
 
+void free_block(block_t *block);
+void free_spike(spike_t *spike);
+void free_block_list(block_t **list);
 
 void free_player(player_t *player);
 player_t *create_player(gd_t *gd);
@@ -112,5 +116,7 @@ player_t *create_player(gd_t *gd);
 
 void apply_physics(gd_t *gd, level_t *level, object_list_t *obj);
 void check_collisions(gd_t *gd, level_t *level, object_list_t *obj);
+
+void load_portal(char **arr, level_t *level, gd_t *gd);
 
 #endif

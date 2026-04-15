@@ -222,10 +222,16 @@ void jump(level_t *level, gd_t *gd)
 {
     if (level->level_completed == 'y')
         return;
-    
-    if (level->player->allow_jump == 'y') {
-        level->player->vy = 27;
-        level->player->allow_jump = 'n';
+
+    if (level->player->gamemode == 'c') {
+        if (level->player->allow_jump == 'y') {
+            level->player->vy = 26;
+            level->player->allow_jump = 'n';
+        }
+        return;
+    }
+    if (level->player->gamemode == 'p') {
+        level->player->vy += 3.5;
     }
 }
 
@@ -248,11 +254,12 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
                 return;
             }
         } else {
-            if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeySpace) {
+            if (gd->event->type == sfEvtMouseButtonPressed) {
                 jump(*level, gd);
+                return;
             }
-            if (gd->event->type == sfEvtMouseButtonPressed)
-                jump(*level, gd);
         }
     }
+    if (sfKeyboard_isKeyPressed(sfKeyUp) == sfTrue || sfKeyboard_isKeyPressed(sfKeySpace) == sfTrue)
+        jump(*level, gd);
 }

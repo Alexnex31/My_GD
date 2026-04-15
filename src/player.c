@@ -23,7 +23,7 @@ player_t *create_player(gd_t *gd)
     player->sprite = sfSprite_create();
     sfSprite_setTexture(player->sprite, gd->res->player_icon, sfTrue);
     sfSprite_setOrigin(player->sprite, (sfVector2f){50, 50});
-    player->pos = (sfVector2f){350, 790};
+    player->pos = (sfVector2f){400, 750};
     sfSprite_setPosition(player->sprite, player->pos);
     player->vy = 0;
     player->size = 2;

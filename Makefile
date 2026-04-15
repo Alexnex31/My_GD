@@ -20,6 +20,7 @@ SRC = src/gd.c \
 	src/level.c	\
 	src/player.c \
 	src/physics.c \
+	src/portal.c \
 	src/utilitary.c \
 	src/music.c \
 	src/cursor.c \
@@ -32,14 +33,14 @@ CC = epiclang
 
 CFLAGS = -Iinclude
 
-LDFLAGS = -l csfml-graphics -l csfml-window -lcsfml-system -lcsfml-audio
+LDFLAGS = -lm -l csfml-graphics -l csfml-window -lcsfml-system -lcsfml-audio
 
 NAME = my_gd
 
 all: $(NAME)
 
 $(NAME): $(OBJ)
-	epiclang $(OBJ) -Iinclude -l csfml-graphics -l csfml-window -lcsfml-system -lcsfml-audio -o $(NAME)
+	epiclang $(OBJ) -Iinclude -l csfml-graphics -l csfml-window -lcsfml-system -lcsfml-audio -lm -o $(NAME)
 
 clean:
 	rm -f $(OBJ)

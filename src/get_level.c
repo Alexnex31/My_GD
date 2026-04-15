@@ -45,7 +45,7 @@ int load_spike(char **arr, level_t *level, gd_t *gd, int nb_spikes)
 
 void load_object(char *line, level_t *level, gd_t *gd, int *nb_blocks, int *nb_spikes)
 {
-    char **arr = my_str_to_word_array(line);
+    char **arr = my_str_word_array_delim(line, " \n\0");
 
     if (strcmp(arr[0], "spike") == 0) {
         *nb_spikes = load_spike(arr, level, gd, *nb_spikes);
@@ -54,6 +54,11 @@ void load_object(char *line, level_t *level, gd_t *gd, int *nb_blocks, int *nb_s
     }
     if (strcmp(arr[0], "block") == 0) {
         *nb_blocks = load_block(arr, level, gd, *nb_blocks);
+        free_arr(arr);
+        return;
+    }
+    if (strcmp(arr[0], "portal") == 0) {
+        load_portal(arr, level, gd);
         free_arr(arr);
         return;
     }
@@ -74,7 +79,7 @@ block_t *create_ground(gd_t *gd)
 {
     block_t *ground = malloc(sizeof(block_t));
 
-    ground->pos = (sfVector2f){0, 840};
+    ground->pos = (sfVector2f){350, 850};
     ground->size = 1;
     ground->sprite = sfSprite_create();
     sfSprite_setTexture(ground->sprite, gd->res->ground, sfTrue);
@@ -90,6 +95,7 @@ void load_level_data(char *levelname, level_t *level, gd_t *gd)
     ssize_t nread;
     int nb_blocks = 0;
     int nb_spikes = 0;
+    sfVector2f sprite_ground_pos = {0, 850};
 
     if (f == NULL)
         return;
@@ -99,8 +105,12 @@ void load_level_data(char *levelname, level_t *level, gd_t *gd)
         return;
     }
     level->objects->ground = create_ground(gd);
+    level->objects->sprite_ground_pos = sprite_ground_pos;
+    level->objects->portal_blocks = NULL;
     level->objects->blocks = NULL;
     level->objects->spikes = NULL;
+    level->objects->portals = NULL;
+    level->objects->nb_portals = 0;
     manage_first_line(line, level, gd);
     nread = getline(&line, &len, f);
     while (nread > 0) {

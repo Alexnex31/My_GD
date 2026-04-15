@@ -33,6 +33,8 @@ void free_textures(textures_t *res)
         sfTexture_destroy(res->block);
     if (res->player_icon != NULL)
         sfTexture_destroy(res->player_icon);
+    if (res->ship_icon != NULL)
+        sfTexture_destroy(res->ship_icon);
     if (res->end_level_background != NULL)
         sfTexture_destroy(res->end_level_background);
     if (res->retry_button != NULL)
@@ -49,15 +51,15 @@ textures_t *load_textures(void)
     res->main_background = sfTexture_createFromFile("res/main_background.png", NULL);
     if (res->main_background == NULL)
         printf("Warning: Could not load res/main_background.png\n");
-    res->edi_background = sfTexture_createFromFile("res/editor_background.png", NULL);
+    res->edi_background = sfTexture_createFromFile("res/cecilya.png", NULL);
     if (res->edi_background == NULL)
-        printf("Warning: Could not load res/editor_background.png\n");
+        printf("Warning: Could not load res/cecilya.png\n");
     res->list_background = sfTexture_createFromFile("res/level_list_background.png", NULL);
     if (res->list_background == NULL)
         printf("Warning: Could not load res/level_list_background.png\n");
-    res->opt_background = sfTexture_createFromFile("res/opt_background.png", NULL);
+    res->opt_background = sfTexture_createFromFile("res/noe_background.jpeg", NULL);
     if (res->opt_background == NULL)
-        printf("Warning: Could not load res/opt_background.png\n");
+        printf("Warning: Could not load res/noe_background.jpeg\n");
     res->level_background = sfTexture_createFromFile("res/level_background.png", NULL);
     if (res->level_background == NULL)
         printf("Warning: Could not load res/level_background.png\n");
@@ -82,6 +84,9 @@ textures_t *load_textures(void)
     res->player_icon = sfTexture_createFromFile("res/player_icon.png", NULL);
     if (res->player_icon == NULL)
         printf("Warning: Could not load res/player_icon.png\n");
+    res->ship_icon = sfTexture_createFromFile("res/ship_icon.png", NULL);
+    if (res->ship_icon == NULL)
+        printf("Warning: Could not load res/ship_icon.png\n");
     res->end_level_background = sfTexture_createFromFile("res/end_level_background.png", NULL);
     if (res->end_level_background == NULL)
         printf("Warning: Could not load res/end_level_background.png\n");

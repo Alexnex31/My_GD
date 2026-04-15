@@ -51,6 +51,10 @@ void free_objects(object_list_t *obj_l)
         free_block(obj_l->ground);
         free_spike_list(obj_l->spikes);
         free_block_list(obj_l->blocks);
+        if (obj_l->portal_blocks != NULL) {
+            free_block_list(obj_l->portal_blocks);
+            obj_l->portal_blocks = NULL;
+        }
         free(obj_l);
     }
 }
@@ -109,8 +113,10 @@ void print_objects(gd_t *gd, level_t *level, object_list_t *obj)
 {
     int i = 0;
 
-    if (obj->ground != NULL)
+    if (obj->ground != NULL) {
+        sfSprite_setPosition(obj->ground->sprite, obj->sprite_ground_pos);
         sfRenderWindow_drawSprite(gd->w, obj->ground->sprite, NULL);
+    }
     if (obj->blocks != NULL) {
         while (obj->blocks[i] != NULL) {
             if (obj->blocks[i]->pos.x < 2000 && obj->blocks[i]->pos.x > -100) {
@@ -130,16 +136,31 @@ void print_objects(gd_t *gd, level_t *level, object_list_t *obj)
             i += 1;
         }
     }
+    i = 0;
+    if (obj->portals != NULL) {
+        while (obj->portals[i] != NULL) {
+            if (obj->portals[i]->pos.x < 2000 && obj->portals[i]->pos.x > -100) {
+                sfSprite_setPosition(obj->portals[i]->sprite, obj->portals[i]->pos);
+                sfRenderWindow_drawSprite(gd->w, obj->portals[i]->sprite, NULL);
+            }
+            i += 1;
+        }
+    }
 }
 
 void print_player(gd_t *gd, level_t *level, object_list_t *obj)
 {
     if (level->player != NULL) {
         if (level->player->sprite != NULL) {
-            if (level->player->gamemode == 'c' && (level->player->pos.y < 750) && level->player->allow_jump == 'n')
-                sfSprite_rotate(level->player->sprite, 4.5);
-            else
+            if (level->player->gamemode == 'c') {
+                if (level->player->pos.y < 750 && level->player->allow_jump == 'n')
+                    sfSprite_rotate(level->player->sprite, 5.4);
+                else
+                    sfSprite_setRotation(level->player->sprite, 0);
+            }
+            if (level->player->gamemode == 'p') {
                 sfSprite_setRotation(level->player->sprite, 0);
+            }
             sfSprite_setPosition(level->player->sprite, level->player->pos);
             sfRenderWindow_drawSprite(gd->w, level->player->sprite, NULL);
         }
@@ -237,6 +258,10 @@ void print_level(gd_t *gd, level_t *level)
     if (level->background != NULL)
         sfRenderWindow_drawSprite(gd->w, level->background, NULL);
     print_objects(gd, level, level->objects);
+    if (level->objects->portal_blocks != NULL) {
+        sfRenderWindow_drawSprite(gd->w, level->objects->portal_blocks[0]->sprite, NULL);
+        sfRenderWindow_drawSprite(gd->w, level->objects->portal_blocks[1]->sprite, NULL);
+    }
     print_player(gd, level, level->objects);
     print_ui_texts(gd, level);
     apply_physics(gd, level, level->objects);
@@ -278,6 +303,7 @@ void reset_attempt_display(level_t *level)
     sfText_setString(level->attempt_text, attempt_str);
     sfClock_restart(level->attempt_display_clock);
     level->show_attempt_text = 'y';
+    level->player->gamemode = 'c';
 }
 
 level_t *start_level(gd_t *gd)
@@ -305,6 +331,7 @@ level_t *start_level(gd_t *gd)
     level->objects = malloc(sizeof(object_list_t));
     level->speed = 1;
     level->shift = 0;
+    level->yshift = 0;
     level->level_end = 100;
     level->best = 0.0f;
     level->percent = 0.0f;

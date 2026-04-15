@@ -44,10 +44,21 @@ typedef struct block {
     int size;
 } block_t;
 
+typedef struct portal {
+    sfSprite *sprite;
+    sfVector2f pos;
+    char gamemode;
+    int size;
+} portal_t;
+
 typedef struct object_list {
     spike_t **spikes;
     block_t **blocks;
+    portal_t **portals;
+    block_t **portal_blocks;
     block_t *ground;
+    sfVector2f sprite_ground_pos;
+    int nb_portals;
 } object_list_t;
 
 typedef struct player {
@@ -76,6 +87,7 @@ typedef struct level {
     player_t *player;
     float speed;
     float shift;
+    float yshift;
     float level_end;
     float best;
     float percent;
@@ -139,6 +151,7 @@ typedef struct textures {
     sfTexture *spike;
     sfTexture *block;
     sfTexture *player_icon;
+    sfTexture *ship_icon;
     sfTexture *end_level_background;
     sfTexture *retry_button;
     sfTexture *quit_button;
