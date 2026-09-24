@@ -48,7 +48,8 @@ void free_spike_list(spike_t **list)
 void free_objects(object_list_t *obj_l)
 {
     if (obj_l != NULL) {
-        free_block(obj_l->ground);
+        if (obj_l->ground != NULL)
+            free_block(obj_l->ground);
         free_spike_list(obj_l->spikes);
         free_block_list(obj_l->blocks);
         if (obj_l->portal_blocks != NULL) {
@@ -109,7 +110,7 @@ void update_percent_display(level_t *level)
     sfText_setString(level->percent_text, percent_str);
 }
 
-void print_objects(gd_t *gd, level_t *level, object_list_t *obj)
+void print_objects(gd_t *gd, object_list_t *obj)
 {
     int i = 0;
 
@@ -148,7 +149,7 @@ void print_objects(gd_t *gd, level_t *level, object_list_t *obj)
     }
 }
 
-void print_player(gd_t *gd, level_t *level, object_list_t *obj)
+void print_player(gd_t *gd, level_t *level)
 {
     if (level->player != NULL) {
         if (level->player->sprite != NULL) {
@@ -189,7 +190,7 @@ void print_ui_texts(gd_t *gd, level_t *level)
 
 end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd)
 {
-    end_level_screen_t *end_screen = malloc(sizeof(end_level_screen_t));
+    end_level_screen_t *end_screen = xcalloc(1, sizeof(end_level_screen_t));
     char attempts_str[100];
     char percent_str[100];
     sfVector2f pos;
@@ -257,14 +258,14 @@ void print_level(gd_t *gd, level_t *level)
     
     if (level->background != NULL)
         sfRenderWindow_drawSprite(gd->w, level->background, NULL);
-    print_objects(gd, level, level->objects);
+    print_objects(gd, level->objects);
     if (level->objects->portal_blocks != NULL) {
         sfRenderWindow_drawSprite(gd->w, level->objects->portal_blocks[0]->sprite, NULL);
         sfRenderWindow_drawSprite(gd->w, level->objects->portal_blocks[1]->sprite, NULL);
     }
-    print_player(gd, level, level->objects);
+    print_player(gd, level);
     print_ui_texts(gd, level);
-    apply_physics(gd, level, level->objects);
+    apply_physics(level, level->objects);
     check_collisions(gd, level, level->objects);
 }
 
@@ -308,40 +309,24 @@ void reset_attempt_display(level_t *level)
 
 level_t *start_level(gd_t *gd)
 {
-    level_t *level = malloc(sizeof(level_t));
+    level_t *level = xcalloc(1, sizeof(level_t));
     char levelpath[256];
 
     level->background = sfSprite_create();
-    if (level->background == NULL) {
-        printf("Error: Failed to create background sprite\n");
-        level->objects = malloc(sizeof(object_list_t));
-        level->best = 0.0f;
-        level->percent = 0.0f;
-        level->attempts = 1;
-        level->lvl = gd->selected_level;
-        return level;
-    }
-    
-    if (gd->res->level_background == NULL) {
-        printf("Error: level_background texture is NULL\n");
-    } else {
-        sfSprite_setTexture(level->background, gd->res->level_background, sfTrue);
-    }
+    sfSprite_setTexture(level->background, gd->res->level_background, sfTrue);
     level->player = create_player(gd);
-    level->objects = malloc(sizeof(object_list_t));
+    level->objects = xcalloc(1, sizeof(object_list_t));
     level->speed = 1;
-    level->shift = 0;
-    level->yshift = 0;
     level->level_end = 100;
-    level->best = 0.0f;
-    level->percent = 0.0f;
-    level->attempts = 0;
     level->curr_attempts = 1;
     level->lvl = gd->selected_level;
     level->level_completed = 'n';
-    level->end_screen = NULL;
     snprintf(levelpath, 256, "levels/level%d", gd->selected_level);
-    load_level_data(levelpath, level, gd);
+    if (load_level_data(levelpath, level, gd) != 0) {
+        dprintf(2, "my_gd: could not load %s\n", levelpath);
+        free_level(level);
+        return NULL;
+    }
     level->attempts += 1;
     create_ui_texts(level, gd);
     return level;

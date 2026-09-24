@@ -9,7 +9,7 @@
 
 int load_block(char **arr, level_t *level, gd_t *gd, int nb_blocks)
 {
-    block_t *block = malloc(sizeof(block_t));
+    block_t *block = xcalloc(1, sizeof(block_t));
 
     nb_blocks += 1;
     block->pos = (sfVector2f){atof(arr[1]), atof(arr[2])};
@@ -27,7 +27,7 @@ int load_block(char **arr, level_t *level, gd_t *gd, int nb_blocks)
 
 int load_spike(char **arr, level_t *level, gd_t *gd, int nb_spikes)
 {
-    spike_t *spike = malloc(sizeof(spike_t));
+    spike_t *spike = xcalloc(1, sizeof(spike_t));
 
     nb_spikes += 1;
     spike->pos = (sfVector2f){atof(arr[1]), atof(arr[2])};
@@ -65,7 +65,7 @@ void load_object(char *line, level_t *level, gd_t *gd, int *nb_blocks, int *nb_s
     free_arr(arr);
 }
 
-void manage_first_line(char *line, level_t *level, gd_t *gd)
+void manage_first_line(char *line, level_t *level)
 {
     char **arr = my_str_to_word_array(line);
 
@@ -77,7 +77,7 @@ void manage_first_line(char *line, level_t *level, gd_t *gd)
 
 block_t *create_ground(gd_t *gd)
 {
-    block_t *ground = malloc(sizeof(block_t));
+    block_t *ground = xcalloc(1, sizeof(block_t));
 
     ground->pos = (sfVector2f){350, 850};
     ground->size = 1;
@@ -87,7 +87,7 @@ block_t *create_ground(gd_t *gd)
     return ground;
 }
 
-void load_level_data(char *levelname, level_t *level, gd_t *gd)
+int load_level_data(char *levelname, level_t *level, gd_t *gd)
 {
     FILE *f = fopen(levelname, "r");
     char *line = NULL;
@@ -98,11 +98,12 @@ void load_level_data(char *levelname, level_t *level, gd_t *gd)
     sfVector2f sprite_ground_pos = {0, 850};
 
     if (f == NULL)
-        return;
+        return -1;
     nread = getline(&line, &len, f);
     if (nread <= 0) {
+        free(line);
         fclose(f);
-        return;
+        return -1;
     }
     level->objects->ground = create_ground(gd);
     level->objects->sprite_ground_pos = sprite_ground_pos;
@@ -111,7 +112,7 @@ void load_level_data(char *levelname, level_t *level, gd_t *gd)
     level->objects->spikes = NULL;
     level->objects->portals = NULL;
     level->objects->nb_portals = 0;
-    manage_first_line(line, level, gd);
+    manage_first_line(line, level);
     nread = getline(&line, &len, f);
     while (nread > 0) {
         load_object(line, level, gd, &nb_blocks, &nb_spikes);
@@ -119,6 +120,7 @@ void load_level_data(char *levelname, level_t *level, gd_t *gd)
     }
     free(line);
     fclose(f);
+    return 0;
 }
 
 void rewrite_level(level_t *level, gd_t *gd)
@@ -126,7 +128,7 @@ void rewrite_level(level_t *level, gd_t *gd)
     FILE *f;
     FILE *tempf;
     char filename[256];
-    char temp_filename[256];
+    char temp_filename[262];
     char line[500];
     int line_num = 1;
     int curr_line_num = 1;
@@ -140,7 +142,7 @@ void rewrite_level(level_t *level, gd_t *gd)
         printf("Error opening file.");
         return;
     }
-    sprintf(temp_filename, "%s.temp", filename);
+    snprintf(temp_filename, sizeof(temp_filename), "%s.temp", filename);
     tempf = fopen(temp_filename, "w");
     if (tempf == NULL) {
         printf("Error creating temporary file.");
@@ -158,6 +160,5 @@ void rewrite_level(level_t *level, gd_t *gd)
     }
     fclose(f);
     fclose(tempf);
-    remove(filename);
     rename(temp_filename, filename);
 }

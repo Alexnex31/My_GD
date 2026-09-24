@@ -20,7 +20,7 @@ void print_editor_menu(editor_m_t *om, sfRenderWindow *w)
 
 editor_m_t *create_editor_menu(gd_t *gd)
 {
-    editor_m_t *menu = malloc(sizeof(editor_m_t));
+    editor_m_t *menu = xcalloc(1, sizeof(editor_m_t));
 
     sfMusic_stop(gd->musics->main);
     menu->background = sfSprite_create();

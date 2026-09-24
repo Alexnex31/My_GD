@@ -27,7 +27,7 @@ void print_cursor(cursor_t *cursor, sfRenderWindow *window)
 
 cursor_t *create_cursor(void)
 {
-    cursor_t *cursor = malloc(sizeof(cursor_t));
+    cursor_t *cursor = xcalloc(1, sizeof(cursor_t));
     sfVector2f v = create_vector_f(0.55, 0.55);
 
     cursor->cursor_s = sfSprite_create();

@@ -1,52 +1,65 @@
 ##
 ## ALEXNEX PROJECT, 2026
-## makefile
+## Makefile
 ## File description:
-## makefile for my gd project
+## Makefile for my_gd
 ##
 
-SRC = src/gd.c \
-	src/button.c \
-	src/main_menu.c \
-	src/option_menu.c \
-	src/editor_menu.c \
-	src/level_list_menu.c \
-	src/keyboard_events.c \
-	src/get_level.c \
-	src/my_putchar.c \
-	src/my_put_nbr.c \
-	src/my_putstr.c \
-	src/window.c \
-	src/level.c	\
-	src/player.c \
-	src/physics.c \
-	src/portal.c \
-	src/utilitary.c \
-	src/music.c \
-	src/cursor.c \
-	src/my_strcpy.c \
-	src/my_str_to_wordarray.c
+CC        = gcc
+CFLAGS    = -Wall -Wextra -Iinclude -MMD -MP -ffp-contract=off
+LDLIBS    = -lcsfml-graphics -lcsfml-window -lcsfml-system -lcsfml-audio -lm
 
-OBJ = $(SRC:.c=.o)
+BUILD     ?= release
+ifeq ($(BUILD),debug)
+    CFLAGS  += -g3 -O0 -fsanitize=address,undefined
+    LDFLAGS += -fsanitize=address,undefined
+    NAME    = my_gd_debug
+else
+    CFLAGS  += -O2
+    NAME    = my_gd
+endif
+OUT       = build/$(BUILD)
 
-CC = epiclang
-
-CFLAGS = -Iinclude
-
-LDFLAGS = -lm -l csfml-graphics -l csfml-window -lcsfml-system -lcsfml-audio
-
-NAME = my_gd
+SIM_SRC   = $(wildcard src/sim/*.c)
+GAME_SRC  = $(wildcard src/*.c)
+SIM_OBJ   = $(SIM_SRC:%.c=$(OUT)/%.o)
+GAME_OBJ  = $(GAME_SRC:%.c=$(OUT)/%.o)
+DEP       = $(SIM_OBJ:.o=.d) $(GAME_OBJ:.o=.d)
+TEST_SRC  = $(wildcard tests/*.c)
+TEST_FLAGS = -Wall -Wextra -Iinclude -ffp-contract=off -g -fsanitize=address,undefined
 
 all: $(NAME)
 
-$(NAME): $(OBJ)
-	epiclang $(OBJ) -Iinclude -l csfml-graphics -l csfml-window -lcsfml-system -lcsfml-audio -lm -o $(NAME)
+$(NAME): $(GAME_OBJ) $(SIM_OBJ)
+	$(CC) $^ -o $@ $(LDFLAGS) $(LDLIBS)
+
+$(OUT)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+debug:
+	$(MAKE) BUILD=debug
+
+# Tests link ONLY the simulation: no CSFML, no window, no audio.
+unit_tests: $(TEST_SRC) $(SIM_SRC)
+	$(CC) $(TEST_FLAGS) $^ -o $@ -lm
+
+test: unit_tests
+	./unit_tests
+
+fuzz_parser: tests/fuzz/fuzz_parser.c $(SIM_SRC)
+	clang -Iinclude -ffp-contract=off -g -fsanitize=fuzzer,address,undefined $^ -o $@ -lm
 
 clean:
-	rm -f $(OBJ)
-	find -type f \( -name '*~' -or -name '#*#' \) -delete
+	rm -rf build
+	find . -type f \( -name '*~' -or -name '#*#' \) -delete
 
 fclean: clean
-	rm -f $(NAME)
+	rm -f my_gd my_gd_debug unit_tests fuzz_parser
 
-re: fclean all
+re: fclean
+	$(MAKE) all
+
+-include $(DEP)
+
+.PHONY: all debug test clean fclean re

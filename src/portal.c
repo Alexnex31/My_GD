@@ -2,7 +2,7 @@
 
 void load_portal(char **arr, level_t *level, gd_t *gd)
 {
-    portal_t *portal = malloc(sizeof(portal_t));
+    portal_t *portal = xcalloc(1, sizeof(portal_t));
 
     portal->pos = (sfVector2f){atof(arr[1]), atof(arr[2])};
     if (atof(arr[1]) + 500 > level->level_end)

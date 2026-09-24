@@ -5,20 +5,10 @@
 ** header file to define structures
 */
 
-#include "mygd.h"
-
 #ifndef GD_STRUCT_H
     #define GD_STRUCT_H
-
-typedef struct sound {
-    sfSound *s;
-    sfSoundBuffer *sb;
-} sound_t;
-
-typedef struct back_mus {
-    sfSoundBuffer *sbuf;
-    sfSound *sound;
-} back_mus_t;
+    #include <SFML/Graphics.h>
+    #include <SFML/Audio.h>
 
 typedef struct cursor {
     sfSprite *cursor_s;

@@ -94,7 +94,7 @@ char **fill_names_list(void)
     if (d == NULL)
         return NULL;
     dir = readdir(d);
-    names = malloc(sizeof(char *) * (nb + 1));
+    names = xcalloc(nb + 1, sizeof(char *));
     while (dir != NULL) {
         if (dir->d_name[0] != '.') {
             names[i] = strdup(dir->d_name);
@@ -156,7 +156,7 @@ char *create_display_name(char *filename)
 
 level_button_t *create_level_button(char *filename, int index, gd_t *gd)
 {
-    level_button_t *lb = malloc(sizeof(level_button_t));
+    level_button_t *lb = xcalloc(1, sizeof(level_button_t));
     char filepath[256];
     char *attempts_str;
     char *best_str;
@@ -198,7 +198,7 @@ level_button_t *create_level_button(char *filename, int index, gd_t *gd)
 
 level_list_t *create_level_list(gd_t *gd)
 {
-    level_list_t *menu = malloc(sizeof(level_list_t));
+    level_list_t *menu = xcalloc(1, sizeof(level_list_t));
     int i = 0;
 
     sfMusic_stop(gd->musics->main);
@@ -207,7 +207,7 @@ level_list_t *create_level_list(gd_t *gd)
     sfSprite_setTexture(menu->background, gd->res->list_background, sfTrue);
     menu->names = fill_names_list();
     menu->nb_levels = count_levels();
-    menu->level_buttons = malloc(sizeof(level_button_t *) * menu->nb_levels);
+    menu->level_buttons = xcalloc(menu->nb_levels + 1, sizeof(level_button_t *));
     while (i < menu->nb_levels && menu->names[i] != NULL) {
         menu->level_buttons[i] = create_level_button(menu->names[i], i, gd);
         i += 1;

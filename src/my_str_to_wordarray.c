@@ -66,7 +66,7 @@ char **my_str_to_word_array(char *str)
     int j = 0;
     int a = next_alphanumerical(str, 0);
 
-    tab = malloc(sizeof(char *) * (unsigned long)my_strlen(str));
+    tab = xcalloc((unsigned long)my_strlen(str) + 2, sizeof(char *));
     for (int i = a; i < my_strlen(str) && tab != NULL; i++) {
         if (my_is_alphanumerical(str, i) == 0 || str[i] == '\0') {
             tab[j] = my_create_str(str, a, i);
@@ -113,7 +113,7 @@ char **my_str_word_array_delim(char *str, char *delim)
     int j = 0;
     int a = next_alphanumerical_delim(str, 0, delim);
 
-    tab = malloc(sizeof(char *) * (unsigned long)my_strlen(str));
+    tab = xcalloc((unsigned long)my_strlen(str) + 2, sizeof(char *));
     for (int i = a; i < my_strlen(str) && tab != NULL; i++) {
         if (my_is_alphanumerical_delim(str, i, delim) == 0 || str[i] == '\0') {
             tab[j] = my_create_str(str, a, i);

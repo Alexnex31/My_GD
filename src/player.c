@@ -18,7 +18,7 @@ void free_player(player_t *player)
 
 player_t *create_player(gd_t *gd)
 {
-    player_t *player = malloc(sizeof(player_t));
+    player_t *player = xcalloc(1, sizeof(player_t));
 
     player->sprite = sfSprite_create();
     sfSprite_setTexture(player->sprite, gd->res->player_icon, sfTrue);

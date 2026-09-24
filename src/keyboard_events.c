@@ -218,7 +218,7 @@ void handle_end_screen_click(level_t **level, gd_t *gd, int mx, int my)
     }
 }
 
-void jump(level_t *level, gd_t *gd)
+void jump(level_t *level)
 {
     if (level->level_completed == 'y')
         return;
@@ -255,11 +255,11 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
             }
         } else {
             if (gd->event->type == sfEvtMouseButtonPressed) {
-                jump(*level, gd);
+                jump(*level);
                 return;
             }
         }
     }
     if (sfKeyboard_isKeyPressed(sfKeyUp) == sfTrue || sfKeyboard_isKeyPressed(sfKeySpace) == sfTrue)
-        jump(*level, gd);
+        jump(*level);
 }

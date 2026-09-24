@@ -20,7 +20,7 @@ void print_option_menu(option_m_t *om, sfRenderWindow *w)
 
 option_m_t *create_option_menu(gd_t *gd)
 {
-    option_m_t *menu = malloc(sizeof(option_m_t));
+    option_m_t *menu = xcalloc(1, sizeof(option_m_t));
 
     sfMusic_stop(gd->musics->main);
     menu->background = sfSprite_create();

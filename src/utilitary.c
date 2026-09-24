@@ -7,13 +7,15 @@
 
 #include "mygd.h"
 
-sfVector2u create_vector(int x, int y)
+void *xcalloc(size_t n, size_t size)
 {
-    sfVector2u vector;
+    void *p = calloc(n, size);
 
-    vector.x = x;
-    vector.y = y;
-    return vector;
+    if (p == NULL) {
+        write(2, "my_gd: out of memory\n", 21);
+        exit(84);
+    }
+    return p;
 }
 
 sfVector2f create_vector_f(float x, float y)

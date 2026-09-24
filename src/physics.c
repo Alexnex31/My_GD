@@ -77,7 +77,7 @@ void load_new_player_texture(player_t *player, char gamemode, gd_t *gd)
     }
 }
 
-void player_dead(player_t *player, level_t *level, object_list_t *obj, gd_t *gd)
+void player_dead(player_t *player, level_t *level, gd_t *gd)
 {
     if (level->percent > level->best) {
         level->best = level->percent;
@@ -212,17 +212,15 @@ void apply_gravity(level_t *level)
     level->player->pos.y -= level->player->vy;
 }
 
-void check_portal_boundary(gd_t *gd, level_t *level)
+void check_portal_boundary(level_t *level)
 {
     float player_radius = 25 * level->player->size;
-    float top_kill_y;
     float bottom_kill_y;
 
     if (level->objects->portal_blocks == NULL || level->player->gamemode == 'c')
         return;
     if (level->player->state == 'd')
         return;
-    top_kill_y    = level->objects->portal_blocks[0]->pos.y;
     bottom_kill_y = level->objects->portal_blocks[1]->pos.y;
 
     if (level->player->pos.y <= 100 + player_radius) {
@@ -284,13 +282,13 @@ void check_ground_collision(level_t *level)
     }
 }
 
-void apply_physics(gd_t *gd, level_t *level, object_list_t *obj)
+void apply_physics(level_t *level, object_list_t *obj)
 {
     if (level->level_completed == 'y')
         return;
     move_objects(level, obj);
     apply_gravity(level);
-    check_portal_boundary(gd, level);
+    check_portal_boundary(level);
 }
 
 void level_complete(level_t *level)
@@ -323,13 +321,13 @@ void check_spike(gd_t *gd, level_t *level, object_list_t *obj, int i)
     
     if (player_right > spike_left && player_left < spike_right &&
         player_bottom > spike_top && player_top < spike_bottom) {
-        player_dead(level->player, level, level->objects, gd);
+        player_dead(level->player, level, gd);
     }
 }
 
-block_t *create_boundary_block(portal_t *portal, gd_t *gd, sfVector2f *pos, sfVector2f *sprite_pos)
+block_t *create_boundary_block(gd_t *gd, sfVector2f *pos, sfVector2f *sprite_pos)
 {
-    block_t *block = malloc(sizeof(block_t));
+    block_t *block = xcalloc(1, sizeof(block_t));
 
     block->size = 2;
     block->pos = *pos;
@@ -339,15 +337,15 @@ block_t *create_boundary_block(portal_t *portal, gd_t *gd, sfVector2f *pos, sfVe
     return block;
 }
 
-void create_boundaries(block_t **list, portal_t *portal, gd_t *gd)
+void create_boundaries(block_t **list, gd_t *gd)
 {
     sfVector2f top_pos    = {325.0f, 50};
     sfVector2f top_sprite = {0.0f, 0.0f};
     sfVector2f bot_pos    = {325.0f, 950};
     sfVector2f bot_sprite = {0.0f, 950};
 
-    list[0] = create_boundary_block(portal, gd, &top_pos, &top_sprite);
-    list[1] = create_boundary_block(portal, gd, &bot_pos, &bot_sprite);
+    list[0] = create_boundary_block(gd, &top_pos, &top_sprite);
+    list[1] = create_boundary_block(gd, &bot_pos, &bot_sprite);
     list[2] = NULL;
 }
 
@@ -357,14 +355,14 @@ void remove_create_portal_boundaries(level_t *level, gd_t *gd, portal_t *portal)
         free_block_list(level->objects->portal_blocks);
         level->objects->portal_blocks = NULL;
         if (portal->gamemode == 'p') {
-            level->objects->portal_blocks = malloc(sizeof(block_t *) * 3);
-            create_boundaries(level->objects->portal_blocks, portal, gd);
+            level->objects->portal_blocks = xcalloc(3, sizeof(block_t *));
+            create_boundaries(level->objects->portal_blocks, gd);
         }
         return;
     }
     if (portal->gamemode == 'p') {
-        level->objects->portal_blocks = malloc(sizeof(block_t *) * 3);
-        create_boundaries(level->objects->portal_blocks, portal, gd);
+        level->objects->portal_blocks = xcalloc(3, sizeof(block_t *));
+        create_boundaries(level->objects->portal_blocks, gd);
     }
 }
 
@@ -479,7 +477,7 @@ void check_on_block(gd_t *gd, level_t *level, object_list_t *obj, int i)
         level->player->allow_jump = 'y';
     } else {
         if (side == 'l') {
-            player_dead(level->player, level, level->objects, gd);
+            player_dead(level->player, level, gd);
             return;
         }
         if (level->player->gamemode == 'p' && side == 'b') {
@@ -487,7 +485,7 @@ void check_on_block(gd_t *gd, level_t *level, object_list_t *obj, int i)
             level->player->vy = 0;
             return;
         }
-        player_dead(level->player, level, level->objects, gd);
+        player_dead(level->player, level, gd);
     }
 }
 

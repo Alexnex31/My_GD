@@ -7,12 +7,6 @@
 
 #include "mygd.h"
 
-void window_disp_clear(sfRenderWindow *window)
-{
-    sfRenderWindow_display(window);
-    sfRenderWindow_clear(window, sfTransparent);
-}
-
 void close_window(sfRenderWindow *window)
 {
     sfRenderWindow_close(window);

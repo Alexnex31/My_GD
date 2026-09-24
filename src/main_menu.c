@@ -37,7 +37,7 @@ void print_main_menu(main_m_t *m, sfRenderWindow *w)
 
 main_m_t *create_main_menu(gd_t *gd)
 {
-    main_m_t *menu = malloc(sizeof(main_m_t));
+    main_m_t *menu = xcalloc(1, sizeof(main_m_t));
     sfVector2f title_pos = {720, 220};
 
     if (menu == NULL)

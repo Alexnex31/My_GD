@@ -1,4 +1,12 @@
-coucou
-level1.txt
-log.txt
+build/
 *.o
+*.d
+my_gd
+my_gd_debug
+unit_tests
+fuzz_parser
+save/
+*.temp
+*.tmp
+*~
+\#*\#

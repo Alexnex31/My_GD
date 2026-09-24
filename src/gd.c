@@ -1,8 +1,8 @@
 /*
 ** ALEXNEX PROJECT, 2026
-** hunter
+** gd
 ** File description:
-** my_hunter main file
+** my_gd main file
 */
 
 #include "mygd.h"
@@ -44,59 +44,49 @@ void free_textures(textures_t *res)
     free(res);
 }
 
+static sfTexture *load_texture(const char *path)
+{
+    sfTexture *tex = sfTexture_createFromFile(path, NULL);
+
+    if (tex == NULL) {
+        dprintf(2, "my_gd: missing asset %s\n", path);
+        exit(84);
+    }
+    return tex;
+}
+
 textures_t *load_textures(void)
 {
-    textures_t *res = malloc(sizeof(textures_t));
+    textures_t *res = xcalloc(1, sizeof(textures_t));
 
-    res->main_background = sfTexture_createFromFile("res/main_background.png", NULL);
-    if (res->main_background == NULL)
-        printf("Warning: Could not load res/main_background.png\n");
-    res->edi_background = sfTexture_createFromFile("res/cecilya.png", NULL);
-    if (res->edi_background == NULL)
-        printf("Warning: Could not load res/cecilya.png\n");
-    res->list_background = sfTexture_createFromFile("res/level_list_background.png", NULL);
-    if (res->list_background == NULL)
-        printf("Warning: Could not load res/level_list_background.png\n");
-    res->opt_background = sfTexture_createFromFile("res/noe_background.jpeg", NULL);
-    if (res->opt_background == NULL)
-        printf("Warning: Could not load res/noe_background.jpeg\n");
-    res->level_background = sfTexture_createFromFile("res/level_background.png", NULL);
-    if (res->level_background == NULL)
-        printf("Warning: Could not load res/level_background.png\n");
-    res->play_button = sfTexture_createFromFile("res/play_button.png", NULL);
-    if (res->play_button == NULL)
-        printf("Warning: Could not load res/play_button.png\n");
-    res->opt_button = sfTexture_createFromFile("res/param_button.png", NULL);
-    if (res->opt_button == NULL)
-        printf("Warning: Could not load res/param_button.png\n");
-    res->onli_button = sfTexture_createFromFile("res/online_button.png", NULL);
-    if (res->onli_button == NULL)
-        printf("Warning: Could not load res/online_button.png\n");
-    res->ground = sfTexture_createFromFile("res/ground.png", NULL);
-    if (res->ground == NULL)
-        printf("Warning: Could not load res/ground.png\n");
-    res->spike = sfTexture_createFromFile("res/spike.png", NULL);
-    if (res->spike == NULL)
-        printf("Warning: Could not load res/spike.png\n");
-    res->block = sfTexture_createFromFile("res/block.png", NULL);
-    if (res->block == NULL)
-        printf("Warning: Could not load res/block.png\n");
-    res->player_icon = sfTexture_createFromFile("res/player_icon.png", NULL);
-    if (res->player_icon == NULL)
-        printf("Warning: Could not load res/player_icon.png\n");
-    res->ship_icon = sfTexture_createFromFile("res/ship_icon.png", NULL);
-    if (res->ship_icon == NULL)
-        printf("Warning: Could not load res/ship_icon.png\n");
-    res->end_level_background = sfTexture_createFromFile("res/end_level_background.png", NULL);
-    if (res->end_level_background == NULL)
-        printf("Warning: Could not load res/end_level_background.png\n");
-    res->retry_button = sfTexture_createFromFile("res/retry_button.png", NULL);
-    if (res->retry_button == NULL)
-        printf("Warning: Could not load res/retry_button.png\n");
-    res->quit_button = sfTexture_createFromFile("res/quit_button.png", NULL);
-    if (res->quit_button == NULL)
-        printf("Warning: Could not load res/quit_button.png\n");
+    res->main_background = load_texture("res/main_background.png");
+    res->edi_background = load_texture("res/cecilya.png");
+    res->list_background = load_texture("res/level_list_background.png");
+    res->opt_background = load_texture("res/noe_background.jpeg");
+    res->level_background = load_texture("res/level_background.png");
+    res->play_button = load_texture("res/play_button.png");
+    res->opt_button = load_texture("res/param_button.png");
+    res->onli_button = load_texture("res/online_button.png");
+    res->ground = load_texture("res/ground.png");
+    res->spike = load_texture("res/spike.png");
+    res->block = load_texture("res/block.png");
+    res->player_icon = load_texture("res/player_icon.png");
+    res->ship_icon = load_texture("res/ship_icon.png");
+    res->end_level_background = load_texture("res/end_level_background.png");
+    res->retry_button = load_texture("res/retry_button.png");
+    res->quit_button = load_texture("res/quit_button.png");
     return res;
+}
+
+static sfMusic *load_music(const char *path)
+{
+    sfMusic *music = sfMusic_createFromFile(path);
+
+    if (music == NULL) {
+        dprintf(2, "my_gd: missing asset %s\n", path);
+        exit(84);
+    }
+    return music;
 }
 
 void free_musics(music_t *musics)
@@ -116,12 +106,12 @@ void free_musics(music_t *musics)
 
 music_t *load_musics(void)
 {
-    music_t *musics = malloc(sizeof(music_t));
+    music_t *musics = xcalloc(1, sizeof(music_t));
 
-    musics->main = sfMusic_createFromFile("res/menuLoop.mp3");
-    musics->editor = sfMusic_createFromFile("res/back_mus.ogg");
-    musics->param = sfMusic_createFromFile("res/back_mus.ogg");
-    musics->level1 = sfMusic_createFromFile("res/back_mus.ogg");
+    musics->main = load_music("res/menuLoop.mp3");
+    musics->editor = load_music("res/back_mus.ogg");
+    musics->param = load_music("res/back_mus.ogg");
+    musics->level1 = load_music("res/back_mus.ogg");
     return musics;
 }
 
@@ -138,35 +128,31 @@ void free_gd(gd_t *gd)
 
 gd_t *create_gd(void)
 {
-    gd_t *gd = malloc(sizeof(gd_t));
+    gd_t *gd = xcalloc(1, sizeof(gd_t));
 
     gd->res = load_textures();
     gd->musics = load_musics();
     gd->main_font = sfFont_createFromFile("res/GDfont.ttf");
-    if (gd->main_font == NULL)
-        printf("Warning: Could not load res/GDfont.ttf\n");
+    if (gd->main_font == NULL) {
+        dprintf(2, "my_gd: missing asset res/GDfont.ttf\n");
+        exit(84);
+    }
     gd->w = create_window(1920, 1080);
     gd->cursor = create_cursor();
-    gd->event = malloc(sizeof(sfEvent));
+    gd->event = xcalloc(1, sizeof(sfEvent));
     gd->menu = 'm';
     gd->selected_level = 1;
     return gd;
-}
-
-static int my_strlen(char *str)
-{
-    int i = 0;
-
-    while (str[i] != '\0') {
-        i += 1;
-    }
-    return i;
 }
 
 void handle_playing(gd_t *gd, level_t **level)
 {
     if (*level == NULL)
         *level = start_level(gd);
+    if (*level == NULL) {
+        gd->menu = 'l';
+        return;
+    }
     print_level(gd, *level);
     if ((*level)->level_completed == 'y')
         print_cursor(gd->cursor, gd->w);
@@ -245,32 +231,42 @@ int main_loop(gd_t *gd)
     return 0;
 }
 
-int info(char *argv)
+static void chdir_to_executable(void)
 {
-    if (argv[0] == '-' && argv[1] == 'h') {
-        my_putstr("GD :)\n");
-        my_putstr("🭀 🭁 🭂 🭃 🭄 🭅 🭆 🭇 🭈 🭉 🭊 🭋 🭌 🭍 🭎 🭏 🭐 🭑 🭒 🭓 🭔 🭕 🭖 🭗 🭘 🭙\n");
-        return 0;
-    }
-    write(2, "wrong arguments, try : ""./my_hunter -h or ./my_hunter\n", 54);
-    return 84;
+    char path[4096];
+    ssize_t n = readlink("/proc/self/exe", path, sizeof(path) - 1);
+    char *slash;
+
+    if (n <= 0)
+        return;
+    path[n] = '\0';
+    slash = strrchr(path, '/');
+    if (slash == NULL)
+        return;
+    *slash = '\0';
+    if (chdir(path) != 0)
+        dprintf(2, "my_gd: cannot enter %s\n", path);
+}
+
+static void print_usage(int fd)
+{
+    const char *msg = "usage: ./my_gd [-h]\n";
+
+    write(fd, msg, strlen(msg));
 }
 
 int main(int argc, char **argv)
 {
-    gd_t *gd;
-
     if (argc == 1) {
-        gd = create_gd();
-        return main_loop(gd);
+        chdir_to_executable();
+        return main_loop(create_gd());
     }
-    if (argc > 2) {
-        write(2, "too many arguments, try : ", 27);
-        write(2, "./my_hunter -h or ./my_gd\n", 31);
-        return 84;
+    if (argc == 2 && strcmp(argv[1], "-h") == 0) {
+        my_putstr("GD :)\n");
+        my_putstr("🭀 🭁 🭂 🭃 🭄 🭅 🭆 🭇 🭈 🭉 🭊 🭋 🭌 🭍 🭎 🭏 🭐 🭑 🭒 🭓 🭔 🭕 🭖 🭗 🭘 🭙\n");
+        print_usage(1);
+        return 0;
     }
-    if (my_strlen(argv[1]) == 2)
-        return info(argv[1]);
-    write(2, "wrong arguments, try : ""./my_gd -h or ./my_gd\n", 54);
+    print_usage(2);
     return 84;
 }
