@@ -63,6 +63,7 @@ The verification tools are in **`my_gd_lab.zip`** (delivered with this plan, see
 - [Appendix E: The verification lab](#appendix-e-the-verification-lab)
 - [Appendix F: Coordinate spaces and units cheat sheet](#appendix-f-coordinate-spaces-and-units-cheat-sheet)
 - [Appendix G: The geometry, formula by formula](#appendix-g-the-geometry-formula-by-formula)
+- [Appendix H: Build order, file by file](#appendix-h-build-order-file-by-file)
 - [Footnote: a future fork with another graphics library](#footnote-a-future-fork-with-another-graphics-library)
 
 ---
@@ -611,7 +612,7 @@ So the simulation stores velocities in **px per tick** and accelerations in **px
     #define CAM_TOP_MARGIN      200.0
     #define CAM_BOTTOM_MARGIN   790.0
     #define CAM_TAU             0.08    /* seconds, smoothing time constant (3.5)          */
-    #define CAM_LERP            0.050750 /* = 1 - exp(-1 / (TICK_RATE * CAM_TAU))          */
+    #define CAM_LERP            0.0507502406   /* = 1 - exp(-1/(TICK_RATE*CAM_TAU)) */
 
     /* Ship corridor (5.2) */
     #define CORRIDOR_MAX_HEIGHT 1000.0   /* the tallest mode corridor (ship, UFO, wave) */
@@ -3327,6 +3328,212 @@ Start from `14695981039346656037ULL`. The sim never produces a NaN (G.10), so th
 - **`t` is always clamped** to `[0, 1]` before use, and a contact at `t = 0` is legal (already touching and moving in).
 - **The only tolerances in the engine** are `CONTACT_SKIN` (1/1024 px: how far the circle is placed off a tilted face, and the `2 ×` growth of the jump zone), `RISE_EPSILON` (1/4096 px/tick: the momentum comparisons of the jump zone and the step), the 1/1024 px grid at load, and the `1e-12` axis-deduplication test at load. Nothing else compares with an epsilon; everywhere else, exact comparisons are the specification.
 - **Build with `-ffp-contract=off`** (Phase 1) so no `a * b + c` is fused: with contraction, two compilers can disagree in the last bit and the determinism tests fail.
+
+---
+
+## Appendix H: Build order, file by file
+
+The phases say what the engine does; this says what to write, in the order to write it. Every function here is fully specified somewhere in the plan, and the **Spec** column says where. Each step ends with tests that pass before the next one starts.
+
+Files under `src/sim/` never include an SFML header (Principle: 2.2). Their prototypes live in `include/sim/`, one header per module, except the engine-internal ones (`move`, `zone`, `interact`, `player`, `camera`), which share `include/sim/internal.h` because only the sim calls them.
+
+---
+
+### Step 1: headers, the mode table, the test runner
+
+**`include/sim/constants.h`** — 3.2, as written there. **`include/sim/sim_types.h`** — 3.3: `vec2_t`, `rect_t`, `input_t`, the enums, `hitbox_t`, `object_t`, `level_data_t`, `player_t`, `camera_t`, `ship_bounds_t`, `run_state_t`, `sim_snapshot_t`, `touch_t`, `face_t`, `contact_t`, `event_t`, `sim_t`, and the two `spent` helpers. **`include/sim/sim.h`** — 2.3 (already written).
+
+**`include/sim/modes.h` + `src/sim/modes.c`**
+
+| Function | Job | Spec |
+|---|---|---|
+| `const mode_ops_t MODES[MODE_COUNT]` | the table, designated initializers | 3.3, FEATURES 6.1 |
+| `int mode_from_name(const char *name)` | `"cube"` → `MODE_CUBE`, `-1` if unknown | 5.5 |
+
+**`include/sim/alloc.h` + `src/sim/alloc.c`**
+
+| Function | Job | Spec |
+|---|---|---|
+| `void *sim_xcalloc(size_t n, size_t size)` | calloc or exit 84; the sim's own copy, so it doesn't depend on the game layer | 3.3 |
+
+**`tests/main.c`** — the `CHECK` macro and the list of test functions (8.1). **`tests/test_constants.c`**
+
+Done when `make` still builds the game, `make test` runs, and these pass: each trigonometric literal equals its `double` recomputation, `CAM_LERP == 1 - exp(-1 / (TICK_RATE * CAM_TAU))` to 1e-9, `PER_TICK(SCROLL_SPEED) == 4.3275`, and a ship held from `vy = 0` settles at exactly `PER_TICK(SHIP_MAX_VY)`.
+
+---
+
+### Step 2: the geometry
+
+Pure functions, no player, no tick. This is the step to be slow on: everything later assumes it's right.
+
+**`include/sim/geom.h`** (static inline): `dot`, `cross`, `vadd`, `vsub`, `vscale`, `vlen`, `rect_overlap`. G.1.
+
+**`include/sim/hitbox.h` + `src/sim/hitbox.c`**
+
+| Function | Job | Spec |
+|---|---|---|
+| `static double grid(double v)` | round to 1/1024 px | 4.2 |
+| `static vec2_t rotate_point(vec2_t p, vec2_t c, double deg)` | rotate around the rect's center | 4.2 |
+| `static rect_t bounds_of(const vec2_t *v, int n)` | AABB | G.2 |
+| `static void ensure_clockwise(vec2_t *v, int n)` | signed area, reverse if negative | G.2 |
+| `static void build_faces(hitbox_t *h)` | `face_kind`, `face_n`, `face_off` per edge | G.2 |
+| `static void build_axes(hitbox_t *h)` | keep non-axis-parallel normals, deduplicate, fill `axis_lo/hi` | G.2 |
+| `void hitbox_build_poly(hitbox_t *h, const vec2_t *local, int n, rect_t rect, double deg)` | the whole build | 4.2, G.2 |
+| `void hitbox_build_circle(hitbox_t *h, rect_t rect, double r)` | saws; a `SHAPE_CIRCLE` hitbox | FEATURES 10.6 |
+| `void hitbox_for_object(object_t *o)` | local shape from the type, then `hitbox_build_*` | 4.2 table |
+| `vec2_t hitbox_axis(const hitbox_t *h, int k)` | `k = 0` → `(0,1)`, `k = 1` → `(1,0)`, else `axes[k-2]` | G.2 |
+| `double hitbox_lo(const hitbox_t *h, int k)`, `hitbox_hi` | the matching projections | G.2 |
+| `bool up_facing_horizontal_face(const hitbox_t *h, int i, double g, face_t *out)` | edge `i` if horizontal and facing the player's up | G.7 |
+
+**`include/sim/sweep.h` + `src/sim/sweep.c`**
+
+| Function | Job | Spec |
+|---|---|---|
+| `bool sweep_box_poly(vec2_t c, double h, vec2_t d, const hitbox_t *hb, contact_t *out)` | the square's contact sweep | 4.3 |
+| `double sweep_box_touch(vec2_t c, double h, vec2_t d, const hitbox_t *hb)` | first touch time, `INFINITY` if none | G.3 |
+| `bool overlap_box_poly(vec2_t c, double h, const hitbox_t *hb)` | static overlap, touching excluded | G.3 |
+| `bool sweep_circle_poly(vec2_t c, double r, vec2_t d, const hitbox_t *hb, face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out)` | the circle's contact sweep, filtered | G.4, G.9 |
+| `double sweep_circle_touch(vec2_t c, double r, vec2_t d, const hitbox_t *hb)` | same, unfiltered, time only | G.4 |
+| `double poly_distance(vec2_t c, const hitbox_t *hb)` | distance from a point to a convex polygon, 0 inside | G.4 |
+| `bool overlap_circle_poly(vec2_t c, double r, const hitbox_t *hb)` | `poly_distance < r` | G.4 |
+| `int clip_half_plane(const vec2_t *in, int n, double y_line, double g, vec2_t *out)` | Sutherland–Hodgman, one plane | G.6 |
+| `bool sweep_box_plane(vec2_t c, double h, vec2_t d, double sy, double side, contact_t *out)` | the square against the ground or a corridor boundary | G.5 |
+| `bool sweep_circle_plane(vec2_t c, double r, vec2_t d, double sy, double side, contact_t *out)` | the same for the circle | G.5 |
+| `double sweep_box_disc(vec2_t c, double h, vec2_t d, vec2_t C, double r)` | saws: slabs and corner discs | G.10 |
+
+**`tests/test_hitbox.c`, `tests/test_sweep.c`** — done when: a block at 0/90/180/270° has exactly axis-aligned vertices and only flat faces; at 30° only tilted ones; a 45° `slope` has one face of each kind and a `slope` at 180° a horizontal top; a square resting exactly on a face doesn't overlap it and a square 1/1024 px into it does; a square fully inside a block overlaps; a square sliding along a top face reports no contact, and the same square moving down into it reports `t` with `flat` true and the face's exact `offset`; a circle falling on a 45° face stops with its center 50 px from the surface; the 100 px gap of 8.2 passes; a 10 px spike is hit at 8 px/tick.
+
+---
+
+### Step 3: the loader
+
+**`include/sim/level.h` + `src/sim/level_parse.c`**
+
+| Function | Job | Spec |
+|---|---|---|
+| `int level_parse_mem(const char *buf, size_t len, object_t **objs, size_t *count, level_header_t *hdr, sim_log_fn log)` | text → objects, one warning per bad line, never fatal | 7.3 |
+| `static int parse_object_line(char *line, int lineno, object_t *out, sim_log_fn log)` | `type x y size [word] [key=value...]` | 7.2 |
+| `static int parse_kv(const char *tok, object_t *o, sim_log_fn log)` | `rot=`, `w=`, `h=`, `group=` | 7.2 |
+| `static bool parse_double(const char *s, double *out)`, `parse_int` | reject `2.5` where an int is expected, `nan`, `inf`, trailing junk | 7.3 |
+
+**`src/sim/level_build.c`**
+
+| Function | Job | Spec |
+|---|---|---|
+| `static int cmp_object(const void *a, const void *b)` | by `hitbox.aabb.x`, then `line` | 4.1 |
+| `void level_finalize(level_data_t *lvl)` | hitboxes, sort, `reach`, `end_shift`, `kill_y` | 4.1, 3.4, 4.7 |
+| `int sim_load_mem(sim_t *s, const char *buf, size_t len, const char *name, sim_log_fn log)` | parse, finalize, allocate `spent`, `sim_reset` | 2.3 |
+| `int sim_load(sim_t *s, const char *path, sim_log_fn log)` | read the file, then `sim_load_mem` | 2.3 |
+| `void sim_free(sim_t *s)` | objects and `spent` | 2.3 |
+
+**`tests/test_parser.c`** — done when the 8.1 parser cases pass: comments, blank lines, `\r\n`, missing fields, unknown type, unknown portal mode, `size 0` and negatives rejected with file and line, a legacy header line ignored, no trailing newline, and a 10 000-line level loading with the objects sorted.
+
+---
+
+### Step 4: the tick, cube on flat ground
+
+The first version moves a cube on the ground and on block tops. No circle, no slopes, no steps, no orbs.
+
+**`include/sim/internal.h` + `src/sim/player.c`**
+
+| Function | Job | Spec |
+|---|---|---|
+| `void player_update_hold(player_t *p, input_t in)` | none / fresh / used | 3.4 |
+| `void player_apply_input(player_t *p, input_t in)` | the cube's jump, the ship's thrust | 3.4 |
+| `void player_apply_gravity(player_t *p)` | gravity, the fall cap, the grounded exception | 3.4 |
+| `void player_flip_gravity(player_t *p)` | flip and negate `vy` | 3.4 |
+| `void player_update_rotation(player_t *p)` | cosmetic; a stub returning immediately is fine here | 9.4 |
+
+**`src/sim/move.c`** (the heart)
+
+| Function | Job | Spec |
+|---|---|---|
+| `static void broadphase(sim_t *s, rect_t sweep)` | fill `cand`, advance `first_active` | 4.1 |
+| `static rect_t tick_sweep_bounds(const player_t *p)` | the tick's AABB | G.8 |
+| `static void advance(sim_t *s, vec2_t d, double t)` | the only place the player moves | G.8 |
+| `static void keep(event_t *out, const contact_t *c)` | strictly-earlier wins | G.9 |
+| `static void try_square(sim_t *s, size_t i, vec2_t d, event_t *out)` | the square's filter | G.9 |
+| `static void try_surfaces(sim_t *s, vec2_t d, event_t *out)` | ground, corridor floor and ceiling | G.5, G.9 |
+| `static bool first_event(sim_t *s, vec2_t d, vec2_t vel, event_t *out)` | the earliest event | G.9 |
+| `static void settle(player_t *p, const contact_t *c, double half)` | exact placement | 4.4 |
+| `static void land(player_t *p, const contact_t *c, vec2_t *vel)` | support, `surface_rise` | 4.4 |
+| `static void head_hit(player_t *p, const contact_t *c, vec2_t *vel)` | die, bounce, or stop on a surface | 4.4 |
+| `static void pass_into(sim_t *s, const contact_t *c)` | the passed list | 4.4 |
+| `static void respond(sim_t *s, const contact_t *c, vec2_t *vel)` | floor / ceiling / wall | 4.4 |
+| `static bool leg_deaths(sim_t *s, vec2_t d, double t_end)` | inner box and spikes along the leg | 4.4, 4.5 |
+| `static bool crossed_surface(const sim_t *s)` | the safety net | G.8 |
+| `void move_and_collide(sim_t *s)` | the leg loop | 4.4 |
+
+**`src/sim/camera.c`**: `void camera_follow(camera_t *c, const player_t *p, const ship_bounds_t *b)` — 3.5.
+
+**`src/sim/hash.c`**: `hash_bytes`, `hash_double`, `sim_state_hash`, `sim_physics_hash` — G.11.
+
+**`src/sim/sim.c`**: `sim_reset`, `sim_tick`, `sim_percent`, `sim_snapshot_init/save/restore/free` — 3.4, 3.3.
+
+**`tests/test_tick.c`** — done when: a jump from flat ground has apex 213.32 ± 0.05 px, 102 ticks and 441.4 px; `distance` grows by exactly `vx` every tick; running across 20 adjacent blocks stays grounded with no death; a player spawned inside a block dies on tick 1; running into a tall block's side dies exactly 30 px in; the same input script twice gives the same `sim_state_hash` every tick; a snapshot saved at tick 500, restored and replayed gives the same hashes.
+
+---
+
+### Step 5: the circle, slopes, steps and the jump zone
+
+**`src/sim/move.c`** (added to)
+
+| Function | Job | Spec |
+|---|---|---|
+| `static bool circle_face_ok(const hitbox_t *h, int i, double g)` | tilted, or facing the ceiling | G.9 |
+| `static bool circle_vertex_ok(const hitbox_t *h, int i, double g)` | between two tilted faces, or a ceiling corner | G.9 |
+| `static void try_circle(sim_t *s, size_t i, vec2_t d, event_t *out)` | the circle's candidates | G.9 |
+| `static bool step_event(const sim_t *s, vec2_t d, vec2_t vel, face_t f, double *t)` | when the step happens inside the leg | 4.4, G.7 |
+| `static void try_steps(sim_t *s, vec2_t d, vec2_t vel, event_t *out)` | the highest step, over every candidate's up-facing faces | 4.4 |
+| `static bool lift_hits_surface(const sim_t *s, double y, double lift)` | refuse a lift into a boundary | G.7 |
+| `static bool circle_hits_neutral(sim_t *s, vec2_t lift)` | the lift's ceiling check | 4.4 |
+| `static void step_up(sim_t *s, const face_t *f, vec2_t *vel)` | the lift and the landing | 4.4 |
+
+**`src/sim/zone.c`**
+
+| Function | Job | Spec |
+|---|---|---|
+| `static bool zone_dark(const sim_t *s, const hitbox_t *h)` | clip, then distance to the circle | G.6 |
+| `static bool zone_light(const sim_t *s, const hitbox_t *h)` | flat faces against the zone rectangle | G.6 |
+| `static bool zone_surface(const sim_t *s)` | the ground and corridor boundaries in the zone | G.6 |
+| `void update_can_jump(sim_t *s)` | the zone plus the momentum test | 4.3 |
+
+**`tests/test_slopes.c`, `tests/test_steps.c`, `tests/test_zone.c`** — done when the 8.2 bullets for slopes, seams, ledges, step-up, "step-up needs downward momentum", face kinds, the jump zone and "no jump buffer" pass, at 0.5×, 1× and 4× speed.
+
+---
+
+### Step 6: harm, interactive objects, portals, corridors
+
+**`src/sim/interact.c`**
+
+| Function | Job | Spec |
+|---|---|---|
+| `void leg_touches(sim_t *s, vec2_t d, double t_end)` | collect live interactive objects with their path position | 4.6 |
+| `static int touch_cmp(const void *a, const void *b)` | `(at, index)` | 4.6 |
+| `static bool interactive_wants_activation(const sim_t *s, const object_t *o)` | portal: always; orb: a fresh hold | 5.1 |
+| `static void interactive_act(sim_t *s, const object_t *o)` | the effect | 5.1 |
+| `static void touch_interactive(sim_t *s, size_t i)` | act once, then spend | 5.1 |
+| `void apply_interactive(sim_t *s)` | sort and apply, tick step 5 | 4.6 |
+| `static void center_corridor(sim_t *s, const object_t *portal)` | the corridor from the portal and the camera lock | 5.2 |
+| `static void enter_portal(sim_t *s, const object_t *o)` | the mode change | 5.2 |
+
+Spikes need nothing new: `leg_deaths` already sweeps the rigid square against `CAT_HARM` (step 4).
+
+**`tests/test_interact.c`** — done when: a portal acts exactly once per crossing and is skipped afterwards; the corridor bounds match the examples of 5.2 and the camera stays locked; a same-mode portal switches corridors; the old boundaries stop existing on that tick; `vy`, position and gravity are untouched by a portal; a spike touched only by the square's corner kills, and one exactly grazing it doesn't.
+
+---
+
+### Step 7: the game layer
+
+Now the game can run the new engine: `handle_playing` with the integer accumulator (3.6), `input_for_tick` (FEATURES 1), the views and letterboxing (9.1, 9.7), the level's vertex buffers (9.2), the player (9.4) and the corridor strips (5.3). Then death, respawn, attempts and progress (Phase 6).
+
+**Build the F3 overlay (9.6) as soon as a cube moves on screen**, before anything else in Phase 9 is polished: the hitboxes, the contacts of the last tick, the jump zone and the numbers are what make every later question answerable by looking.
+
+---
+
+### Step 8 and after
+
+The bot (8.3) and CI (8.5), then the modes and objects of FEATURES in their own order (6.7's checklist per mode), then the editor. By then the engine is fixed and everything else is a table row or a scene.
 
 ---
 
