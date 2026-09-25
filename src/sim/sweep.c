@@ -361,3 +361,25 @@ double sweep_box_disc(vec2_t c, double h, vec2_t d, vec2_t center, double r)
     }
     return best;
 }
+
+/* The same distance, for a bare vertex list: the clipped jump zone (G.6). */
+double poly_points_distance(vec2_t c, const vec2_t *v, int n)
+{
+    bool inside = n > 2;
+    double best = INFINITY;
+
+    for (int i = 0; i < n; i++) {
+        vec2_t a = v[i];
+        vec2_t e = vsub(v[(i + 1) % n], a);
+        double len = dot(e, e);
+        double u = len > 0.0 ? dot(vsub(c, a), e) / len : 0.0;
+        vec2_t q;
+
+        if (cross(e, vsub(c, a)) < 0.0)      /* clockwise on screen: inside is >= 0 */
+            inside = false;
+        u = fmin(fmax(u, 0.0), 1.0);
+        q = vadd(a, vscale(e, u));
+        best = fmin(best, vlen(vsub(c, q)));
+    }
+    return inside ? 0.0 : best;
+}

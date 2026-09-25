@@ -787,6 +787,8 @@ typedef struct sim {                  /* the run state, plus this tick's scratch
     touch_t touch[MAX_TOUCHES];       /* live interactive objects touched (4.6)      */
     size_t nb_touch;
     int legs;                         /* legs advanced this tick: path positions     */
+    double tick_x0;                   /* distance when the tick started (G.8)        */
+    double tick_left;                 /* the fraction of the tick still to travel    */
 } sim_t;
 
 static inline bool is_spent(const run_state_t *st, size_t i)
@@ -3227,11 +3229,14 @@ y1 = max(ys, ye) + half + room + CONTACT_SKIN
 `advance(s, d, t)`, the only place the player moves:
 
 ```c
-st->distance += d.x * t;
-p->pos.x = PLAYER_SPAWN_X + st->distance;      /* never accumulated (3.2) */
+s->tick_left *= 1.0 - t;                       /* the fraction of the tick left  */
+st->distance = s->tick_x0 + p->vx * (1.0 - s->tick_left);
+p->pos.x = PLAYER_SPAWN_X + st->distance;      /* never accumulated (3.2)        */
 p->pos.y += d.y * t;
 s->legs += 1;                                  /* path position = leg index + fraction */
 ```
+
+`tick_x0` and `tick_left` are set by `move_and_collide` at the start of the tick (`distance` and `1.0`). Horizontal distance is **not** accumulated leg by leg: `vx * t + vx * (1 - t)` isn't `vx` in floating point, so a tick that landed on something would cover a hair less ground than one that didn't, and two runs that differ only in where they land would drift apart. Rebuilding it from the fraction travelled makes every tick cover exactly `vx`, split or not: when the last leg ends, `tick_left` is exactly 0.
 
 `crossed_surface(s)`: `pos.y > GROUND_Y`, or `pos.y > bounds.bottom`, or `pos.y < bounds.top` while the corridor is active. It can't happen (G.5); it's the safety net of 4.3.
 
@@ -3517,7 +3522,7 @@ The first version moves a cube on the ground and on block tops. No circle, no sl
 |---|---|---|
 | `static void broadphase(sim_t *s, rect_t sweep)` | fill `cand`, advance `first_active` | 4.1 |
 | `static rect_t tick_sweep_bounds(const player_t *p)` | the tick's AABB | G.8 |
-| `static void advance(sim_t *s, vec2_t d, double t)` | the only place the player moves | G.8 |
+| `static void advance(sim_t *s, vec2_t d, double t)` | the only place the player moves; rebuilds `distance` from the tick's fraction | G.8 |
 | `static void keep(event_t *out, const contact_t *c)` | strictly-earlier wins | G.9 |
 | `static void try_square(sim_t *s, size_t i, vec2_t d, event_t *out)` | the square's filter | G.9 |
 | `static void try_surfaces(sim_t *s, vec2_t d, event_t *out)` | ground, corridor floor and ceiling | G.5, G.9 |

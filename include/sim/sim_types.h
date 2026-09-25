@@ -181,6 +181,8 @@ typedef struct sim {                  /* the run state, plus this tick's scratch
     touch_t touch[MAX_TOUCHES];       /* live interactive objects touched (4.6)      */
     size_t nb_touch;
     int legs;                         /* legs advanced this tick: path positions     */
+    double tick_x0;                   /* distance when the tick started (3.2)        */
+    double tick_left;                 /* the fraction of the tick still to travel    */
 } sim_t;
 
 static inline bool is_spent(const run_state_t *st, size_t i)

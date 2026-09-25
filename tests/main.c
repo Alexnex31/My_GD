@@ -16,6 +16,7 @@ int main(void)
     test_sweep();
     test_circle();
     test_parser();
+    test_tick();
     if (failures == 0)
         printf("all tests passed\n");
     else
