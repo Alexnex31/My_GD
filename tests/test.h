@@ -9,5 +9,8 @@ extern int failures;
         failures++; } } while (0)
 
 void test_constants(void);
+void test_hitbox(void);
+void test_sweep(void);
+void test_circle(void);
 
 #endif

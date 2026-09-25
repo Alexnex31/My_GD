@@ -26,6 +26,7 @@ SIM_OBJ   = $(SIM_SRC:%.c=$(OUT)/%.o)
 GAME_OBJ  = $(GAME_SRC:%.c=$(OUT)/%.o)
 DEP       = $(SIM_OBJ:.o=.d) $(GAME_OBJ:.o=.d)
 TEST_SRC  = $(wildcard tests/*.c)
+HDR       = $(wildcard include/sim/*.h) $(wildcard tests/*.h)
 TEST_FLAGS = -Wall -Wextra -Iinclude -ffp-contract=off -g -fsanitize=address,undefined
 
 all: $(NAME)
@@ -41,8 +42,8 @@ debug:
 	$(MAKE) BUILD=debug
 
 # Tests link ONLY the simulation: no CSFML, no window, no audio.
-unit_tests: $(TEST_SRC) $(SIM_SRC)
-	$(CC) $(TEST_FLAGS) $^ -o $@ -lm
+unit_tests: $(TEST_SRC) $(SIM_SRC) $(HDR)
+	$(CC) $(TEST_FLAGS) $(filter %.c,$^) -o $@ -lm
 
 test: unit_tests
 	./unit_tests

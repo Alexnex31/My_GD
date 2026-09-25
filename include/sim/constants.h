@@ -63,7 +63,7 @@
     #define CAM_TOP_MARGIN      200.0
     #define CAM_BOTTOM_MARGIN   790.0
     #define CAM_TAU             0.08    /* seconds, smoothing time constant (3.5)          */
-    #define CAM_LERP            0.050750 /* = 1 - exp(-1 / (TICK_RATE * CAM_TAU))          */
+    #define CAM_LERP            0.0507502406   /* = 1 - exp(-1/(TICK_RATE*CAM_TAU)) */
 
     /* Ship corridor (5.2) */
     #define CORRIDOR_MAX_HEIGHT 1000.0   /* the tallest mode corridor (ship, UFO, wave) */

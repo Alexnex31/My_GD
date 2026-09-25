@@ -45,6 +45,7 @@ typedef enum hold_state {     /* 3.4: GD's buffered clicks and orb locking */
 #define HB_MAX_VERTS 4
 
 typedef enum shape_kind { SHAPE_POLY, SHAPE_CIRCLE } shape_kind_t;
+typedef enum face_kind { FACE_HORIZONTAL, FACE_VERTICAL, FACE_TILTED } face_kind_t;
 
 typedef struct hitbox {       /* full shape: area, not outline (3.0) */
     shape_kind_t kind;
@@ -137,6 +138,11 @@ typedef struct sim_snapshot {
     run_state_t st;           /* st.spent points into the snapshot's own buffer */
 } sim_snapshot_t;
 
+#define SURF_GROUND (-1L)
+#define SURF_FLOOR  (-2L)          /* the corridor's floor   */
+#define SURF_CEIL   (-3L)          /* the corridor's ceiling */
+
+static inline bool is_surface(long s) { return s < 0; }
 typedef struct contact {
     double t;            /* fraction of the move, 0..1                        */
     vec2_t normal;       /* unit, out of the obstacle toward the player       */

@@ -261,6 +261,7 @@ SIM_OBJ   = $(SIM_SRC:%.c=$(OUT)/%.o)
 GAME_OBJ  = $(GAME_SRC:%.c=$(OUT)/%.o)
 DEP       = $(SIM_OBJ:.o=.d) $(GAME_OBJ:.o=.d)
 TEST_SRC  = $(wildcard tests/*.c)
+HDR       = $(wildcard include/sim/*.h) $(wildcard tests/*.h)
 TEST_FLAGS = -Wall -Wextra -Iinclude -ffp-contract=off -g -fsanitize=address,undefined
 
 all: $(NAME)
@@ -276,8 +277,8 @@ debug:
 	$(MAKE) BUILD=debug
 
 # Tests link ONLY the simulation: no CSFML, no window, no audio.
-unit_tests: $(TEST_SRC) $(SIM_SRC)
-	$(CC) $(TEST_FLAGS) $^ -o $@ -lm
+unit_tests: $(TEST_SRC) $(SIM_SRC) $(HDR)
+	$(CC) $(TEST_FLAGS) $(filter %.c,$^) -o $@ -lm
 
 test: unit_tests
 	./unit_tests
@@ -683,6 +684,7 @@ typedef enum hold_state {     /* 3.4: GD's buffered clicks and orb locking */
 #define HB_MAX_VERTS 4
 
 typedef enum shape_kind { SHAPE_POLY, SHAPE_CIRCLE } shape_kind_t;
+typedef enum face_kind { FACE_HORIZONTAL, FACE_VERTICAL, FACE_TILTED } face_kind_t;
 
 typedef struct hitbox {       /* full shape: area, not outline (3.0) */
     shape_kind_t kind;
@@ -1260,6 +1262,13 @@ The jump zone is a **support** test, not a collision: it has to see the surface 
 **Sweeps.** The core test: one of the player's shapes, moving by `d` during a leg of the move, against one convex shape. It returns **when** they first touch while moving into each other (`t` in 0..1, the fraction of `d`) and the **normal** of what was hit.
 
 ```c
+/* contact.surface: an object index, or one of the three surfaces (4.3) */
+#define SURF_GROUND (-1L)
+#define SURF_FLOOR  (-2L)          /* the corridor's floor   */
+#define SURF_CEIL   (-3L)          /* the corridor's ceiling */
+
+static inline bool is_surface(long s) { return s < 0; }
+
 typedef struct contact {
     double t;            /* fraction of the move, 0..1                        */
     vec2_t normal;       /* unit, out of the obstacle toward the player       */
