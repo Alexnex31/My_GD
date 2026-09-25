@@ -1,4 +1,6 @@
-2 15 100.000000
+name LEVEL 2
+version 2
+
 spike 1000 800 1
 block 1000 200 1
 block 1100 200 1

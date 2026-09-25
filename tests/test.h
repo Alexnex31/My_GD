@@ -12,5 +12,6 @@ void test_constants(void);
 void test_hitbox(void);
 void test_sweep(void);
 void test_circle(void);
+void test_parser(void);
 
 #endif

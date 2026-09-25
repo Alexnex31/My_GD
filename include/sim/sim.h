@@ -9,9 +9,9 @@
     #define MYGD_SIM_H
     #include "sim/sim_types.h"
 
-int sim_load(sim_t *s, const char *path, sim_log_fn log);          /* 0 on success */
+int sim_load(sim_t *s, const char *path, sim_log_fn log);   /* levels/<id>.gd */
 int sim_load_mem(sim_t *s, const char *buf, size_t len,
-    const char *name, sim_log_fn log);                              /* same, from memory */
+    const char *id, sim_log_fn log);                        /* same, from memory */
 void sim_free(sim_t *s);
 void sim_reset(sim_t *s);                      /* back to spawn, every object live again */
 void sim_tick(sim_t *s, input_t in);           /* advance one fixed tick */

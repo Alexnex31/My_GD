@@ -74,13 +74,24 @@ typedef struct object {       /* level data: never modified after load */
     int line;                 /* source line, for messages and stable sort      */
 } object_t;
 
+typedef struct level_header { /* the level file's header fields (7.2) */
+    char name[128];           /* the prose name; the id when the file has none  */
+    char author[64];
+    int version;              /* format version the file was written for        */
+    char song[64];            /* a file in res/songs (FEATURES 4.5), "" = none  */
+    double offset;            /* seconds of song skipped at the start           */
+    double bpm;               /* the editor's beat grid (FEATURES 11.10)        */
+    double first_beat;
+} level_header_t;
+
 typedef struct level_data {   /* immutable after sim_load */
     object_t *objects;        /* contiguous, sorted by hitbox.aabb.x (then line) */
     size_t nb_objects;
     double reach;              /* max over objects of hitbox.aabb.w: broadphase (4.1) */
     double end_shift;          /* distance at which the level completes (3.4)     */
     double kill_y;             /* kill ceiling, world y (4.7)                     */
-    char name[128];
+    char id[24];               /* the file's digits, e.g. "10280" (7.2)           */
+    level_header_t hdr;
 } level_data_t;
 
 typedef struct player {

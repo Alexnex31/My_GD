@@ -1,4 +1,6 @@
-3 33 100.000000
+name LEVEL 3
+version 2
+
 spike 2000 750 2
 spike 2500 750 2
 spike 3000 750 2

@@ -1,4 +1,6 @@
-6 43 100.000000
+name LEVEL 6
+version 2
+
 spike 1600 750 2
 spike 2600 775 2
 spike 2700 750 2

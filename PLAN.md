@@ -1851,7 +1851,7 @@ The loader rejects `portal ... <mode>` unless the mode is a name in `MODES` (`cu
 ```c
 void level_on_death(level_t *lv, gd_t *gd)
 {
-    level_record_best(lv, gd);               /* 6.3: best, "New best!" popup, save */
+    level_record_best(lv);                   /* 6.2: the session's best and popup */
     lv->state = LEVEL_DYING;
     lv->death_ticks = DEATH_DELAY_TICKS;
     lv->death_pos = lv->sim.st.player.pos;   /* where to draw the explosion */
@@ -1865,7 +1865,7 @@ void level_respawn(level_t *lv, gd_t *gd)
     lv->state = LEVEL_PLAYING;
     lv->accumulator = 0;
     sfClock_restart(lv->clock);
-    level_count_attempt(lv, gd);
+    level_count_attempt(lv);
     sfMusic_play(gd->musics.level);          /* sfMusic_play on a stopped music restarts it */
 }
 ```
@@ -1878,55 +1878,89 @@ The death delay (and the explosion) is a deliberate change from the legacy game,
 
 Music today restarts through a side effect (`if (level->shift == 0) sfMusic_play(...)` in `print_level`, true on the first frame of each attempt). Make it explicit as above.
 
-### 6.2 Attempts
+### 6.2 Attempts and best: in memory, written once
+
+Progress belongs to the session while you play, and to the file only when you leave the level. Writing `save/progress.txt` after every death would mean a `write` + `fsync` + `rename` every few seconds, for a number nobody reads until the level ends.
+
+So the level keeps its own counters and updates the store in memory; the file is written when the level is left:
 
 ```c
-void level_count_attempt(level_t *lv, gd_t *gd)
+typedef struct level_stats {        /* the session's numbers, in level_t */
+    int attempts;                   /* this session only, for the on-screen text */
+    float best;                     /* the best of this session                  */
+    float practice_best;
+    bool dirty;                     /* something to write when leaving           */
+} level_stats_t;
+
+void level_count_attempt(level_t *lv)
 {
-    progress_get(&gd->progress, lv->id)->attempts += 1;
-    lv->session_attempts += 1;
+    lv->stats.attempts += 1;
+    lv->stats.dirty = true;
     level_show_attempt_text(lv);
+}
+
+void level_record_best(level_t *lv)
+{
+    float pct = sim_percent(&lv->sim);
+    float *best = lv->practice ? &lv->stats.practice_best : &lv->stats.best;
+
+    if (pct <= *best)
+        return;
+    *best = pct;
+    lv->stats.dirty = true;
+    if (!lv->practice)
+        level_show_new_best(lv, pct);        /* "New best! 47%" popup, game layer */
+}
+
+/* The one place that touches the store and the file (6.4). */
+void level_flush_stats(level_t *lv, gd_t *gd)
+{
+    progress_entry_t *pe;
+
+    if (!lv->stats.dirty)
+        return;
+    pe = progress_get(&gd->progress, lv->id);
+    pe->attempts += lv->stats.attempts;
+    pe->best = fmaxf(pe->best, lv->stats.best);
+    if (lv->stats.practice_best > pe->practice_best)
+        pe->practice_best = lv->stats.practice_best;
+    if (pe->best == lv->stats.best)
+        pe->level_hash = lv->file_hash;      /* best achieved on this version */
+    lv->stats = (level_stats_t){0};
+    progress_save(&gd->progress);
 }
 ```
 
-Called from `level_start` (first attempt), `level_respawn` and `level_restart` (6.5). Today the level header's attempt count also increases on start; this keeps that behavior.
+`level_count_attempt` is called from `level_start` (first attempt), `level_respawn` and `level_restart` (6.5). `level_record_best` runs on death and on completion.
 
-### 6.3 Best and completion
+**When the file is written**, and only then:
+
+| Event | Session numbers | File |
+|---|---|---|
+| Death | attempts + 1, best updated | — |
+| Completion | best 100 | — |
+| Restart key (6.5) | attempts + 1 | — |
+| Back to the level list (end screen, pause, Escape) | flushed | **written** |
+| Quitting the game (Quit button, window closed) | flushed | **written** |
+| Practice mode (13) | `practice_best` only, no popup | on leaving, like the rest |
+
+The game layer has exactly two call sites: `level_free` (every way out of a level goes through it) and the quit path, which frees the level before closing the window. A crash or a `kill -9` loses the session's numbers, which is the price of not writing every few seconds; nothing else is at risk, since the store is only ever written whole (6.4).
+
+**The list stays right** while you play, because it reads the in-memory store, and the level you just left flushed into it before the list appeared.
+
+### 6.3 Completion
 
 ```c
-void level_record_best(level_t *lv, gd_t *gd)
-{
-    progress_entry_t *pe = progress_get(&gd->progress, lv->id);
-    float pct = sim_percent(&lv->sim);
-
-    if (lv->practice) {                      /* Phase 13: a stat, no popup */
-        if (pct > pe->practice_best)
-            pe->practice_best = pct;
-    } else if (pct > pe->best) {
-        pe->best = pct;
-        pe->level_hash = lv->file_hash;      /* best achieved on this version of the level */
-        level_show_new_best(lv, pct);        /* "New best! 47%" popup, game layer */
-    }
-    progress_save(&gd->progress);
-}
-
 void level_on_complete(level_t *lv, gd_t *gd)
 {
-    level_record_best(lv, gd);               /* sim_percent is 100 here */
+    (void)gd;
+    level_record_best(lv);                   /* sim_percent is 100 here */
     lv->state = LEVEL_COMPLETE;
     lv->end_screen = create_end_level_screen(lv, gd);
 }
 ```
 
-Which events touch what:
-
-| Event | Attempts | Best | Save |
-|---|---|---|---|
-| Death | +1 (on respawn) | updated | yes |
-| Completion | — | 100 | yes |
-| Restart key (6.5) | +1 | updated | yes |
-| Quit (Escape → pause → Quit, window closed) | — | **not** updated | yes |
-| Practice mode (13) | +1 per respawn | `practice_best` only, no popup | yes |
+The end screen shows the session's attempts and the best from the store combined with the session's, so the numbers on screen match what will be written when you leave.
 
 ### 6.4 The progress store (replaces `rewrite_level`)
 
@@ -1945,7 +1979,7 @@ New module `src/sim/progress.c` (pure C, so it's unit-testable):
 #define SAVE_PATH  "save/progress.txt"
 
 typedef struct progress_entry {
-    char id[64];            /* level file name, e.g. "level3" */
+    char id[24];            /* the level file's digits, e.g. "10280" (7.2) */
     int attempts;
     float best;
     float practice_best;    /* Phase 13: a stat only */
@@ -1965,37 +1999,37 @@ int progress_load(progress_t *p, const char *path);    /* missing file = empty s
 int progress_save(const progress_t *p);                 /* 0 on success */
 progress_entry_t *progress_get(progress_t *p, const char *id);   /* creates if missing */
 void progress_free(progress_t *p);
-bool progress_valid_id(const char *id);                 /* [A-Za-z0-9_.-]{1,63} */
+bool progress_valid_id(const char *id);                 /* digits only, 1 to 18 */
 ```
 
 File format, one line per level, `key=value` fields after the id:
 
 ```text
-level3 attempts=33 best=47.83 practice_best=81.20 hash=9f2c41d07ab35e11
+10280 attempts=33 best=47.83 practice_best=81.20 hash=9f2c41d07ab35e11
 ```
 
 - Using `key=value` from the start (instead of positional numbers) means new fields (the song override of FEATURES 4.6, practice best, anything later) never need a format migration. Missing fields take defaults; unknown fields are kept in `extra` and written back, so an older build doesn't destroy a newer build's data.
 - Load: read a line, take the id (first word), then split the rest on spaces and each field on the first `=`. Numbers with `strtof`/`strtol`, checking the end pointer.
-- **Ids are file names**, and the format is space-separated, so a level file whose name isn't `[A-Za-z0-9_.-]{1,63}` is skipped by the level list with a warning ("rename it to play it"). That also keeps names safe in paths.
+- **The id is the level file's name without `.gd`**, digits only (7.2), so it's always safe in a path and in this space-separated format. A file in `levels/` that isn't `<digits>.gd` is skipped by the level list with a warning ("rename it to play it").
 - Save: `mkdir(SAVE_DIR, 0755)` (ignore `EEXIST`), write `save/progress.txt.tmp`, `fflush`, `fsync(fileno(f))`, check that `fclose` returns 0 (that's when write errors surface), then `rename()` it over `save/progress.txt`. A crash or power loss mid-save leaves the old file intact (`fsync` makes sure the new content is on disk before the rename makes it visible).
 - Load once in `create_gd`, free in `free_gd`.
-- Save on death, completion, restart and quit. Only death, restart and completion update `best` (6.3).
+- **Written only when a level is left** (6.2): the session's attempts and best live in `level_t` until then. Every path out of a level flushes them, so the file is written once per visit instead of once per attempt.
 
 **Level versions.** `hash` records which version of the level the best was achieved on. The level list computes each level's current hash (FNV-1a over the file's bytes, a few microseconds per level) and, when it differs from the stored one, shows the best with an "edited since" marker. The best is kept: GD keeps progress on updated levels too, and an edit is often a decoration change.
 
-**Migration:** when the loader finds a legacy header (Phase 7) and the store has no entry for that level, it imports the attempts and best (the best is already truncated to an integer by F6, nothing to recover). After one run, remove the headers from the level files and commit.
+**No migration.** The old counts lived in the level files' first line (7.2); those files were converted once by hand and the originals kept outside the repository. The store starts empty.
 
 Where to put `save/`: next to the binary is simplest while the game runs from its source folder (Phase 1.4 item 6 makes that folder the working directory). If you ever install it, use `$XDG_DATA_HOME/my_gd/` (default `~/.local/share/my_gd/`).
 
 ### 6.5 Restart key
 
-The restart key (default `R`, rebindable: FEATURES 2.2) is a voluntary death **without** the delay and explosion: record the best (the player did reach that percentage), count a new attempt, and respawn immediately.
+The restart key (default `R`, rebindable: FEATURES 2.2) is a voluntary death **without** the delay and explosion: record the best (the player did reach that percentage), count a new attempt, and respawn immediately. Like every other attempt, it only touches the session's numbers (6.2).
 
 ```c
 void level_restart(level_t *lv, gd_t *gd)
 {
     if (lv->state == LEVEL_PLAYING)
-        level_record_best(lv, gd);
+        level_record_best(lv);
     level_respawn(lv, gd);                   /* sim_reset, +1 attempt, music restart */
 }
 ```
@@ -2014,11 +2048,18 @@ In practice mode, restart respawns from the **last checkpoint** instead of the s
 - A missing file leaves `objects` uninitialized, and the first frame dereferences garbage.
 - Only `level3` ends with a newline; the other six don't. The loader happens to cope, but the new one must be tested for it.
 
-### 7.2 Format (backward compatible)
+### 7.2 Format
+
+A level file is **`levels/<id>.gd`**, and its name is the level's **id: digits only** (`levels/10280.gd`). The id is what the progress store keys on (6.4) and what the level list sorts by; nothing inside the file repeats it. A file in `levels/` whose name isn't digits + `.gd` is not a level: the list skips it with a warning, which also keeps `.temp` files and editor leftovers out (7.5).
+
+The file is a **header** then a **body**:
 
 ```text
-# comments and blank lines are ignored
+# comments and blank lines are ignored, anywhere
 name Stereo Madness
+author Alexnex
+version 2
+
 block 1000 200 1
 spike 3000 750 2
 spike 3400 0 2 rot=180            # ceiling spike
@@ -2028,11 +2069,26 @@ slope 6100 750 2 w=4 h=2          # 200 x 100: a 26.6 deg slope
 portal 2100 750 2 ship
 ```
 
-- `name <rest of line>`: optional; defaults to the uppercased file name (today's behavior).
-- Object types: `block`, `slope` (a right triangle rising left to right, 4.2; `rot=` turns it into any other orientation, e.g. `rot=90` for a ceiling slope), `spike`, `portal`.
-- Object lines: `type x y size [word] [key=value ...]`. The positional part is unchanged, so every existing level loads.
+**Header.** Every line whose first word isn't an object type is a header field: `key <rest of the line>`. There's no separator and no fixed order; by convention the header sits at the top. Fields:
+
+| Key | Meaning | Default |
+|---|---|---|
+| `name` | the level's prose name, shown in the list and on the end screen | the id |
+| `author` | who made it | empty |
+| `version` | the format version this file was written for | 2 |
+| `song` | a file in `res/songs/` (FEATURES 4.5) | empty: the menu default |
+| `offset` | seconds of song to skip at the start (FEATURES 4.4) | 0 |
+| `bpm`, `first_beat` | the editor's beat grid (FEATURES 11.10) | 0 |
+
+An unknown key is a warning and is ignored, so a file written by a newer build still opens; the editor keeps those lines verbatim when it saves (FEATURES 11.1).
+
+**Player progress is never in the level file**: attempts, best and practice best live in `save/progress.txt`, keyed by the id (6.4). A level file only describes the level, so editing or sharing one never touches anyone's records, and the game never writes to `levels/`.
+
+**Body.** One object per line: `type x y size [word] [key=value ...]`.
+
+- Types: `block`, `slope` (a right triangle rising left to right, 4.2; `rot=` turns it into any other orientation, e.g. `rot=90` for a ceiling slope), `spike`, `portal` (whose extra word is the gamemode).
+- `x` and `y` are world pixels, any sign; `size`, `w` and `h` are grid units of 50 px.
 - `#` starts a comment anywhere on a line.
-- A **first** non-comment line matching `%d %d %f` is a legacy header: import it into progress (6.4) and ignore it otherwise.
 
 Optional `key=value` fields, any object:
 
@@ -2049,18 +2105,20 @@ Why `rot=` instead of `up|down|left|right`: an angle covers the four directions 
 
 Sizes: `size`, `w` and `h` must be at least 1. Zero or negative rejects the line (a zero-size object would be invisible and touch nothing, so it's always a mistake). There's no maximum.
 
+**No migration.** The legacy format (a first line of `id attempts best`, files named `levelN`) is not read at all: the seven levels that existed were converted once by hand, and the old copies are kept outside the repository. A legacy file loads as a level whose first line is an invalid object, with one warning.
+
 ### 7.3 Parser
 
-Numbers are parsed with `strtof`/`strtol` and the end pointer checked, never with a bare `sscanf`, because `sscanf("%d")` reads `2.5` as `2` and leaves `.5` for the next field, silently accepts trailing junk, and `%f` accepts `nan` and `inf`, which would poison sorting (a comparator with NaN isn't a valid ordering, and `qsort` then misbehaves) and every collision test.
+Numbers are parsed with `strtod`/`strtol` and the end pointer checked, never with a bare `sscanf`, because `sscanf("%d")` reads `2.5` as `2` and leaves `.5` for the next field, silently accepts trailing junk, and `%f` accepts `nan` and `inf`, which would poison sorting (a comparator with NaN isn't a valid ordering, and `qsort` then misbehaves) and every collision test.
 
 ```c
-static bool parse_float(const char *s, float *out)
+static bool parse_double(const char *s, double *out)
 {
     char *end;
-    float v;
+    double v;
 
     errno = 0;
-    v = strtof(s, &end);
+    v = strtod(s, &end);
     if (end == s || *end != '\0' || errno == ERANGE || !isfinite(v))
         return false;
     *out = v;
@@ -2087,11 +2145,11 @@ static int parse_object(char *line, int lineno, object_t *o, sim_log_fn log)
     int n = split_words(line, tok, 16);         /* spaces/tabs, stops at '#' */
     const char *word = NULL;
     int first_field = 4;
-    float x;
-    float y;
+    double x;
+    double y;
     int size;
 
-    if (n < 4 || !parse_float(tok[1], &x) || !parse_float(tok[2], &y) ||
+    if (n < 4 || !parse_double(tok[1], &x) || !parse_double(tok[2], &y) ||
         !parse_int(tok[3], &size) || size <= 0)
         return -1;
     if (n > 4 && strchr(tok[4], '=') == NULL) {
@@ -2099,7 +2157,7 @@ static int parse_object(char *line, int lineno, object_t *o, sim_log_fn log)
         first_field = 5;
     }
     *o = (object_t){.line = lineno, .size = size,
-        .rect = {x, y, (float)size * UNIT, (float)size * UNIT}};
+        .rect = {x, y, size * UNIT, size * UNIT}};
     for (int i = first_field; i < n; i++)
         if (parse_field(o, tok[i], lineno, log) != 0)
             return -1;                          /* e.g. w=-2 or rot=abc */
@@ -2107,20 +2165,20 @@ static int parse_object(char *line, int lineno, object_t *o, sim_log_fn log)
 }
 ```
 
-`object_init` rejects an unknown type, a missing or unexpected extra word (`portal` needs a mode, `block`, `slope` and `spike` take none), and an unknown portal mode. `parse_field` handles the table in 7.2; an unknown key logs a warning and is ignored (not the whole line), so newer files open in older builds as far as possible.
+The type is checked first, before anything else on the line, because that's what tells a header field from an object. `object_init` then rejects a missing or unexpected extra word (`portal` needs a mode, `block`, `slope` and `spike` take none) and an unknown portal mode. `parse_field` handles the table in 7.2; an unknown key logs a warning and is ignored (not the whole line), so newer files open in older builds as far as possible.
 
 Loader (`sim_load` reads the file into memory, then `sim_load_mem` does the work):
 
-1. `fopen("levels/<id>")` and read it whole. On failure, log and return -1; the game goes back to the level list with a message instead of crashing.
+1. `fopen("levels/<id>.gd")` and read it whole. On failure, log and return -1; the game goes back to the level list with a message instead of crashing.
 2. Walk the lines, strip `\r\n` (files edited on Windows have `\r`), skip blank lines and comments. A last line without a newline is a normal line.
-3. Handle `name` and the legacy header.
-4. `parse_object`; on failure log `levels/level3:12: invalid line, skipped` and continue.
-5. Append to a growable array (double the capacity when full).
-6. After reading: sort by `(hitbox.aabb.x, line)` with an explicit comparator (`(a > b) - (a < b)`, never a float subtraction cast to int), then compute `reach`, `end_shift` (3.4), `kill_y` (4.7), and allocate the `spent` bitset (`(n + 63) / 64` words).
+3. A line whose first word isn't an object type is a header field (7.2): store the known keys, warn once for an unknown one.
+4. `parse_object`; on failure log `levels/10280.gd:12: invalid line, skipped` and continue.
+5. Two passes over the buffer: the first counts the lines, the second fills one allocation of that size (the object array ends up exactly as long as the number of valid objects). One allocation, no realloc, and the same result whatever the file.
+6. After reading: sort by `(hitbox.aabb.x, line)` with an explicit comparator (`(a > b) - (a < b)`, never a float subtraction cast to int), then compute `reach`, `end_shift` (3.4), `kill_y` (4.7), allocate the `spent` bitset (`(n + 63) / 64` words) and call `sim_reset`. A level with no object is legal: `reach` 0, `end_shift` 100, and `kill_y` from the corridor constant alone.
 
 ### 7.4 A `--check` mode
 
-Add `./my_gd --check levels/level6`: loads the level with the sim only (no window), prints warnings, and runs the bot (Phase 8).
+Add `./my_gd --check levels/10280.gd`: loads the level with the sim only (no window), prints warnings, and runs the bot (Phase 8).
 
 Warnings: invalid lines, identical objects on top of each other, objects below the ground, neutral surfaces steeper than 50° facing up where the player could land (they act as walls, 4.4), unknown fields, more than `MAX_CANDIDATES` objects within one tick's reach (4.1), and anything past the end.
 
@@ -2134,9 +2192,9 @@ Problems today: arbitrary order (F7); the directory is read twice (`count_levels
 
 Fixes:
 
-- Read the directory once into a growable array, skipping names starting with `.`, ending in `.temp` / `.tmp`, or not valid ids (6.4, with a warning).
-- Sort in natural order, so `level2` comes before `level10`. A 20-line comparator does it: compare character by character, and when both sides are at a digit, compare the whole numbers (skip leading zeros, then the longer run of digits is bigger, then digit by digit). Writing it yourself avoids glibc's `strverscmp` and `_GNU_SOURCE`.
-- Identify levels by file name (`gd->selected_level_id` is a `char *`); load `levels/<id>`.
+- Read the directory once into a growable array, keeping only names that are `<digits>.gd` (7.2) and warning about the rest, which also skips `.temp` files and editor leftovers.
+- Sort by the id as a **number**, so 2 comes before 10 with no natural-order comparator to write.
+- Identify levels by that id (`gd->selected_level_id` is a `char *` of digits); load `levels/<id>.gd`.
 - Show the level's `name` line (read with the loader, header only), and attempts and best from the progress store, with the "edited since" marker (6.4).
 - Format with `snprintf(buf, sizeof(buf), "Best: %.2f%%", best)`.
 - Hit-test with the sprite's real bounds: `sfFloatRect_contains(&bounds, x, y)` with `bounds = sfSprite_getGlobalBounds(sprite)`.
@@ -2162,7 +2220,7 @@ Plain C with a tiny assert macro (or Criterion if you already use it):
 What to test (levels are given as strings to `sim_load_mem`, no temp files):
 
 - **Parser:** blank lines, comments (full-line and after an object), `\r\n`, missing fields, unknown types, bad portal modes, negative coordinates, no trailing newline, legacy header detection, `name` line. Rejected: `size` `0`, `-1`, `2.5`, `nan`, `inf`, `1e99`, `w=0`, `h=-2`, trailing junk (`750x`). Accepted: `rot=`, `w=`, `h=`, `group=` (ignored with one warning), an unknown field (ignored, line kept).
-- **Progress:** save → load round trip keeps `47.83` and `practice_best`; an unknown `key=value` survives a load/save cycle; a missing file gives an empty store; `progress_get` creates entries; invalid ids are refused; a failed save leaves the previous file untouched.
+- **Progress:** the file is written once per visit, not per attempt: 20 simulated deaths leave `save/progress.txt` untouched (same mtime and bytes), and leaving the level writes `attempts=20` once; save → load round trip keeps `47.83` and `practice_best`; an unknown `key=value` survives a load/save cycle; a missing file gives an empty store; `progress_get` creates entries; invalid ids are refused; a failed save leaves the previous file untouched.
 - **Collisions**, with hand-built objects: land on a block from above; die hitting its side; ship slides under; spike hitbox edges (1 px inside kills, 1 px outside doesn't); the wide-block case (F5, now `w=8 h=1`); the 100 px gap under a wall (level 5).
 - **Broadphase:** a 45°-rotated block (its hitbox bounds stick out of its rect) still stops a player at its corner; every test level gives the same results with the broadphase and with a brute-force loop over all objects (compare `sim_state_hash` every tick).
 - **Rotation:** blocks rotated by 90°, 180°, 270° have bit-exact axis-aligned hitboxes (level 5's gap still passes when its blocks are written with `rot=90`); a spike at `rot=180` on the ceiling kills a player touching its tip from below and not one passing 1 px under it; a 45° spike: a box touching the bounding box's empty corner survives (the separating-axis test), a box touching the diagonal edge dies; a block at `rot=30` is a real tilted shape: landing on its top face slides along a 30° slope.
@@ -2554,7 +2612,7 @@ Call `sfJoystick_update()` once per frame before polling if the window doesn't p
 
 ### 10.4 Pause
 
-Escape currently quits straight to the level list. Make it open a pause overlay (Resume, Restart, Practice mode on/off, Quit), stop ticking, `sfMusic_pause` the music. Losing window focus opens the same overlay. Restart follows 6.5. Quit counts as neither death nor completion: attempts are saved, `best` isn't updated (6.3). Resuming restarts the level clock, so the pause doesn't turn into a burst of ticks (3.6).
+Escape currently quits straight to the level list. Make it open a pause overlay (Resume, Restart, Practice mode on/off, Quit), stop ticking, `sfMusic_pause` the music. Losing window focus opens the same overlay. Restart follows 6.5. Quit counts as neither death nor completion: it doesn't update the best, and leaving the level is what writes the session's attempts to `save/progress.txt` (6.2). Resuming restarts the level clock, so the pause doesn't turn into a burst of ticks (3.6).
 
 ### 10.5 Menu polish
 
@@ -2666,7 +2724,7 @@ Record the ticks where `held` changes and the ticks with `pressed` (a few dozen 
 
 ```text
 my_gd-replay 1
-level level3 hash=9f2c41d07ab35e11 tick_rate=240 rules=0
+level 10280 hash=9f2c41d07ab35e11 tick_rate=240 rules=0
 held 104 131 190 212 ...
 pressed 104 190 ...
 ```

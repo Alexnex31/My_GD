@@ -1,4 +1,6 @@
-5 87 100.000000
+name LEVEL 5
+version 2
+
 block 1700 650 2
 block 1700 550 2
 block 1700 450 2
