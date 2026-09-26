@@ -17,6 +17,7 @@ int main(void)
     test_circle();
     test_parser();
     test_tick();
+    test_slopes();
     if (failures == 0)
         printf("all tests passed\n");
     else

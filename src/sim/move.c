@@ -66,6 +66,13 @@ static void advance(sim_t *s, vec2_t d, double t)
     s->legs += 1;
 }
 
+/* A step's lift: straight against gravity, so it costs no horizontal travel. */
+static void advance_y(sim_t *s, double dy)
+{
+    s->st.player.pos.y += dy;
+    s->legs += 1;
+}
+
 static bool is_passed(const sim_t *s, size_t i)
 {
     for (size_t k = 0; k < s->nb_passed; k++)
@@ -132,7 +139,190 @@ static void try_surfaces(sim_t *s, vec2_t d, event_t *out)
     }
 }
 
-static bool first_event(sim_t *s, vec2_t d, event_t *out)
+/*
+** When this leg kills: the inner box against neutral objects, or the rigid
+** square against harm, whichever comes first. INFINITY when neither does.
+** Surfaces are not tested: they never kill (4.3).
+*/
+static double leg_death_time(sim_t *s, vec2_t d)
+{
+    const player_t *p = &s->st.player;
+    const mode_ops_t *m = &MODES[p->mode];
+    double death = INFINITY;
+    double t;
+
+    for (size_t k = 0; k < s->nb_cand; k++) {
+        const object_t *o = &s->lvl.objects[s->cand[k]];
+
+        if (OBJ_CATEGORY[o->type] == CAT_NEUTRAL)
+            t = sweep_box_touch(p->pos, m->inner_half, d, &o->hitbox);
+        else if (OBJ_CATEGORY[o->type] == CAT_HARM)
+            t = sweep_box_touch(p->pos, m->half, d, &o->hitbox);
+        else
+            continue;
+        death = fmin(death, t);
+    }
+    return death;
+}
+
+static void leg_touches(sim_t *s, vec2_t d, double t_end)
+{
+    (void)s;                                 /* interactive objects: step 6 (4.6) */
+    (void)d;
+    (void)t_end;
+}
+
+/* The circle owns tilted faces, and every face or corner facing a ceiling. */
+static bool circle_face_ok(const hitbox_t *h, int i, double g)
+{
+    return h->face_kind[i] == FACE_TILTED || h->face_n[i].y * g > 0.0;
+}
+
+static bool circle_vertex_ok(const hitbox_t *h, int i, double g)
+{
+    int prev = (i + h->nverts - 1) % h->nverts;
+
+    if (h->face_kind[prev] == FACE_TILTED && h->face_kind[i] == FACE_TILTED)
+        return true;                         /* a corner between two slopes */
+    return h->face_n[prev].y * g > 0.0 || h->face_n[i].y * g > 0.0;
+}
+
+static void try_circle(sim_t *s, size_t i, vec2_t d, event_t *out)
+{
+    const player_t *p = &s->st.player;
+    const hitbox_t *h = &s->lvl.objects[i].hitbox;
+    double half = MODES[p->mode].half;
+    contact_t c;
+
+    if (is_passed(s, i) || overlap_circle_poly(p->pos, half, h))
+        return;
+    if (!sweep_circle_poly(p->pos, half, d, h, circle_face_ok, circle_vertex_ok,
+        p->gravity_dir, &c))
+        return;
+    c.surface = (long)i;
+    keep(out, &c);
+}
+
+/* The corridor's ceiling, or the ground once gravity is flipped (G.7). */
+static bool lift_hits_surface(const sim_t *s, double y, double lift)
+{
+    const player_t *p = &s->st.player;
+    double g = p->gravity_dir;
+    double top = (y - lift * g) - MODES[p->mode].half * g;
+    double ceiling;
+
+    if (s->st.bounds.active)
+        ceiling = g > 0.0 ? s->st.bounds.top : s->st.bounds.bottom;
+    else if (g < 0.0)
+        ceiling = GROUND_Y;
+    else
+        return false;                        /* nothing above an open level */
+    return (top - ceiling) * g < 0.0;
+}
+
+/*
+** When the inner box's leading side reaches a horizontal face that sits
+** between it and the feet, and the player could jump then, it is a step (G.7).
+*/
+static bool step_event(const sim_t *s, vec2_t d, vec2_t vel, face_t f,
+    double *t_out)
+{
+    const player_t *p = &s->st.player;
+    const mode_ops_t *m = &MODES[p->mode];
+    double g = p->gravity_dir;
+    double lead = p->pos.x + m->inner_half;
+    double t = lead >= f.x0 ? 0.0 : (f.x0 - lead) / d.x;
+    double y = p->pos.y + d.y * t;
+    double feet = y + m->half * g;
+
+    if (d.x <= 0.0 || t > 1.0)
+        return false;
+    if (vel.y > p->surface_rise + RISE_EPSILON)
+        return false;                        /* rising: it keeps its motion */
+    if (p->pos.x + d.x * t - m->half >= f.x1)
+        return false;                        /* the square is past the face */
+    if ((f.y - (y + m->inner_half * g)) * g < 0.0 || (feet - f.y) * g <= 0.0)
+        return false;                        /* the inner box decides, or too low */
+    if (lift_hits_surface(s, y, (feet - f.y) * g))
+        return false;
+    *t_out = t;
+    return true;
+}
+
+static void try_steps(sim_t *s, vec2_t d, vec2_t vel, event_t *out)
+{
+    double g = s->st.player.gravity_dir;
+    face_t f;
+    double t;
+
+    for (size_t k = 0; k < s->nb_cand; k++) {
+        const object_t *o = &s->lvl.objects[s->cand[k]];
+
+        if (OBJ_CATEGORY[o->type] != CAT_NEUTRAL)
+            continue;
+        for (int i = 0; i < o->hitbox.nverts; i++) {
+            if (!up_facing_horizontal_face(&o->hitbox, i, g, &f))
+                continue;
+            if (!step_event(s, d, vel, f, &t) || t >= out->t)
+                continue;                    /* a contact at the same time wins */
+            if (out->kind == EV_STEP && t == out->t
+                && (f.y - out->step.y) * g > 0.0)
+                continue;                    /* among steps, the highest one */
+            out->kind = EV_STEP;
+            out->t = t;
+            out->step = f;
+        }
+    }
+}
+
+/*
+** The circle, along a lift: anything it runs into on the way up kills, in
+** every mode (4.4). Shapes it already overlaps are skipped: climbing a block
+** means the circle is inside that block's corner before the lift even starts.
+*/
+static double circle_lift_death(sim_t *s, vec2_t lift)
+{
+    const player_t *p = &s->st.player;
+    double half = MODES[p->mode].half;
+    double death = INFINITY;
+
+    for (size_t k = 0; k < s->nb_cand; k++) {
+        const object_t *o = &s->lvl.objects[s->cand[k]];
+
+        if (OBJ_CATEGORY[o->type] != CAT_NEUTRAL
+            || overlap_circle_poly(p->pos, half, &o->hitbox))
+            continue;
+        death = fmin(death, sweep_circle_touch(p->pos, half, lift, &o->hitbox));
+    }
+    return death;
+}
+
+/* The lift is a leg of its own: checked like any other, then it lands (4.4). */
+static void step_up(sim_t *s, const face_t *f, vec2_t *vel)
+{
+    player_t *p = &s->st.player;
+    const mode_ops_t *m = &MODES[p->mode];
+    double g = p->gravity_dir;
+    double target = f->y - m->half * g;
+    vec2_t lift = {0.0, target - p->pos.y};
+    double death = fmin(leg_death_time(s, lift), circle_lift_death(s, lift));
+
+    if (death <= 1.0) {
+        advance_y(s, lift.y * death);
+        p->alive = false;
+        return;
+    }
+    leg_touches(s, lift, 1.0);
+    advance_y(s, lift.y);
+    p->pos.y = target;                       /* exact, like settle on a face */
+    p->grounded = true;
+    p->surface_rise = 0.0;
+    p->support_normal = (vec2_t){0.0, -g};
+    p->vy = 0.0;
+    vel->y = 0.0;
+}
+
+static bool first_event(sim_t *s, vec2_t d, vec2_t vel, event_t *out)
 {
     out->kind = EV_NONE;
     out->t = 1.0;
@@ -141,9 +331,11 @@ static bool first_event(sim_t *s, vec2_t d, event_t *out)
 
         if (OBJ_CATEGORY[s->lvl.objects[i].type] != CAT_NEUTRAL)
             continue;
-        try_square(s, i, d, out);            /* the circle and the steps: step 5 */
+        try_square(s, i, d, out);
+        try_circle(s, i, d, out);
     }
     try_surfaces(s, d, out);
+    try_steps(s, d, vel, out);               /* contacts first, then steps (G.9) */
     return out->kind != EV_NONE;
 }
 
@@ -210,43 +402,6 @@ static void respond(sim_t *s, const contact_t *c, vec2_t *vel)
         pass_into(s, c);
 }
 
-/*
-** The inner box against neutral objects, and the rigid square against harm,
-** over [0, t_end] of this leg. The earliest touch kills, where it happened.
-** Surfaces are not tested: they never kill (4.3).
-*/
-static bool leg_deaths(sim_t *s, vec2_t d, double t_end)
-{
-    player_t *p = &s->st.player;
-    const mode_ops_t *m = &MODES[p->mode];
-    double death = INFINITY;
-    double t;
-
-    for (size_t k = 0; k < s->nb_cand; k++) {
-        const object_t *o = &s->lvl.objects[s->cand[k]];
-
-        if (OBJ_CATEGORY[o->type] == CAT_NEUTRAL)
-            t = sweep_box_touch(p->pos, m->inner_half, d, &o->hitbox);
-        else if (OBJ_CATEGORY[o->type] == CAT_HARM)
-            t = sweep_box_touch(p->pos, m->half, d, &o->hitbox);
-        else
-            continue;
-        death = fmin(death, t);
-    }
-    if (death > t_end)
-        return false;
-    advance(s, d, death);
-    p->alive = false;
-    return true;
-}
-
-static void leg_touches(sim_t *s, vec2_t d, double t_end)
-{
-    (void)s;                                 /* interactive objects: step 6 (4.6) */
-    (void)d;
-    (void)t_end;
-}
-
 /* A surface can't be crossed (4.3): only a bug could put the player past one. */
 static bool crossed_surface(const sim_t *s)
 {
@@ -276,14 +431,22 @@ void move_and_collide(sim_t *s)
             last ? 0.0 : -vel.y * p->gravity_dir * s->tick_left};
         event_t e = {.kind = EV_NONE, .t = 1.0};
 
+        double death;
+
         if (!last)
-            first_event(s, d, &e);
-        if (leg_deaths(s, d, e.t))
-            return;                          /* death stops everything (4.4) */
+            first_event(s, d, vel, &e);
+        death = leg_death_time(s, d);
+        if (death <= e.t) {
+            advance(s, d, death);            /* death stops everything (4.4) */
+            p->alive = false;
+            return;
+        }
         leg_touches(s, d, e.t);
         advance(s, d, e.t);
         if (e.kind == EV_CONTACT)
             respond(s, &e.contact, &vel);
+        else if (e.kind == EV_STEP)
+            step_up(s, &e.step, &vel);
     }
     if (p->alive && crossed_surface(s))
         p->alive = false;
