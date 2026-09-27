@@ -18,6 +18,7 @@ int main(void)
     test_parser();
     test_tick();
     test_slopes();
+    test_portal();
     if (failures == 0)
         printf("all tests passed\n");
     else

@@ -15,5 +15,6 @@ void test_circle(void);
 void test_parser(void);
 void test_tick(void);
 void test_slopes(void);
+void test_portal(void);
 
 #endif

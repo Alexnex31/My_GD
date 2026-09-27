@@ -165,13 +165,6 @@ static double leg_death_time(sim_t *s, vec2_t d)
     return death;
 }
 
-static void leg_touches(sim_t *s, vec2_t d, double t_end)
-{
-    (void)s;                                 /* interactive objects: step 6 (4.6) */
-    (void)d;
-    (void)t_end;
-}
-
 /* The circle owns tilted faces, and every face or corner facing a ceiling. */
 static bool circle_face_ok(const hitbox_t *h, int i, double g)
 {

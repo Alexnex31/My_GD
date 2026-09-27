@@ -55,7 +55,9 @@ void sim_tick(sim_t *s, input_t in)
     move_and_collide(s);                     /* 3. legs, contacts, deaths (4.4) */
     if (p->alive)
         collide_kill_ceiling(p, &s->lvl);    /* 4. flipped gravity only (4.7)   */
-    if (p->alive)                            /* 5. interactive objects: step 6  */
+    if (p->alive)
+        apply_interactive(s);                /* 5. portals, in contact order    */
+    if (p->alive)
         update_can_jump(s);                  /*    the jump zone, last (4.3)    */
     camera_follow(&st->cam, p, &st->bounds); /* 6.                              */
     st->tick += 1;
