@@ -59,7 +59,24 @@ void player_flip_gravity(player_t *p)
     p->can_jump = false;
 }
 
+/*
+** The icon's angle (9.4). Cosmetic: it is computed in the tick so it doesn't
+** depend on the frame rate and a replay shows the same thing, and it is left
+** out of the state hash (G.11) because it decides nothing.
+*/
 void player_update_rotation(player_t *p)
 {
-    (void)p;                                 /* the icon's spin is drawing (9.4) */
+    float surface = (float)(atan2(p->support_normal.x,
+        -p->support_normal.y * p->gravity_dir) * 180.0 / M_PI);
+
+    if (p->mode == MODE_SHIP) {
+        p->rotation = (float)(-atan2(p->vy, p->vx) * 180.0 / M_PI
+            * p->gravity_dir);
+        return;
+    }
+    if (!p->grounded) {
+        p->rotation += (float)PER_TICK(CUBE_SPIN) * (float)p->gravity_dir;
+        return;
+    }
+    p->rotation = surface + roundf((p->rotation - surface) / 90.0f) * 90.0f;
 }

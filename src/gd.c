@@ -117,6 +117,9 @@ music_t *load_musics(void)
 
 void free_gd(gd_t *gd)
 {
+    progress_free(&gd->progress);
+    sfView_destroy(gd->ui_view);
+    sfView_destroy(gd->level_view);
     free_textures(gd->res);
     free_musics(gd->musics);
     sfFont_destroy(gd->main_font);
@@ -137,26 +140,17 @@ gd_t *create_gd(void)
         dprintf(2, "my_gd: missing asset res/GDfont.ttf\n");
         exit(84);
     }
-    gd->w = create_window(1920, 1080);
+    gd->w = create_window(1280, 720);
+    gd->ui_view = sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H});
+    gd->level_view = sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H});
+    apply_letterbox(gd, sfRenderWindow_getSize(gd->w).x,
+        sfRenderWindow_getSize(gd->w).y);
     gd->cursor = create_cursor();
     gd->event = xcalloc(1, sizeof(sfEvent));
     gd->menu = 'm';
-    gd->selected_level = 1;
+    snprintf(gd->selected_id, sizeof(gd->selected_id), "1");
+    progress_load(&gd->progress, SAVE_PATH);
     return gd;
-}
-
-void handle_playing(gd_t *gd, level_t **level)
-{
-    if (*level == NULL)
-        *level = start_level(gd);
-    if (*level == NULL) {
-        gd->menu = 'l';
-        return;
-    }
-    print_level(gd, *level);
-    if ((*level)->level_completed == 'y')
-        print_cursor(gd->cursor, gd->w);
-    keyboard_events_playing(level, gd);
 }
 
 void handle_level_list(gd_t *gd, level_list_t **level_list)
@@ -204,7 +198,8 @@ int main_loop(gd_t *gd)
     level_t *level = NULL;
 
     while (sfRenderWindow_isOpen(gd->w)) {
-        sfRenderWindow_clear(gd->w, sfTransparent);
+        sfRenderWindow_clear(gd->w, sfBlack);
+        sfRenderWindow_setView(gd->w, gd->ui_view);
         if (gd->menu == 'm')
             handle_main_menu(gd, &main_menu);
         if (gd->menu == 'o')
@@ -226,7 +221,7 @@ int main_loop(gd_t *gd)
     if (level_list != NULL)
         free_level_list_menu(level_list);
     if (level != NULL)
-        free_level(level);
+        level_free(level, gd);
     free_gd(gd);
     return 0;
 }

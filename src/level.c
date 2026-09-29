@@ -2,332 +2,176 @@
 ** ALEXNEX PROJECT, 2026
 ** level
 ** File description:
-** functions to create and manage a level
+** the level scene: the fixed-timestep loop, death, respawn (3.6, 6.1)
 */
 
 #include "mygd.h"
 
-void free_block(block_t *block)
+static void log_level_warning(const char *msg)
 {
-    sfSprite_destroy(block->sprite);
-    free(block);
+    dprintf(2, "my_gd: %s\n", msg);
 }
 
-void free_spike(spike_t *spike)
+void level_count_attempt(level_t *lv)
 {
-    sfSprite_destroy(spike->sprite);
-    free(spike);
+    lv->stats.attempts += 1;
+    lv->stats.dirty = true;
 }
 
-void free_block_list(block_t **list)
+void level_record_best(level_t *lv)
 {
-    int i = 0;
+    float pct = sim_percent(&lv->sim);
 
-    if (list == NULL)
+    if (pct <= lv->stats.best)
         return;
-    while (list[i] != NULL) {
-        free_block(list[i]);
-        i += 1;
-    }
-    free(list);
+    lv->stats.best = pct;
+    lv->stats.dirty = true;
 }
 
-void free_spike_list(spike_t **list)
+/* The one place that touches the store and the file (6.2, 6.4). */
+void level_flush_stats(level_t *lv, gd_t *gd)
 {
-    int i = 0;
+    progress_entry_t *pe = NULL;
 
-    if (list == NULL)
+    if (!lv->stats.dirty)
         return;
-    while (list[i] != NULL) {
-        free_spike(list[i]);
-        i += 1;
-    }
-    free(list);
-}
-
-void free_objects(object_list_t *obj_l)
-{
-    if (obj_l != NULL) {
-        if (obj_l->ground != NULL)
-            free_block(obj_l->ground);
-        free_spike_list(obj_l->spikes);
-        free_block_list(obj_l->blocks);
-        if (obj_l->portal_blocks != NULL) {
-            free_block_list(obj_l->portal_blocks);
-            obj_l->portal_blocks = NULL;
-        }
-        free(obj_l);
-    }
-}
-
-void free_end_level_screen(end_level_screen_t *end_screen)
-{
-    if (end_screen == NULL)
+    pe = progress_get(&gd->progress, lv->id);
+    if (pe == NULL)
         return;
-    if (end_screen->background != NULL)
-        sfSprite_destroy(end_screen->background);
-    if (end_screen->title_text != NULL)
-        sfText_destroy(end_screen->title_text);
-    if (end_screen->attempts_text != NULL)
-        sfText_destroy(end_screen->attempts_text);
-    if (end_screen->percent_text != NULL)
-        sfText_destroy(end_screen->percent_text);
-    if (end_screen->retry_button != NULL)
-        free_button(end_screen->retry_button);
-    if (end_screen->quit_button != NULL)
-        free_button(end_screen->quit_button);
-    free(end_screen);
-}
-
-void free_level(level_t *level)
-{
-    if (level == NULL)
-        return;
-    free_player(level->player);
-    if (level->background != NULL)
-        sfSprite_destroy(level->background);
-    if (level->attempt_text != NULL)
-        sfText_destroy(level->attempt_text);
-    if (level->percent_text != NULL)
-        sfText_destroy(level->percent_text);
-    if (level->attempt_display_clock != NULL)
-        sfClock_destroy(level->attempt_display_clock);
-    free_end_level_screen(level->end_screen);
-    free_objects(level->objects);
-    free(level);
-}
-
-void update_percent_display(level_t *level)
-{
-    char percent_str[50];
-    
-    level->percent = (level->shift / level->level_end) * 100.0f;
-    if (level->percent > 100.0f)
-        level->percent = 100.0f;
-    if (level->percent < 0.0f)
-        level->percent = 0.0f;
-    snprintf(percent_str, 50, "%.2f%%", level->percent);
-    sfText_setString(level->percent_text, percent_str);
-}
-
-void print_objects(gd_t *gd, object_list_t *obj)
-{
-    int i = 0;
-
-    if (obj->ground != NULL) {
-        sfSprite_setPosition(obj->ground->sprite, obj->sprite_ground_pos);
-        sfRenderWindow_drawSprite(gd->w, obj->ground->sprite, NULL);
+    pe->attempts += lv->stats.attempts;
+    if (lv->stats.best > pe->best) {
+        pe->best = lv->stats.best;
+        pe->level_hash = lv->file_hash;      /* the version it was set on */
     }
-    if (obj->blocks != NULL) {
-        while (obj->blocks[i] != NULL) {
-            if (obj->blocks[i]->pos.x < 2000 && obj->blocks[i]->pos.x > -100) {
-                sfSprite_setPosition(obj->blocks[i]->sprite, obj->blocks[i]->pos);
-                sfRenderWindow_drawSprite(gd->w, obj->blocks[i]->sprite, NULL);
-            }
-            i += 1;
-        }
-    }
-    i = 0;
-    if (obj->spikes != NULL) {
-        while (obj->spikes[i] != NULL) {
-            if (obj->spikes[i]->pos.x < 2000 && obj->spikes[i]->pos.x > -100) {
-                sfSprite_setPosition(obj->spikes[i]->sprite, obj->spikes[i]->pos);
-                sfRenderWindow_drawSprite(gd->w, obj->spikes[i]->sprite, NULL);
-            }
-            i += 1;
-        }
-    }
-    i = 0;
-    if (obj->portals != NULL) {
-        while (obj->portals[i] != NULL) {
-            if (obj->portals[i]->pos.x < 2000 && obj->portals[i]->pos.x > -100) {
-                sfSprite_setPosition(obj->portals[i]->sprite, obj->portals[i]->pos);
-                sfRenderWindow_drawSprite(gd->w, obj->portals[i]->sprite, NULL);
-            }
-            i += 1;
-        }
-    }
+    if (lv->stats.practice_best > pe->practice_best)
+        pe->practice_best = lv->stats.practice_best;
+    lv->stats = (level_stats_t){0};
+    progress_save(&gd->progress);
 }
 
-void print_player(gd_t *gd, level_t *level)
+level_t *level_start(gd_t *gd, const char *id)
 {
-    if (level->player != NULL) {
-        if (level->player->sprite != NULL) {
-            if (level->player->gamemode == 'c') {
-                if (level->player->pos.y < 750 && level->player->allow_jump == 'n')
-                    sfSprite_rotate(level->player->sprite, 5.4);
-                else
-                    sfSprite_setRotation(level->player->sprite, 0);
-            }
-            if (level->player->gamemode == 'p') {
-                sfSprite_setRotation(level->player->sprite, 0);
-            }
-            sfSprite_setPosition(level->player->sprite, level->player->pos);
-            sfRenderWindow_drawSprite(gd->w, level->player->sprite, NULL);
-        }
-    }
-}
+    level_t *lv = xcalloc(1, sizeof(level_t));
+    char path[300];
 
-void print_ui_texts(gd_t *gd, level_t *level)
-{
-    sfTime elapsed;
-    float seconds;
-
-    if (level->percent_text != NULL) {
-        update_percent_display(level);
-        sfRenderWindow_drawText(gd->w, level->percent_text, NULL);
-    }
-    if (level->show_attempt_text == 'y' && level->attempt_text != NULL) {
-        elapsed = sfClock_getElapsedTime(level->attempt_display_clock);
-        seconds = sfTime_asSeconds(elapsed);
-        if (seconds < 1.5f) {
-            sfRenderWindow_drawText(gd->w, level->attempt_text, NULL);
-        } else {
-            level->show_attempt_text = 'n';
-        }
-    }
-}
-
-end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd)
-{
-    end_level_screen_t *end_screen = xcalloc(1, sizeof(end_level_screen_t));
-    char attempts_str[100];
-    char percent_str[100];
-    sfVector2f pos;
-
-    end_screen->background = sfSprite_create();
-    if (gd->res->end_level_background != NULL)
-        sfSprite_setTexture(end_screen->background, gd->res->end_level_background, sfTrue);
-    
-    end_screen->title_text = sfText_create();
-    sfText_setString(end_screen->title_text, "LEVEL COMPLETE!");
-    sfText_setFont(end_screen->title_text, gd->main_font);
-    sfText_setCharacterSize(end_screen->title_text, 80);
-    pos = create_vector_f(600, 200);
-    sfText_setPosition(end_screen->title_text, pos);
-    sfText_setOutlineThickness(end_screen->title_text, 4);
-    sfText_setFillColor(end_screen->title_text, sfWhite);
-    
-    end_screen->attempts_text = sfText_create();
-    snprintf(attempts_str, 100, "Attempts: %d", level->curr_attempts);
-    sfText_setString(end_screen->attempts_text, attempts_str);
-    sfText_setFont(end_screen->attempts_text, gd->main_font);
-    sfText_setCharacterSize(end_screen->attempts_text, 50);
-    pos = create_vector_f(700, 400);
-    sfText_setPosition(end_screen->attempts_text, pos);
-    sfText_setOutlineThickness(end_screen->attempts_text, 3);
-    sfText_setFillColor(end_screen->attempts_text, sfWhite);
-    
-    end_screen->percent_text = sfText_create();
-    snprintf(percent_str, 100, "Completion: 100%%");
-    sfText_setString(end_screen->percent_text, percent_str);
-    sfText_setFont(end_screen->percent_text, gd->main_font);
-    sfText_setCharacterSize(end_screen->percent_text, 50);
-    pos = create_vector_f(680, 500);
-    sfText_setPosition(end_screen->percent_text, pos);
-    sfText_setOutlineThickness(end_screen->percent_text, 3);
-    sfText_setFillColor(end_screen->percent_text, sfWhite);
-    
-    end_screen->retry_button = create_button(600, 700, 250, gd->res->retry_button);
-    end_screen->quit_button = create_button(1000, 700, 250, gd->res->quit_button);
-    
-    return end_screen;
-}
-
-void print_end_level_screen(gd_t *gd, end_level_screen_t *end_screen)
-{
-    if (end_screen->background != NULL)
-        sfRenderWindow_drawSprite(gd->w, end_screen->background, NULL);
-    sfRenderWindow_drawText(gd->w, end_screen->title_text, NULL);
-    sfRenderWindow_drawText(gd->w, end_screen->attempts_text, NULL);
-    sfRenderWindow_drawText(gd->w, end_screen->percent_text, NULL);
-    print_button(end_screen->retry_button, gd->w);
-    print_button(end_screen->quit_button, gd->w);
-}
-
-void print_level(gd_t *gd, level_t *level)
-{
-    if (level->shift == 0)
-        sfMusic_play(gd->musics->level1);
-    if (level->level_completed == 'y') {
-        if (level->end_screen == NULL)
-            level->end_screen = create_end_level_screen(level, gd);
-        print_end_level_screen(gd, level->end_screen);
-        return;
-    }
-    
-    if (level->background != NULL)
-        sfRenderWindow_drawSprite(gd->w, level->background, NULL);
-    print_objects(gd, level->objects);
-    if (level->objects->portal_blocks != NULL) {
-        sfRenderWindow_drawSprite(gd->w, level->objects->portal_blocks[0]->sprite, NULL);
-        sfRenderWindow_drawSprite(gd->w, level->objects->portal_blocks[1]->sprite, NULL);
-    }
-    print_player(gd, level);
-    print_ui_texts(gd, level);
-    apply_physics(level, level->objects);
-    check_collisions(gd, level, level->objects);
-}
-
-void create_ui_texts(level_t *level, gd_t *gd)
-{
-    char attempt_str[50];
-    sfVector2f attempt_pos = {860, 500};
-    sfVector2f percent_pos = {920, 20};
-
-    level->attempt_text = sfText_create();
-    snprintf(attempt_str, 50, "Attempt %d", level->curr_attempts);
-    sfText_setString(level->attempt_text, attempt_str);
-    sfText_setFont(level->attempt_text, gd->main_font);
-    sfText_setCharacterSize(level->attempt_text, 50);
-    sfText_setPosition(level->attempt_text, attempt_pos);
-    sfText_setOutlineThickness(level->attempt_text, 3);
-    sfText_setFillColor(level->attempt_text, sfWhite);
-    
-    level->percent_text = sfText_create();
-    sfText_setString(level->percent_text, "0%");
-    sfText_setFont(level->percent_text, gd->main_font);
-    sfText_setCharacterSize(level->percent_text, 40);
-    sfText_setPosition(level->percent_text, percent_pos);
-    sfText_setOutlineThickness(level->percent_text, 2);
-    sfText_setFillColor(level->percent_text, sfWhite);
-    
-    level->attempt_display_clock = sfClock_create();
-    level->show_attempt_text = 'y';
-}
-
-void reset_attempt_display(level_t *level)
-{
-    char attempt_str[50];
-    
-    snprintf(attempt_str, 50, "Attempt %d", level->curr_attempts);
-    sfText_setString(level->attempt_text, attempt_str);
-    sfClock_restart(level->attempt_display_clock);
-    level->show_attempt_text = 'y';
-    level->player->gamemode = 'c';
-}
-
-level_t *start_level(gd_t *gd)
-{
-    level_t *level = xcalloc(1, sizeof(level_t));
-    char levelpath[256];
-
-    level->background = sfSprite_create();
-    sfSprite_setTexture(level->background, gd->res->level_background, sfTrue);
-    level->player = create_player(gd);
-    level->objects = xcalloc(1, sizeof(object_list_t));
-    level->speed = 1;
-    level->level_end = 100;
-    level->curr_attempts = 1;
-    level->lvl = gd->selected_level;
-    level->level_completed = 'n';
-    snprintf(levelpath, 256, "levels/level%d", gd->selected_level);
-    if (load_level_data(levelpath, level, gd) != 0) {
-        dprintf(2, "my_gd: could not load %s\n", levelpath);
-        free_level(level);
+    snprintf(path, sizeof(path), "levels/%s.gd", id);
+    if (sim_load(&lv->sim, path, log_level_warning) != 0) {
+        dprintf(2, "my_gd: cannot load %s\n", path);
+        free(lv);
         return NULL;
     }
-    level->attempts += 1;
-    create_ui_texts(level, gd);
-    return level;
+    snprintf(lv->id, sizeof(lv->id), "%s", id);
+    level_read_header(path, &lv->sim.lvl.hdr, &lv->file_hash);
+    lv->state = LEVEL_PLAYING;
+    lv->clock = sfClock_create();
+    lv->object_sprite = sfSprite_create();
+    lv->player_sprite = sfSprite_create();
+    lv->ground_sprite = sfSprite_create();
+    sfSprite_setTexture(lv->ground_sprite, gd->res->ground, sfTrue);
+    lv->hud_text = sfText_create();
+    sfText_setFont(lv->hud_text, gd->main_font);
+    sfText_setCharacterSize(lv->hud_text, 40);
+    sfText_setOutlineThickness(lv->hud_text, 3);
+    level_count_attempt(lv);
+    sfMusic_play(gd->musics->level1);
+    return lv;
+}
+
+void level_free(level_t *lv, gd_t *gd)
+{
+    if (lv == NULL)
+        return;
+    level_flush_stats(lv, gd);               /* every way out goes through here */
+    if (lv->end_screen != NULL)
+        free_end_level_screen(lv->end_screen);
+    sfSprite_destroy(lv->object_sprite);
+    sfSprite_destroy(lv->player_sprite);
+    sfSprite_destroy(lv->ground_sprite);
+    sfText_destroy(lv->hud_text);
+    sfClock_destroy(lv->clock);
+    sim_free(&lv->sim);
+    free(lv);
+}
+
+void level_on_death(level_t *lv, gd_t *gd)
+{
+    level_record_best(lv);
+    lv->state = LEVEL_DYING;
+    lv->death_ticks = DEATH_DELAY_TICKS;
+    lv->death_pos = lv->sim.st.player.pos;
+    sfMusic_stop(gd->musics->level1);
+}
+
+void level_respawn(level_t *lv, gd_t *gd)
+{
+    sim_reset(&lv->sim);
+    lv->state = LEVEL_PLAYING;
+    lv->accumulator = 0;
+    sfClock_restart(lv->clock);
+    level_count_attempt(lv);
+    sfMusic_play(gd->musics->level1);        /* play on a stopped music restarts it */
+}
+
+/* A voluntary death: the percentage counts, but no delay and no explosion. */
+void level_restart(level_t *lv, gd_t *gd)
+{
+    if (lv->state == LEVEL_PLAYING)
+        level_record_best(lv);
+    level_respawn(lv, gd);
+}
+
+void level_on_complete(level_t *lv, gd_t *gd)
+{
+    level_record_best(lv);                   /* sim_percent is 100 here */
+    lv->state = LEVEL_COMPLETE;
+    if (lv->end_screen == NULL)
+        lv->end_screen = create_end_level_screen(lv, gd);
+}
+
+void level_step(level_t *lv, gd_t *gd, input_t in)
+{
+    if (lv->state == LEVEL_DYING) {
+        lv->death_ticks -= 1;
+        if (lv->death_ticks <= 0)
+            level_respawn(lv, gd);
+        return;
+    }
+    if (lv->state != LEVEL_PLAYING)
+        return;
+    sim_tick(&lv->sim, in);
+    if (!lv->sim.st.player.alive)
+        level_on_death(lv, gd);
+    else if (lv->sim.st.complete)
+        level_on_complete(lv, gd);
+}
+
+/*
+** Events, then whole ticks, then one render (3.6). The accumulator is an
+** integer number of microseconds x TICK_RATE, so a tick costs exactly
+** 1000000 of it and nothing ever rounds.
+*/
+void handle_playing(gd_t *gd, level_t **level)
+{
+    level_t *lv = NULL;
+    sfInt64 frame_us = 0;
+
+    if (*level == NULL)
+        *level = level_start(gd, gd->selected_id);
+    lv = *level;
+    if (lv == NULL) {
+        gd->menu = 'l';
+        return;
+    }
+    keyboard_events_playing(level, gd);
+    if (*level == NULL || !sfRenderWindow_isOpen(gd->w))
+        return;                              /* the scene changed */
+    frame_us = sfClock_restart(lv->clock).microseconds;
+    if (frame_us > 250000)
+        frame_us = 250000;                   /* no burst of ticks after a hitch */
+    lv->accumulator += frame_us * TICK_RATE;
+    while (lv->accumulator >= 1000000) {
+        level_step(lv, gd, input_for_tick(gd));
+        lv->accumulator -= 1000000;
+    }
+    level_render(gd, lv);
 }

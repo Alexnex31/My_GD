@@ -23,6 +23,17 @@ int level_parse_mem(const char *buf, size_t len, const char *source,
 /* "levels/10280.gd" -> "10280"; false when the name isn't <digits>.gd (7.2) */
 bool level_id_from_path(const char *path, char *id, size_t size);
 
+/*
+** The header and the file's hash, without building a single hitbox (7.5): the
+** level list needs a name and a version marker for every file it shows.
+** Returns 0, or -1 when the file cannot be read.
+*/
+int level_read_header(const char *path, level_header_t *hdr,
+    uint64_t *file_hash);
+
+/* FNV-1a over raw bytes: the level file's version (6.4) and the progress store. */
+uint64_t fnv1a(const void *data, size_t len);
+
 /* Hitboxes, sort by (aabb.x, line), then reach, end_shift and kill_y. */
 void level_finalize(level_data_t *lvl);
 

@@ -68,6 +68,51 @@ int sim_load_mem(sim_t *s, const char *buf, size_t len, const char *id,
     return 0;
 }
 
+static char *read_whole_file(const char *path, size_t *len);
+
+uint64_t fnv1a(const void *data, size_t len)
+{
+    const unsigned char *p = data;
+    uint64_t h = 0xcbf29ce484222325ULL;
+
+    for (size_t i = 0; i < len; i++) {
+        h ^= p[i];
+        h *= 0x100000001b3ULL;
+    }
+    return h;
+}
+
+/* The defaults sim_load_mem starts from, for a header read on its own. */
+static void header_defaults(level_header_t *hdr, const char *id)
+{
+    *hdr = (level_header_t){0};
+    snprintf(hdr->name, sizeof(hdr->name), "%s", id);
+    hdr->start = (level_start_t){
+        .pos = {PLAYER_SPAWN_X, PLAYER_SPAWN_Y}, .mode = MODE_CUBE,
+        .speed_mult = 1.0, .gravity_dir = 1};
+}
+
+int level_read_header(const char *path, level_header_t *hdr,
+    uint64_t *file_hash)
+{
+    char id[LEVEL_ID_MAX + 1] = "";
+    object_t *objs = NULL;
+    size_t count = 0;
+    size_t len = 0;
+    char *text = read_whole_file(path, &len);
+
+    if (text == NULL)
+        return -1;
+    level_id_from_path(path, id, sizeof(id));
+    header_defaults(hdr, id);
+    if (file_hash != NULL)
+        *file_hash = fnv1a(text, len);
+    level_parse_mem(text, len, id, &objs, &count, hdr, NULL);
+    free(objs);                  /* no level_finalize: the hitboxes are the cost */
+    free(text);
+    return 0;
+}
+
 /* "levels/10280.gd" -> "10280": the id is the file name, digits only (7.2). */
 bool level_id_from_path(const char *path, char *id, size_t size)
 {

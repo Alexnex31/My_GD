@@ -73,6 +73,17 @@ static void advance_y(sim_t *s, double dy)
     s->legs += 1;
 }
 
+/* The overlay's record of what this tick did (9.6). Physics never reads it. */
+static void log_debug(sim_t *s, debug_kind_t kind, vec2_t normal)
+{
+    if (s->nb_dbg >= MAX_DEBUG_EVENTS)
+        return;
+    s->dbg[s->nb_dbg].pos = s->st.player.pos;
+    s->dbg[s->nb_dbg].normal = normal;
+    s->dbg[s->nb_dbg].kind = kind;
+    s->nb_dbg += 1;
+}
+
 static bool is_passed(const sim_t *s, size_t i)
 {
     for (size_t k = 0; k < s->nb_passed; k++)
@@ -324,11 +335,13 @@ static void step_up(sim_t *s, const face_t *f, vec2_t *vel)
 
     if (death <= 1.0) {
         advance_y(s, lift.y * death);
+        log_debug(s, DBG_DEATH, (vec2_t){0.0, 0.0});
         p->alive = false;
         return;
     }
     leg_touches(s, lift, 1.0);
     advance_y(s, lift.y);
+    log_debug(s, DBG_STEP, (vec2_t){0.0, 0.0});
     p->pos.y = target;                       /* exact, like settle on a face */
     p->grounded = true;
     p->surface_rise = 0.0;
@@ -363,10 +376,12 @@ static void settle(player_t *p, const contact_t *c, double half)
 }
 
 /* Supported: the player slides along the surface at its own rise speed. */
-static void land(player_t *p, const contact_t *c, vec2_t *vel)
+static void land(sim_t *s, const contact_t *c, vec2_t *vel)
 {
+    player_t *p = &s->st.player;
     double rise = vel->x * (c->normal.x / c->normal.y) * p->gravity_dir;
 
+    log_debug(s, DBG_LAND, c->normal);
     settle(p, c, MODES[p->mode].half);
     p->grounded = true;
     p->support_normal = c->normal;
@@ -377,11 +392,14 @@ static void land(player_t *p, const contact_t *c, vec2_t *vel)
 }
 
 /* A ceiling. Surfaces never kill: a fatal head hit becomes a stop (4.3). */
-static void head_hit(player_t *p, const contact_t *c, vec2_t *vel)
+static void head_hit(sim_t *s, const contact_t *c, vec2_t *vel)
 {
+    player_t *p = &s->st.player;
     double e = MODES[p->mode].head_restitution;
     double follow = vel->x * (c->normal.x / c->normal.y) * p->gravity_dir;
 
+    log_debug(s, e < 0.0 && !is_surface(c->surface) ? DBG_DEATH : DBG_HEAD,
+        c->normal);
     if (e < 0.0 && !is_surface(c->surface)) {
         p->alive = false;
         return;
@@ -397,6 +415,7 @@ static void head_hit(player_t *p, const contact_t *c, vec2_t *vel)
 /* Steeper than 50 degrees: the player goes into it and keeps its speed. */
 static void pass_into(sim_t *s, const contact_t *c)
 {
+    log_debug(s, DBG_PASS, c->normal);
     if (!is_surface(c->surface) && s->nb_passed < MAX_CANDIDATES) {
         s->passed[s->nb_passed] = (size_t)c->surface;
         s->nb_passed += 1;
@@ -405,13 +424,13 @@ static void pass_into(sim_t *s, const contact_t *c)
 
 static void respond(sim_t *s, const contact_t *c, vec2_t *vel)
 {
-    player_t *p = &s->st.player;
+    const player_t *p = &s->st.player;
     double up_dot = -c->normal.y * p->gravity_dir;
 
     if (up_dot >= FLOOR_MIN_DOT)
-        land(p, c, vel);
+        land(s, c, vel);
     else if (up_dot <= -FLOOR_MIN_DOT)
-        head_hit(p, c, vel);
+        head_hit(s, c, vel);
     else
         pass_into(s, c);
 }
@@ -433,6 +452,7 @@ void move_and_collide(sim_t *s)
     vec2_t vel = {p->vx, p->vy};
 
     broadphase(s, tick_sweep_bounds(p));
+    s->nb_dbg = 0;                           /* the overlay's record (9.6) */
     s->legs = 0;
     s->nb_touch = 0;
     s->nb_passed = 0;
@@ -452,6 +472,7 @@ void move_and_collide(sim_t *s)
         death = leg_death_time(s, d);
         if (death <= e.t) {
             advance(s, d, death);            /* death stops everything (4.4) */
+            log_debug(s, DBG_DEATH, (vec2_t){0.0, 0.0});
             p->alive = false;
             return;
         }

@@ -1,0 +1,25 @@
+/*
+** ALEXNEX PROJECT, 2026
+** view.h
+** File description:
+** header file for my_gd project
+*/
+
+#ifndef GD_VIEW_H
+    #define GD_VIEW_H
+
+/*
+** Presentation constants (9.1). The logical screen the game draws in: the
+** window can be any size, a letterbox viewport maps this onto it (9.7).
+** These belong to the game layer, never to the simulation.
+*/
+    #define VIEW_W 1920.0f
+    #define VIEW_H 1080.0f
+
+    #define CHUNK_W 1024.0f       /* static vertex buffers, one per chunk (9.2) */
+
+typedef enum draw_layer {         /* the draw order, in the game and the editor */
+    LAYER_BLOCK, LAYER_HAZARD, LAYER_INTERACTIVE, LAYER_COUNT
+} draw_layer_t;
+
+#endif

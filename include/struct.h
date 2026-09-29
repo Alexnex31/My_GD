@@ -10,6 +10,9 @@
     #include <SFML/Graphics.h>
     #include <SFML/Audio.h>
 
+    #include "sim/progress.h"
+    #include "level.h"
+
 typedef struct cursor {
     sfSprite *cursor_s;
     sfTexture *cursor_t;
@@ -22,46 +25,6 @@ typedef struct button {
     char pressed;
 } button_t;
 
-typedef struct spike {
-    sfSprite *sprite;
-    sfVector2f pos;
-    int size;
-} spike_t;
-
-typedef struct block {
-    sfSprite *sprite;
-    sfVector2f pos;
-    int size;
-} block_t;
-
-typedef struct portal {
-    sfSprite *sprite;
-    sfVector2f pos;
-    char gamemode;
-    int size;
-} portal_t;
-
-typedef struct object_list {
-    spike_t **spikes;
-    block_t **blocks;
-    portal_t **portals;
-    block_t **portal_blocks;
-    block_t *ground;
-    sfVector2f sprite_ground_pos;
-    int nb_portals;
-} object_list_t;
-
-typedef struct player {
-    sfSprite *sprite;
-    sfVector2f pos;
-    float vy;
-    float size;
-    float orientation;
-    char gamemode;
-    char state;
-    char allow_jump;
-} player_t;
-
 typedef struct end_level_screen {
     sfSprite *background;
     sfText *title_text;
@@ -71,33 +34,14 @@ typedef struct end_level_screen {
     button_t *quit_button;
 } end_level_screen_t;
 
-typedef struct level {
-    sfSprite *background;
-    object_list_t *objects;
-    player_t *player;
-    float speed;
-    float shift;
-    float yshift;
-    float level_end;
-    float best;
-    float percent;
-    int lvl;
-    int attempts;
-    int curr_attempts;
-    sfText *attempt_text;
-    sfText *percent_text;
-    sfClock *attempt_display_clock;
-    char show_attempt_text;
-    char level_completed;
-    end_level_screen_t *end_screen;
-} level_t;
-
 typedef struct level_button {
     char *filename;
-    char *display_name;
+    char *display_name;           /* the header's name (7.2)                */
+    char id[24];                  /* the file's digits                      */
+    uint64_t file_hash;           /* the level's current version (6.4)      */
+    bool edited;                  /* the best was set on another version    */
     float best;
     int attempts;
-    int level_num;
     button_t *play_button;
     sfText *name_text;
     sfText *attempts_text;
@@ -159,10 +103,16 @@ typedef struct gd {
     music_t *musics;
     sfFont *main_font;
     sfRenderWindow *w;
+    sfView *ui_view;              /* menus and the HUD, fixed 1920x1080 (9.1) */
+    sfView *level_view;           /* the world, centered on the camera        */
+    float viewport_px_w;          /* the letterboxed viewport, window pixels  */
     cursor_t *cursor;
     sfEvent *event;
     char menu;
-    int selected_level;
+    char selected_id[24];         /* the level file's digits (7.2)            */
+    bool was_held;                /* last tick's jump input, for the edge     */
+    bool debug_overlay;           /* F3 (9.6)                                 */
+    progress_t progress;          /* attempts and best, loaded once (6.4)     */
 } gd_t;
 
 #endif

@@ -319,8 +319,31 @@ static void test_big_level(void)
     free(text);
 }
 
+/* The level list reads a name and a version marker without building shapes. */
+static void test_read_header_only(void)
+{
+    level_header_t a = {0};
+    level_header_t b = {0};
+    uint64_t ha = 0;
+    uint64_t hb = 0;
+
+    if (level_read_header("levels/7.gd", &a, &ha) != 0)
+        return;                                /* run from another directory */
+    CHECK(strncmp(a.name, "LEVEL", 5) == 0);
+    CHECK(ha != 0);
+    CHECK(level_read_header("levels/7.gd", &b, &hb) == 0);
+    CHECK(ha == hb);                           /* the same file, the same hash */
+    CHECK(level_read_header("levels/6.gd", &b, &hb) == 0);
+    CHECK(ha != hb);                           /* a different one, another hash */
+    CHECK(level_read_header("levels/nope.gd", &b, &hb) == -1);
+    /* FNV-1a, against its published value for "a" */
+    CHECK(fnv1a("a", 1) == 0xaf63dc4c8601ec8cULL);
+    CHECK(fnv1a("", 0) == 0xcbf29ce484222325ULL);
+}
+
 void test_parser(void)
 {
+    test_read_header_only();
     test_basic_level();
     test_whitespace_and_comments();
     test_header_fields();

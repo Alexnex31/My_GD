@@ -17,5 +17,6 @@ void test_tick(void);
 void test_slopes(void);
 void test_portal(void);
 void test_start(void);
+void test_progress(void);
 
 #endif

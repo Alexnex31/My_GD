@@ -22,6 +22,9 @@ void sim_snapshot_init(sim_snapshot_t *snap, const sim_t *s);      /* allocates 
 void sim_snapshot_save(sim_snapshot_t *snap, const sim_t *s);
 void sim_snapshot_restore(sim_t *s, const sim_snapshot_t *snap);
 void sim_snapshot_free(sim_snapshot_t *snap);
+/* The jump zone of the last tick (4.3), for the F3 overlay: read only. */
+void sim_jump_zone(const sim_t *s, rect_t *out, double *y_line);
+
 uint64_t sim_state_hash(const sim_t *s);       /* hash of the whole run state */
 uint64_t sim_physics_hash(const sim_t *s);     /* the same without the camera (bot memo, 3.3) */
 

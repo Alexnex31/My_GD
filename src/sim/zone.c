@@ -10,6 +10,7 @@
 #include "sim/geom.h"
 #include "sim/internal.h"
 #include "sim/modes.h"
+#include "sim/sim.h"
 #include "sim/sweep.h"
 
 #define ZONE_SKIN (2.0 * CONTACT_SKIN)       /* covers the gap kept from slopes */
@@ -79,6 +80,12 @@ static bool zone_surface(const sim_t *s, rect_t zone)
         return false;
     return (zone.y + zone.h >= b->bottom && zone.y <= b->bottom)
         || (zone.y + zone.h >= b->top && zone.y <= b->top);
+}
+
+/* The same rectangle, for the overlay to draw (9.6). Nothing here reads it. */
+void sim_jump_zone(const sim_t *s, rect_t *out, double *y_line)
+{
+    *out = zone_rect(&s->st.player, y_line);
 }
 
 /*

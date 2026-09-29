@@ -20,6 +20,7 @@ int main(void)
     test_slopes();
     test_portal();
     test_start();
+    test_progress();
     if (failures == 0)
         printf("all tests passed\n");
     else

@@ -65,96 +65,87 @@ void print_level_list(level_list_t *level_list, sfRenderWindow *w)
     }
 }
 
-int count_levels(void)
+/* A level is levels/<digits>.gd and nothing else (7.2, 7.5). */
+static bool level_file_id(const char *name, char *id, size_t size)
 {
-    int nb = 0;
-    DIR *d = opendir("levels");
-    struct dirent *dir;
+    size_t n = strlen(name);
 
-    if (d == NULL)
-        return 0;
-    dir = readdir(d);
-    while (dir != NULL) {
-        if (dir->d_name[0] != '.')
-            nb += 1;
-        dir = readdir(d);
-    }
-    closedir(d);
-    return nb;
+    if (n < 4 || strcmp(name + n - 3, ".gd") != 0 || n - 3 >= size)
+        return false;
+    for (size_t i = 0; i < n - 3; i++)
+        if (name[i] < '0' || name[i] > '9')
+            return false;
+    memcpy(id, name, n - 3);
+    id[n - 3] = '\0';
+    return true;
 }
 
+static int cmp_id(const void *a, const void *b)
+{
+    long ia = atol(*(char *const *)a);
+    long ib = atol(*(char *const *)b);
+
+    return (ia > ib) - (ia < ib);            /* 2 before 10, unlike strcmp */
+}
+
+/* The ids in levels/, sorted numerically. NULL terminated. */
 char **fill_names_list(void)
 {
-    int nb = count_levels();
     DIR *d = opendir("levels");
-    struct dirent *dir;
-    char **names;
-    int i = 0;
+    struct dirent *dir = NULL;
+    char **ids = NULL;
+    char id[24];
+    int n = 0;
 
     if (d == NULL)
         return NULL;
-    dir = readdir(d);
-    names = xcalloc(nb + 1, sizeof(char *));
-    while (dir != NULL) {
-        if (dir->d_name[0] != '.') {
-            names[i] = strdup(dir->d_name);
-            i += 1;
-        }
-        dir = readdir(d);
+    ids = xcalloc(257, sizeof(char *));
+    for (dir = readdir(d); dir != NULL && n < 256; dir = readdir(d)) {
+        if (level_file_id(dir->d_name, id, sizeof(id))) {
+            ids[n] = strdup(id);
+            n += 1;
+        } else if (dir->d_name[0] != '.')
+            dprintf(2, "my_gd: levels/%s is not <digits>.gd, skipped\n",
+                dir->d_name);
     }
-    names[i] = NULL;
     closedir(d);
-    return names;
+    qsort(ids, n, sizeof(char *), cmp_id);
+    return ids;
 }
 
-void read_level_info(char *filepath, int *level_num, int *attempts, float *best)
+int count_levels(void)
 {
-    FILE *f = fopen(filepath, "r");
-    char *line = NULL;
-    size_t len = 0;
-    ssize_t nread;
-    char **arr;
+    char **ids = fill_names_list();
+    int n = 0;
 
-    *level_num = 0;
-    *attempts = 0;
-    *best = 0.0f;
-    if (f == NULL)
-        return;
-    nread = getline(&line, &len, f);
-    if (nread <= 0) {
-        fclose(f);
-        return;
-    }
-    arr = my_str_to_word_array(line);
-    if (arr[0] != NULL)
-        *level_num = atoi(arr[0]);
-    if (arr[1] != NULL)
-        *attempts = atoi(arr[1]);
-    if (arr[2] != NULL)
-        *best = atof(arr[2]);
-    free_arr(arr);
-    free(line);
-    fclose(f);
+    if (ids == NULL)
+        return 0;
+    while (ids[n] != NULL)
+        n += 1;
+    free_arr(ids);
+    return n;
 }
 
-char *create_display_name(char *filename)
+/* The prose name from the file's header, the numbers from the store (6.4). */
+static void fill_level_info(level_button_t *lb, gd_t *gd)
 {
-    int len = strlen(filename);
-    char *name = malloc(len + 1);
-    int i = 0;
+    level_header_t hdr = {0};
+    progress_entry_t *pe = progress_get(&gd->progress, lb->id);
+    uint64_t hash = 0;
 
-    while (filename[i] != '\0') {
-        if (filename[i] >= 'a' && filename[i] <= 'z')
-            name[i] = filename[i] - 32;
-        else
-            name[i] = filename[i];
-        i += 1;
-    }
-    name[i] = '\0';
-    return name;
+    if (level_read_header(lb->filename, &hdr, &hash) == 0)
+        lb->display_name = strdup(hdr.name);
+    else
+        lb->display_name = strdup(lb->id);
+    lb->file_hash = hash;
+    if (pe == NULL)
+        return;
+    lb->attempts = pe->attempts;
+    lb->best = pe->best;
+    lb->edited = pe->level_hash != 0 && pe->level_hash != hash;
 }
 
-level_button_t *create_level_button(char *filename, int index, gd_t *gd)
+level_button_t *create_level_button(char *id, int index, gd_t *gd)
 {
     level_button_t *lb = xcalloc(1, sizeof(level_button_t));
     char filepath[256];
@@ -164,10 +155,10 @@ level_button_t *create_level_button(char *filename, int index, gd_t *gd)
     float y = 200 + (index / 3) * 250;
     sfVector2f text_pos;
 
-    snprintf(filepath, 256, "levels/%s", filename);
+    snprintf(filepath, 256, "levels/%s.gd", id);
     lb->filename = strdup(filepath);
-    lb->display_name = create_display_name(filename);
-    read_level_info(filepath, &lb->level_num, &lb->attempts, &lb->best);
+    snprintf(lb->id, sizeof(lb->id), "%s", id);
+    fill_level_info(lb, gd);
     lb->play_button = create_button(x + 200, y + 100, 100, gd->res->play_button);
     lb->name_text = sfText_create();
     text_pos = create_vector_f(x, y);
@@ -185,7 +176,9 @@ level_button_t *create_level_button(char *filename, int index, gd_t *gd)
     sfText_setCharacterSize(lb->attempts_text, 25);
     sfText_setPosition(lb->attempts_text, text_pos);
     lb->best_text = sfText_create();
-    best_str = float_to_str(lb->best);
+    best_str = xcalloc(64, 1);
+    snprintf(best_str, 64, "Best: %.2f%%%s", lb->best,
+        lb->edited ? " (edited)" : "");
     text_pos = create_vector_f(x, y + 80);
     sfText_setString(lb->best_text, best_str);
     sfText_setFont(lb->best_text, gd->main_font);

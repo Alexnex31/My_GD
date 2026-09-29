@@ -139,7 +139,8 @@ void handle_level_buttons_click(level_list_t **lvl_list, gd_t *gd, int mx, int m
 
     while (i < (*lvl_list)->nb_levels) {
         if (check_level_button_click((*lvl_list)->level_buttons[i], mx, my)) {
-            gd->selected_level = (*lvl_list)->level_buttons[i]->level_num;
+            snprintf(gd->selected_id, sizeof(gd->selected_id), "%s",
+                (*lvl_list)->level_buttons[i]->id);
             free_level_list_menu(*lvl_list);
             *lvl_list = NULL;
             gd->menu = 'P';
@@ -169,19 +170,18 @@ void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
 
 void go_back_playing_level_list(gd_t *gd, level_t **level)
 {
-    free_level(*level);
+    level_free(*level, gd);                  /* flushes the session's numbers */
     *level = NULL;
     gd->menu = 'l';
 }
 
 void retry_level(gd_t *gd, level_t **level)
 {
-    int selected = gd->selected_level;
-    
-    free_level(*level);
-    *level = NULL;
-    gd->selected_level = selected;
-    *level = start_level(gd);
+    char id[24];
+
+    snprintf(id, sizeof(id), "%s", (*level)->id);
+    level_free(*level, gd);
+    *level = level_start(gd, id);
 }
 
 int check_end_screen_buttons(end_level_screen_t *end_screen, int mx, int my)
@@ -209,57 +209,51 @@ void handle_end_screen_click(level_t **level, gd_t *gd, int mx, int my)
     if ((*level)->end_screen == NULL)
         return;
     result = check_end_screen_buttons((*level)->end_screen, mx, my);
-    if (result == 1) {
-        rewrite_level(*level, gd);
+    if (result == 1)
         retry_level(gd, level);
-    } else if (result == 2) {
-        rewrite_level(*level, gd);
+    else if (result == 2)
         go_back_playing_level_list(gd, level);
-    }
 }
 
-void jump(level_t *level)
+/* The level scene's events. The jump itself is polled per tick (3.6). */
+static void playing_key(level_t **level, gd_t *gd, sfKeyCode key)
 {
-    if (level->level_completed == 'y')
-        return;
-
-    if (level->player->gamemode == 'c') {
-        if (level->player->allow_jump == 'y') {
-            level->player->vy = 26;
-            level->player->allow_jump = 'n';
-        }
-        return;
-    }
-    if (level->player->gamemode == 'p') {
-        level->player->vy += 3.5;
-    }
+    if (key == sfKeyEscape)
+        return go_back_playing_level_list(gd, level);
+    if (key == sfKeyF3)
+        gd->debug_overlay = !gd->debug_overlay;
+    if (key == sfKeyR && (*level)->state != LEVEL_COMPLETE)
+        level_restart(*level, gd);
 }
 
 void keyboard_events_playing(level_t **level, gd_t *gd)
 {
+    sfVector2i pixel;
+    sfVector2f pos;
+
     while (sfRenderWindow_pollEvent(gd->w, gd->event)) {
         if (gd->event->type == sfEvtClosed) {
-            rewrite_level(*level, gd);
+            level_free(*level, gd);
+            *level = NULL;
             close_window(gd->w);
             return;
         }
-        if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeyEscape) {
-            rewrite_level(*level, gd);
-            go_back_playing_level_list(gd, level);
+        if (gd->event->type == sfEvtResized)
+            apply_letterbox(gd, gd->event->size.width, gd->event->size.height);
+        if (gd->event->type == sfEvtGainedFocus)
+            sfClock_restart((*level)->clock);   /* no burst after a pause */
+        if (gd->event->type == sfEvtKeyPressed) {
+            playing_key(level, gd, gd->event->key.code);
+            if (*level == NULL)
+                return;
+        }
+        if (gd->event->type == sfEvtMouseButtonPressed
+            && (*level)->state == LEVEL_COMPLETE) {
+            pixel = (sfVector2i){gd->event->mouseButton.x,
+                gd->event->mouseButton.y};
+            pos = sfRenderWindow_mapPixelToCoords(gd->w, pixel, gd->ui_view);
+            handle_end_screen_click(level, gd, (int)pos.x, (int)pos.y);
             return;
         }
-        if ((*level)->level_completed == 'y') {
-            if (gd->event->type == sfEvtMouseButtonPressed && gd->event->mouseButton.button == sfMouseLeft) {
-                handle_end_screen_click(level, gd, gd->event->mouseButton.x, gd->event->mouseButton.y);
-                return;
-            }
-        } else {
-            if (gd->event->type == sfEvtMouseButtonPressed) {
-                jump(*level);
-                return;
-            }
-        }
     }
-    if (sfKeyboard_isKeyPressed(sfKeyUp) == sfTrue || sfKeyboard_isKeyPressed(sfKeySpace) == sfTrue)
-        jump(*level);
 }

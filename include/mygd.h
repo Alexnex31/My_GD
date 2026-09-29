@@ -18,6 +18,8 @@
     #include <math.h>
     #include <dirent.h>
     #include "struct.h"
+    #include "level.h"
+    #include "view.h"
 
 void my_putchar(char c);
 int my_putstr(char const *str);
@@ -65,11 +67,10 @@ void free_level_list_menu(level_list_t *level_list);
 void print_level_list(level_list_t *level_list, sfRenderWindow *w);
 level_list_t *create_level_list(gd_t *gd);
 
-void free_level(level_t *level);
-void print_level(gd_t *gd, level_t *level);
-level_t *start_level(gd_t *gd);
-void reset_attempt_display(level_t *level);
 int check_end_screen_buttons(end_level_screen_t *end_screen, int mx, int my);
+end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd);
+void print_end_level_screen(gd_t *gd, end_level_screen_t *end_screen);
+void free_end_level_screen(end_level_screen_t *end_screen);
 
 
 void keyboard_events_main_menu(main_m_t **menu, gd_t *gd);
@@ -79,20 +80,10 @@ void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd);
 void keyboard_events_playing(level_t **level, gd_t *gd);
 
 
-int load_level_data(char *levelname, level_t *level, gd_t *gd);
-void rewrite_level(level_t *level, gd_t *gd);
+/* The letterbox of 9.7, applied to both views on every resize. */
+void apply_letterbox(gd_t *gd, unsigned int w, unsigned int h);
 
-void free_block(block_t *block);
-void free_spike(spike_t *spike);
-void free_block_list(block_t **list);
-
-void free_player(player_t *player);
-player_t *create_player(gd_t *gd);
-
-
-void apply_physics(level_t *level, object_list_t *obj);
-void check_collisions(gd_t *gd, level_t *level, object_list_t *obj);
-
-void load_portal(char **arr, level_t *level, gd_t *gd);
+/* The F3 overlay (9.6): shapes, hitboxes, the tick's events, the numbers. */
+void render_debug_overlay(gd_t *gd, level_t *lv, vec2_t cam);
 
 #endif

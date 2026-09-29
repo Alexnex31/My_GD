@@ -42,6 +42,7 @@ typedef enum hold_state {     /* 3.4: GD's buffered clicks and orb locking */
     HOLD_USED                 /* down, already used: jumps, but no orbs    */
 } hold_state_t;
 
+#define MAX_DEBUG_EVENTS 8
 #define HB_MAX_VERTS 4
 #define HB_MAX_AXES (HB_MAX_VERTS + 2)   /* y and x, then the shape's own (G.2) */
 
@@ -181,6 +182,22 @@ typedef struct event {   /* what cuts a leg of the move short (4.4) */
     face_t step;         /* EV_STEP: the face to climb onto          */
 } event_t;
 
+/*
+** What the tick did, for the F3 overlay (9.6). Scratch, never run state: it is
+** out of the hash, out of snapshots and out of replays, and NOTHING under
+** src/sim/ may read it back -- the moment physics depends on it, the run stops
+** being reproducible.
+*/
+typedef enum debug_kind {
+    DBG_LAND, DBG_HEAD, DBG_PASS, DBG_STEP, DBG_DEATH
+} debug_kind_t;
+
+typedef struct debug_event {
+    vec2_t pos;               /* the player's center when it happened        */
+    vec2_t normal;            /* the contact's normal; (0,0) for a step      */
+    debug_kind_t kind;
+} debug_event_t;
+
 typedef struct sim {                  /* the run state, plus this tick's scratch space */
     level_data_t lvl;
     run_state_t st;
@@ -193,6 +210,8 @@ typedef struct sim {                  /* the run state, plus this tick's scratch
     int legs;                         /* legs advanced this tick: path positions     */
     double tick_x0;                   /* distance when the tick started (3.2)        */
     double tick_left;                 /* the fraction of the tick still to travel    */
+    debug_event_t dbg[MAX_DEBUG_EVENTS];   /* what this tick did, for 9.6 only       */
+    int nb_dbg;
 } sim_t;
 
 static inline bool is_spent(const run_state_t *st, size_t i)
