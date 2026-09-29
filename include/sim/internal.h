@@ -21,6 +21,10 @@ void player_update_rotation(player_t *p);          /* cosmetic (9.4) */
 void move_and_collide(sim_t *s);                   /* 4.4 */
 void collide_kill_ceiling(player_t *p, const level_data_t *lvl);   /* 4.7 */
 void update_can_jump(sim_t *s);                    /* the jump zone (4.3) */
+void leg_touches(sim_t *s, vec2_t d, double t_end);   /* interactive, 4.6 */
+void apply_interactive(sim_t *s);                  /* tick step 5 (4.6, 5.1) */
+void corridor_from_center(sim_t *s, double center);   /* 5.2, and the start */
 void camera_follow(camera_t *c, const player_t *p, const ship_bounds_t *b);
+double camera_rest_y(const player_t *p, const ship_bounds_t *b);   /* 7.2 */
 
 #endif

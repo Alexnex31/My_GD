@@ -43,7 +43,8 @@ void level_finalize(level_data_t *lvl)
     }
     lvl->end_shift = 100.0;              /* an empty level is legal, and short */
     if (lvl->nb_objects > 0)
-        lvl->end_shift = fmax(right + LEVEL_END_PADDING, 100.0);
+        lvl->end_shift = fmax(right + LEVEL_END_PADDING
+            - lvl->hdr.start.pos.x, 100.0);   /* the run is measured from the spawn */
     lvl->kill_y = top - KILL_CEILING_MARGIN;
 }
 
@@ -52,10 +53,14 @@ int sim_load_mem(sim_t *s, const char *buf, size_t len, const char *id,
 {
     memset(s, 0, sizeof(*s));
     snprintf(s->lvl.id, sizeof(s->lvl.id), "%s", id);
-    s->lvl.hdr.version = 2;                  /* the current format (7.2) */
     snprintf(s->lvl.hdr.name, sizeof(s->lvl.hdr.name), "%s", id);
+    s->lvl.hdr.start = (level_start_t){   /* what the start_ fields override (7.2) */
+        .pos = {PLAYER_SPAWN_X, PLAYER_SPAWN_Y}, .mode = MODE_CUBE,
+        .speed_mult = 1.0, .gravity_dir = 1};
     level_parse_mem(buf, len, id, &s->lvl.objects, &s->lvl.nb_objects,
         &s->lvl.hdr, log);
+    if (s->lvl.hdr.start.mini && log != NULL)
+        log("start_size mini has no effect yet: the mini scale is FEATURES 10.4");
     level_finalize(&s->lvl);
     s->st.spent_words = (s->lvl.nb_objects + 63) / 64;
     s->st.spent = sim_xcalloc(s->st.spent_words + 1, sizeof(uint64_t));

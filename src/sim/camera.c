@@ -7,6 +7,18 @@
 
 #include "sim/internal.h"
 
+/* Where the camera would already have settled for this player (3.5, 7.2). */
+double camera_rest_y(const player_t *p, const ship_bounds_t *b)
+{
+    double y = 0.0;                          /* the ground view */
+
+    if (b->active)
+        return b->top - (VIEW_HEIGHT - (b->bottom - b->top)) / 2.0;
+    if (p->pos.y - y < CAM_TOP_MARGIN)
+        y = p->pos.y - CAM_TOP_MARGIN;
+    return y > 0.0 ? 0.0 : y;
+}
+
 void camera_follow(camera_t *c, const player_t *p, const ship_bounds_t *b)
 {
     double sy = p->pos.y - c->pos.y;         /* the player's screen y */

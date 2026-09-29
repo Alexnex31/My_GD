@@ -58,13 +58,13 @@ static int touch_cmp(const void *a, const void *b)
 }
 
 /*
-** The corridor a mode's portal opens: as tall as the mode says, centered on
-** the portal, snapped to the grid, and never below the ground (5.2).
+** The corridor a mode opens: as tall as the mode says, centered on the given
+** y, snapped to the grid, and never below the ground (5.2). A portal centers
+** it on itself; the start of an attempt centers it on the player (7.2).
 */
-static void center_corridor(sim_t *s, const object_t *portal)
+void corridor_from_center(sim_t *s, double center)
 {
     double height = MODES[s->st.player.mode].corridor_height;
-    double center = portal->rect.y + portal->rect.h / 2.0;
     double top = center - height / 2.0;
     ship_bounds_t *b = &s->st.bounds;
 
@@ -86,7 +86,7 @@ static void enter_portal(sim_t *s, const object_t *o)
 {
     s->st.player.mode = o->portal_mode;
     if (MODES[o->portal_mode].corridor_height > 0.0)
-        center_corridor(s, o);
+        corridor_from_center(s, o->rect.y + o->rect.h / 2.0);
     else
         s->st.bounds.active = false;         /* its boundaries stop existing now */
 }

@@ -1,5 +1,4 @@
 name LEVEL 5
-version 2
 
 block 1700 650 2
 block 1700 550 2

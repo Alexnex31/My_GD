@@ -1002,30 +1002,39 @@ void sim_reset(sim_t *s)
 {
     run_state_t *st = &s->st;
 
+    const level_start_t *start = &s->lvl.hdr.start;   /* the start_ fields (7.2) */
+
     st->player = (player_t){
-        .pos = {PLAYER_SPAWN_X, PLAYER_SPAWN_Y},
-        .prev_pos = {PLAYER_SPAWN_X, PLAYER_SPAWN_Y},
-        .vx = PER_TICK(SCROLL_SPEED),
-        .gravity_dir = 1,
-        .mode = MODE_CUBE,
-        .grounded = true,
-        .can_jump = true,
+        .pos = start->pos,
+        .prev_pos = start->pos,
+        .vx = PER_TICK(SCROLL_SPEED) * start->speed_mult,
+        .gravity_dir = start->gravity_dir,
+        .mode = start->mode,
         .hold = HOLD_FRESH,                   /* a hold carried into the attempt is fresh */
-        .support_normal = {0.0, -1.0},        /* standing on the ground */
+        .support_normal = {0.0, (double)-start->gravity_dir},
         .alive = true,
     };
     st->cam = (camera_t){{0.0, 0.0}};
     st->bounds = (ship_bounds_t){0};
     st->tick = 0;
     st->distance = 0.0;
-    st->speed_mult = 1.0;
+    st->speed_mult = start->speed_mult;
     st->first_active = 0;
     st->complete = false;
     memset(st->spent, 0, st->spent_words * sizeof(uint64_t));   /* every interactive object is live again */
+    if (MODES[start->mode].corridor_height > 0.0)
+        corridor_from_center(s, start->pos.y);   /* the same rule as a portal (5.2) */
+    st->player.grounded = starts_on_the_floor(s);
+    st->player.can_jump = st->player.grounded;
+    st->cam.pos.y = camera_rest_y(&st->player, &st->bounds);
 }
 ```
 
-Every attempt, including the first, starts at `(350, 800)`, already on the ground. Today the first attempt spawns 50 px further right than the retries (F2); that's gone.
+Every attempt, including the first, starts where the level's header says: `(350, 800)` on the ground unless a `start_` field moves it (7.2). Today the first attempt spawns 50 px further right than the retries (F2); that's gone.
+
+`starts_on_the_floor` is what seeds `grounded` and `can_jump`: the player's feet (`pos.y + half × gravity_dir`) exactly on the ground, or on the corridor's floor when the attempt starts inside a corridor. Anywhere else the attempt starts in the air with `can_jump = false`, and the jump zone of the first tick decides from then on (4.3). `camera_rest_y` puts the camera where the follow of 3.5 would already have settled, so a start high above the ground doesn't open with a one-second pan.
+
+**`distance` is measured from the spawn**, so 0% is wherever the attempt starts and `end_shift` is `last_object_right + LEVEL_END_PADDING − start.pos.x` (4.1).
 
 Percentage:
 
@@ -2060,7 +2069,8 @@ The file is a **header** then a **body**:
 # comments and blank lines are ignored, anywhere
 name Stereo Madness
 author Alexnex
-version 2
+music stereo_madness.ogg
+start_gamemode ship               # optional: the start_ fields all have defaults
 
 block 1000 200 1
 spike 3000 750 2
@@ -2071,18 +2081,54 @@ slope 6100 750 2 w=4 h=2          # 200 x 100: a 26.6 deg slope
 portal 2100 750 2 ship
 ```
 
-**Header.** Every line whose first word isn't an object type is a header field: `key <rest of the line>`. There's no separator and no fixed order; by convention the header sits at the top. Fields:
+**Header.** Every line whose first word isn't an object type is a header field: `key <value>`. The key is the first word; the value is the rest of the line, trimmed of the blanks around it, inner spaces kept. There's no separator between header and body and no fixed order; by convention the header sits at the top, then a blank line, then the objects. Fields:
 
-| Key | Meaning | Default |
+| Key | Value | Default |
 |---|---|---|
 | `name` | the level's prose name, shown in the list and on the end screen | the id |
 | `author` | who made it | empty |
-| `version` | the format version this file was written for | 2 |
-| `song` | a file in `res/songs/` (FEATURES 4.5) | empty: the menu default |
-| `offset` | seconds of song to skip at the start (FEATURES 4.4) | 0 |
-| `bpm`, `first_beat` | the editor's beat grid (FEATURES 11.10) | 0 |
+| `music` | a file in `res/songs/`, as `songs.txt` names it (FEATURES 4.3, 4.5) | empty: the menu default |
+| `music_offset` | seconds of song to skip at the start (FEATURES 4.4) | 0 |
+| `bpm` | the editor's beat grid (FEATURES 11.11) | 0: no grid |
+| `first_beat` | song time in seconds of beat 0, which the grid counts from | 0 |
+| `start_gamemode` | `cube`, `ship`, … : the mode the attempt starts in | `cube` |
+| `start_speed` | `0.5`, `1`, `2`, `3` or `4`, a speed portal's own values (FEATURES 10.3) | `1` |
+| `start_size` | `normal` or `mini` (FEATURES 10.4) | `normal` |
+| `start_gravity` | `normal` or `flipped` | `normal` |
+| `start_x`, `start_y` | the player's **center** at the start, in world pixels | `350`, `800` |
 
-An unknown key is a warning and is ignored, so a file written by a newer build still opens; the editor keeps those lines verbatim when it saves (FEATURES 11.1).
+That's the whole list. **There is no `version` field**: the format is whatever this build reads, and a file that doesn't fit it is fixed by hand, not migrated. A number a field can't use (`bpm abc`) warns and keeps the default.
+
+**The `start_` fields are optional and independent**: each one that isn't in the file keeps its default, so a level that writes none of them starts exactly like every level does today. Together they're the arguments of `sim_reset` (3.4), which is why they live in their own struct:
+
+```c
+typedef struct level_start {  /* where and how an attempt starts (7.2) */
+    vec2_t pos;               /* start_x, start_y: the player's center           */
+    gamemode_t mode;          /* start_gamemode                                  */
+    double speed_mult;        /* start_speed: 0.5, 1, 2, 3 or 4                  */
+    int gravity_dir;          /* start_gravity: +1 normal, -1 flipped            */
+    bool mini;                /* start_size: needs the mini scale (FEATURES 10.4) */
+} level_start_t;
+```
+
+What they imply, all of it already in 3.4's `sim_reset`:
+
+- **`start_x` moves 0%.** `distance` counts from the spawn, so the run is `last_object_right + LEVEL_END_PADDING − start_x` long and the percentage is honest wherever the level starts.
+- **A corridor mode opens its corridor at the spawn**, centered on `start_y` with a portal's own rule (5.2), and the camera starts locked on it.
+- **The player starts grounded only if its feet are exactly on the floor** (the ground, or the corridor's floor). Otherwise the attempt starts in the air, `can_jump = false`.
+- **`start_gravity flipped`** starts the whole attempt upside down: the kill ceiling of 4.7 applies from tick 1, as it does after any gravity portal.
+- **`start_size mini`** is parsed and stored, and does nothing until the mini scale exists (FEATURES 10.4); loading such a level says so once.
+- An unknown gamemode, a speed that isn't one of the five, or a word that isn't the field's two: one warning, the default kept.
+
+The exact rules, so a file always loads the same way:
+
+- **Keys are lowercase and matched exactly.** `Name` is not `name`: it's an unknown field.
+- **`block`, `slope`, `spike` and `portal` can never be keys**, because the type is tested first (7.3). Every other first word is a header field, which is also why a typo'd object line (`blok 1000 700 2`) is reported as an unknown header field and not as a broken object.
+- **A `#` ends the line**, in the header as well as in the body, so a value can't contain one.
+- **The same key twice: the last one wins.** The editor writes each field once.
+- **An empty value is ignored with a warning** and the default is kept, so `name` on its own never blanks the level's name.
+- **A value longer than the field is truncated with a warning**: 127 characters for `name`, 63 for `author` and `music`.
+- **An unknown key is one warning and is ignored**, the rest of the file still loads, so a file written by a newer build still opens and the editor keeps those lines verbatim when it saves (FEATURES 11.1).
 
 **Player progress is never in the level file**: attempts, best and practice best live in `save/progress.txt`, keyed by the id (6.4). A level file only describes the level, so editing or sharing one never touches anyone's records, and the game never writes to `levels/`.
 
@@ -2107,7 +2153,7 @@ Why `rot=` instead of `up|down|left|right`: an angle covers the four directions 
 
 Sizes: `size`, `w` and `h` must be at least 1. Zero or negative rejects the line (a zero-size object would be invisible and touch nothing, so it's always a mistake). There's no maximum.
 
-**No migration.** The legacy format (a first line of `id attempts best`, files named `levelN`) is not read at all: the seven levels that existed were converted once by hand, and the old copies are kept outside the repository. A legacy file loads as a level whose first line is an invalid object, with one warning.
+**No migration, ever.** The legacy format (a first line of `id attempts best`, files named `levelN`) is not read at all: the seven levels that existed were converted once by hand, and the old copies are kept outside the repository. A legacy file loads as a level whose first line is an invalid object, with one warning.
 
 ### 7.3 Parser
 

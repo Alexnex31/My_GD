@@ -64,7 +64,8 @@ A level is a text file in `levels/`, named after its **id**: digits only, with a
 ```text
 name Stereo Madness          # the header: what the level is
 author Alexnex
-version 2
+music stereo_madness.ogg
+start_gamemode ship          # optional: where and how the attempt starts
 
 # the body: one object per line
 block 1000 200 1
@@ -74,7 +75,7 @@ slope 6000 750 2             # 100 x 100, 45 deg, rising to the right
 portal 2100 750 2 ship
 ```
 
-- **Header**: any line whose first word isn't an object type. `name`, `author`, `version`, and later `song`, `offset`, `bpm`, `first_beat`. Unknown keys are ignored with a warning.
+- **Header**: any line whose first word isn't an object type, written `key <value>`. `name`, `author`, `music`, `music_offset`, `bpm` and `first_beat` describe the level; the optional `start_gamemode`, `start_speed`, `start_size`, `start_gravity`, `start_x` and `start_y` say where and how an attempt begins. Unknown keys are ignored with a warning, so the file still loads.
 - **Body**: `type x y size [word] [key=value ...]`, with types `block`, `slope`, `spike` and `portal` (whose word is the gamemode: `cube`, `ship`).
 - `x` and `y` are the object's top-left corner in world pixels, `y` grows downward and the ground's surface is at `y = 850`.
 - `size` is in grid units of 50 px, so `size 2` is the 100 x 100 block that matches the player. `w=` and `h=` override it per axis, `rot=` turns the object by any angle.

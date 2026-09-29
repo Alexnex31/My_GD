@@ -74,14 +74,22 @@ typedef struct object {       /* level data: never modified after load */
     int line;                 /* source line, for messages and stable sort      */
 } object_t;
 
+typedef struct level_start {  /* where and how an attempt starts (7.2) */
+    vec2_t pos;               /* start_x, start_y: the player's center           */
+    gamemode_t mode;          /* start_gamemode                                  */
+    double speed_mult;        /* start_speed: 0.5, 1, 2, 3 or 4                  */
+    int gravity_dir;          /* start_gravity: +1 normal, -1 flipped            */
+    bool mini;                /* start_size: needs the mini scale (FEATURES 10.4) */
+} level_start_t;
+
 typedef struct level_header { /* the level file's header fields (7.2) */
     char name[128];           /* the prose name; the id when the file has none  */
     char author[64];
-    int version;              /* format version the file was written for        */
-    char song[64];            /* a file in res/songs (FEATURES 4.5), "" = none  */
-    double offset;            /* seconds of song skipped at the start           */
-    double bpm;               /* the editor's beat grid (FEATURES 11.10)        */
-    double first_beat;
+    char music[64];           /* a file in res/songs (FEATURES 4.5), "" = none  */
+    double music_offset;      /* seconds of song skipped at the start           */
+    double bpm;               /* the editor's beat grid (FEATURES 11.11)        */
+    double first_beat;        /* song time of beat 0, with bpm (FEATURES 11.11) */
+    level_start_t start;
 } level_header_t;
 
 typedef struct level_data {   /* immutable after sim_load */

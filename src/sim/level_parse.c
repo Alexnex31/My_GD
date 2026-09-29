@@ -195,8 +195,12 @@ static int parse_object(char *line, object_t *o, parse_ctx_t *ctx)
     return object_init(o, word, ctx);
 }
 
-/* The rest of a header line, trimmed, into a fixed buffer (7.2). */
-static void take_text(const char *line, char *out, size_t size)
+/*
+** The rest of a header line, trimmed, into a fixed buffer (7.2). An empty
+** value keeps the field's default instead of blanking it.
+*/
+static bool take_text(const char *line, char *out, size_t size,
+    parse_ctx_t *ctx)
 {
     size_t len;
 
@@ -205,10 +209,43 @@ static void take_text(const char *line, char *out, size_t size)
     len = strlen(line);
     while (len > 0 && (line[len - 1] == ' ' || line[len - 1] == '\t'))
         len -= 1;
-    if (len >= size)
+    if (len == 0) {
+        warn(ctx, "header field has no value, ignored");
+        return false;
+    }
+    if (len >= size) {
+        warn(ctx, "header field too long, truncated");
         len = size - 1;
+    }
     memcpy(out, line, len);
     out[len] = '\0';
+    return true;
+}
+
+/* A two-word field: false for the default word, true for the other one. */
+static bool set_flag(const char *text, const char *off, const char *on,
+    parse_ctx_t *ctx)
+{
+    if (strcmp(text, on) == 0)
+        return true;
+    if (strcmp(text, off) != 0)
+        warn(ctx, "header field takes one of its two words, ignored");
+    return false;
+}
+
+/* The speeds of a speed portal (FEATURES 10.3), written the same way. */
+static bool start_speed(const char *text, level_start_t *st, parse_ctx_t *ctx)
+{
+    static const double allowed[] = {0.5, 1.0, 2.0, 3.0, 4.0};
+    double v = 0.0;
+
+    if (!parse_double(text, &v))
+        return (warn(ctx, "start_speed needs a number, ignored"), true);
+    for (size_t i = 0; i < sizeof(allowed) / sizeof(*allowed); i++)
+        if (v == allowed[i])
+            return (st->speed_mult = v, true);
+    warn(ctx, "start_speed must be 0.5, 1, 2, 3 or 4, ignored");
+    return true;
 }
 
 static bool header_number(const char *key, const char *value,
@@ -216,23 +253,63 @@ static bool header_number(const char *key, const char *value,
 {
     char text[64];
     double v = 0.0;
-    int n = 0;
 
-    take_text(value, text, sizeof(text));
-    if (strcmp(key, "version") == 0)
-        return parse_int(text, &n) ? (hdr->version = n, true)
-            : (warn(ctx, "version must be a whole number, ignored"), true);
-    if (strcmp(key, "offset") != 0 && strcmp(key, "bpm") != 0
-        && strcmp(key, "first_beat") != 0)
+    if (strcmp(key, "start_speed") == 0)
+        return take_text(value, text, sizeof(text), ctx)
+            ? start_speed(text, &hdr->start, ctx) : true;
+    if (strcmp(key, "music_offset") != 0 && strcmp(key, "bpm") != 0
+        && strcmp(key, "first_beat") != 0 && strcmp(key, "start_x") != 0
+        && strcmp(key, "start_y") != 0)
         return false;
+    if (!take_text(value, text, sizeof(text), ctx))
+        return true;
     if (!parse_double(text, &v)) {
         warn(ctx, "header field needs a number, ignored");
         return true;
     }
-    hdr->offset = strcmp(key, "offset") == 0 ? v : hdr->offset;
+    hdr->music_offset = strcmp(key, "music_offset") == 0 ? v : hdr->music_offset;
     hdr->bpm = strcmp(key, "bpm") == 0 ? v : hdr->bpm;
     hdr->first_beat = strcmp(key, "first_beat") == 0 ? v : hdr->first_beat;
+    hdr->start.pos.x = strcmp(key, "start_x") == 0 ? v : hdr->start.pos.x;
+    hdr->start.pos.y = strcmp(key, "start_y") == 0 ? v : hdr->start.pos.y;
     return true;
+}
+
+/* The three word fields: a gamemode name, normal|flipped, normal|mini. */
+static bool header_word(const char *key, const char *value,
+    level_header_t *hdr, parse_ctx_t *ctx)
+{
+    char text[64];
+    int mode = 0;
+
+    if (strcmp(key, "start_gamemode") != 0 && strcmp(key, "start_gravity") != 0
+        && strcmp(key, "start_size") != 0)
+        return false;
+    if (!take_text(value, text, sizeof(text), ctx))
+        return true;
+    mode = mode_from_name(text);
+    if (strcmp(key, "start_gamemode") == 0 && mode < 0)
+        return (warn(ctx, "unknown gamemode, ignored"), true);
+    if (strcmp(key, "start_gamemode") == 0)
+        return (hdr->start.mode = (gamemode_t)mode, true);
+    if (strcmp(key, "start_gravity") == 0)
+        return set_flag(text, "normal", "flipped", ctx)
+            ? (hdr->start.gravity_dir = -1, true) : true;
+    return set_flag(text, "normal", "mini", ctx)
+        ? (hdr->start.mini = true, true) : true;
+}
+
+/* The text fields of 7.2, and how much room each one has. */
+static char *header_text_field(const char *key, level_header_t *hdr,
+    size_t *size)
+{
+    if (strcmp(key, "name") == 0)
+        return (*size = sizeof(hdr->name), hdr->name);
+    if (strcmp(key, "author") == 0)
+        return (*size = sizeof(hdr->author), hdr->author);
+    if (strcmp(key, "music") == 0)
+        return (*size = sizeof(hdr->music), hdr->music);
+    return NULL;
 }
 
 /* Every line that doesn't start with an object type is a header field. */
@@ -241,6 +318,8 @@ static void parse_header_line(char *line, level_header_t *hdr,
 {
     char *value = line;
     char key[32];
+    char *dst = NULL;
+    size_t size = 0;
     size_t klen = 0;
 
     while (value[klen] != '\0' && value[klen] != ' ' && value[klen] != '\t')
@@ -251,16 +330,12 @@ static void parse_header_line(char *line, level_header_t *hdr,
     }
     memcpy(key, value, klen);
     key[klen] = '\0';
-    value += klen;
-    if (strcmp(key, "name") == 0)
-        return take_text(value, hdr->name, sizeof(hdr->name));
-    if (strcmp(key, "author") == 0)
-        return take_text(value, hdr->author, sizeof(hdr->author));
-    if (strcmp(key, "song") == 0)
-        return take_text(value, hdr->song, sizeof(hdr->song));
-    if (header_number(key, value, hdr, ctx))
-        return;
-    warn(ctx, "unknown header field, ignored");
+    dst = header_text_field(key, hdr, &size);
+    if (dst != NULL)
+        take_text(value + klen, dst, size, ctx);
+    else if (!header_number(key, value + klen, hdr, ctx)
+        && !header_word(key, value + klen, hdr, ctx))
+        warn(ctx, "unknown header field, ignored");
 }
 
 /* Copies one line out of the buffer, without its newline or a trailing \r. */
@@ -280,6 +355,15 @@ static size_t next_line(const char *buf, size_t len, size_t pos, char *out,
     memcpy(out, buf + pos, n);
     out[n] = '\0';
     return end < len ? end + 1 : len;
+}
+
+/* A '#' ends the line, in the header as well as in the body (7.2). */
+static void strip_comment(char *line)
+{
+    char *hash = strchr(line, '#');
+
+    if (hash != NULL)
+        *hash = '\0';
 }
 
 static bool is_blank(const char *line)
@@ -313,6 +397,7 @@ int level_parse_mem(const char *buf, size_t len, const char *source,
     while (pos < len) {
         pos = next_line(buf, len, pos, line, sizeof(line));
         ctx.lineno += 1;
+        strip_comment(line);
         if (is_blank(line))
             continue;
         memcpy(copy, line, sizeof(copy));      /* parse_object splits in place */

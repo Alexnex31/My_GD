@@ -33,7 +33,6 @@ static void test_basic_level(void)
 
     load(&s, "name STEREO MADNESS\n"
         "author ALEXNEX\n"
-        "version 2\n"
         "\n"
         "block 1000 200 1\n"
         "spike 3000 750 2\n"
@@ -42,7 +41,6 @@ static void test_basic_level(void)
     CHECK(s.lvl.nb_objects == 3);
     CHECK(strcmp(s.lvl.hdr.name, "STEREO MADNESS") == 0);
     CHECK(strcmp(s.lvl.hdr.author, "ALEXNEX") == 0);
-    CHECK(s.lvl.hdr.version == 2);
     CHECK(strcmp(s.lvl.id, "10280") == 0);
     CHECK(s.lvl.objects[0].type == OBJ_BLOCK);
     CHECK(s.lvl.objects[0].rect.x == 1000.0 && s.lvl.objects[0].rect.y == 200.0);
@@ -72,11 +70,11 @@ static void test_header_fields(void)
 {
     sim_t s;
 
-    load(&s, "song stereo_madness.ogg\noffset 2.5\nbpm 140\n"
+    load(&s, "music stereo_madness.ogg\nmusic_offset 2.5\nbpm 140\n"
         "first_beat 0.25\nblock 1000 700 2\n");
     CHECK(warnings == 0);
-    CHECK(strcmp(s.lvl.hdr.song, "stereo_madness.ogg") == 0);
-    CHECK(s.lvl.hdr.offset == 2.5 && s.lvl.hdr.bpm == 140.0);
+    CHECK(strcmp(s.lvl.hdr.music, "stereo_madness.ogg") == 0);
+    CHECK(s.lvl.hdr.music_offset == 2.5 && s.lvl.hdr.bpm == 140.0);
     CHECK(s.lvl.hdr.first_beat == 0.25);
     sim_free(&s);
     /* unknown keys and bad numbers warn, the level still loads */
@@ -84,6 +82,12 @@ static void test_header_fields(void)
     CHECK(warnings == 2);
     CHECK(s.lvl.nb_objects == 1);
     CHECK(s.lvl.hdr.bpm == 0.0);
+    sim_free(&s);
+    /* version is not a field any more: an old file loads with one warning */
+    load(&s, "name LEVEL 1\nversion 2\nblock 1000 700 2\n");
+    CHECK(warnings == 1);
+    CHECK(s.lvl.nb_objects == 1);
+    CHECK(strcmp(s.lvl.hdr.name, "LEVEL 1") == 0);
     sim_free(&s);
     /* the old format is not read any more: its header is just a bad line */
     load(&s, "7 35 100.000000\nblock 1000 700 2\n");
@@ -106,6 +110,27 @@ static void test_name_rules(void)
     sim_free(&s);
     load(&s, "block 1000 700 2\n");
     CHECK(strcmp(s.lvl.hdr.name, "10280") == 0);   /* the id by default */
+    CHECK(warnings == 0);
+    sim_free(&s);
+    /* a '#' ends a header line too, and the value is trimmed */
+    load(&s, "name  STEREO MADNESS   # the first level\nblock 1000 700 2\n");
+    CHECK(warnings == 0);
+    CHECK(strcmp(s.lvl.hdr.name, "STEREO MADNESS") == 0);
+    sim_free(&s);
+    /* the last line of a repeated key wins */
+    load(&s, "name FIRST\nname SECOND\nblock 1000 700 2\n");
+    CHECK(warnings == 0);
+    CHECK(strcmp(s.lvl.hdr.name, "SECOND") == 0);
+    sim_free(&s);
+    /* an empty value keeps the default instead of blanking it */
+    load(&s, "name\nname   \nblock 1000 700 2\n");
+    CHECK(warnings == 2);
+    CHECK(strcmp(s.lvl.hdr.name, "10280") == 0);
+    sim_free(&s);
+    /* keys are lowercase: anything else is an unknown field */
+    load(&s, "Name STEREO MADNESS\nblock 1000 700 2\n");
+    CHECK(warnings == 1);
+    CHECK(strcmp(s.lvl.hdr.name, "10280") == 0);
     sim_free(&s);
 }
 
@@ -198,7 +223,8 @@ static void test_derived_values(void)
 
     load(&s, "block 1000 700 2\nblock 5000 650 2 w=8 h=1\n");
     CHECK(s.lvl.reach == 400.0);
-    CHECK(s.lvl.end_shift == 5400.0 + LEVEL_END_PADDING);
+    /* the run is measured from the spawn: 500 px past the last object (7.2) */
+    CHECK(s.lvl.end_shift == 5400.0 + LEVEL_END_PADDING - PLAYER_SPAWN_X);
     CHECK(s.lvl.kill_y == GROUND_Y - CORRIDOR_MAX_HEIGHT - KILL_CEILING_MARGIN);
     sim_free(&s);
     load(&s, "block 1000 -400 2\n");           /* higher than any corridor */
@@ -268,7 +294,6 @@ static void test_real_levels(void)
         CHECK(s.lvl.nb_objects > 0);
         CHECK(s.lvl.end_shift > 1000.0);
         CHECK(strncmp(s.lvl.hdr.name, "LEVEL", 5) == 0);
-        CHECK(s.lvl.hdr.version == 2);
         CHECK(atoi(s.lvl.id) == i);
         sim_free(&s);
     }

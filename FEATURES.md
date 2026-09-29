@@ -450,24 +450,25 @@ The `license` column exists so you always know you're allowed to ship a song (th
 For a level, in this order:
 
 1. The player's **override** for this level, if set and the file still exists.
-2. The level's `music <file>` line, if the file exists.
+2. The level's `music` field, if the file exists.
 3. The **default level song** (`back_mus.ogg` today, or a `default_level_song` setting).
 
 Start offset, in this order:
 
-1. The level's `music <file> <offset>` value, **only if** the song being played is that file (an override uses its own default offset: the level's offset was chosen for the level's song).
+1. The level's `music_offset` value, **only if** the song being played is the level's `music` file (an override uses its own default offset: the level's offset was chosen for the level's song).
 2. The song's `default_offset` from `songs.txt`.
 3. 0.
 
 If the chosen file fails to open at level start, fall back to the next rule and show a small "song missing" notice.
 
-### 4.5 Level header line
+### 4.5 Level header fields
 
 ```text
-music <file> [offset_seconds]
+music stereo_sunrise.ogg
+music_offset 1.25
 ```
 
-`file` is relative to `music/` and can't contain spaces (the loader rejects the line with a warning, and the song library warns about such files). The sim doesn't read it: the level parser passes header lines it doesn't know to a callback provided by the game layer, which stores `music_file` and `music_offset` in `level_t`. That keeps PLAN Phase 2's rule that the sim knows nothing about audio.
+Two header fields of PLAN 7.2, one value each. `music` names a file as `songs.txt` does, so it can't contain spaces or a `#`; a missing file falls back to 4.4's next rule. `music_offset` is in seconds. The parser stores both in `level_header_t`, which is level data like the name: the sim carries them and never reads them, and the game layer's music manager is what acts on them. That keeps PLAN Phase 2's rule that the sim knows nothing about audio.
 
 ### 4.6 Player override
 
@@ -1364,7 +1365,7 @@ typedef struct ed_object {
 
 typedef struct ed_level {
     char file[64];              /* name in levels/, "" for a new level */
-    level_header_t hdr;         /* name, music, offset, bpm, first_beat, version */
+    level_header_t hdr;         /* name, author, music, bpm, the start_ fields */
     ed_object_t *objects;
     size_t count;
     size_t cap;
@@ -1619,7 +1620,7 @@ float ed_time_at_x(const ed_level_t *lv, float world_x)
 
 A vertical line scrolls with the song while it plays, at `x = PLAYER_SPAWN_X + (song_time − offset) × SCROLL_SPEED`, so you see where the music is in the level.
 
-**Beat lines**: set BPM and first-beat time (a text field each, stored as `bpm 128 0.35` in the header). Beat `k` is at song time `first_beat + k × 60 / bpm`, so at:
+**Beat lines**: set BPM and first-beat time (a text field each, stored as `bpm 128` and `first_beat 0.35` in the header, PLAN 7.2). Beat `k` is at song time `first_beat + k × 60 / bpm`, so at:
 
 ```c
 float beat_x(int k, const level_header_t *h)
@@ -1636,7 +1637,7 @@ Draw only beats in view: compute `k_min` and `k_max` from the view's left and ri
 
 1. New level: ask for a name (text field). File name = lowercase name, spaces → `_`, only `[a-z0-9_-]`, max 48 chars; if taken, add `_2`, `_3`…
 2. Write `levels/<file>.tmp` with `level_write`, check `fclose`, `rename` over `levels/<file>`.
-3. Content: `version 2`, header lines, then objects **sorted by x** (then y). Sorted files are readable and give small git diffs. Optional fields are written only when they differ from their default (`rot=` when not 0, `w=`/`h=` when not equal to `size`), followed by the object's `extra` fields unchanged.
+3. Content: the header fields that aren't at their default value, then objects **sorted by x** (then y). Sorted files are readable and give small git diffs. Optional fields are written only when they differ from their default (`rot=` when not 0, `w=`/`h=` when not equal to `size`), followed by the object's `extra` fields unchanged.
 4. `dirty = false`.
 
 Autosave: every 60 s if dirty, and before every playtest, write to `save/editor_autosave/<file>` (not over the real file). When opening a level whose autosave is newer than the level file, ask "Restore unsaved changes from <time>?". Delete the autosave after a successful normal save.

@@ -1,5 +1,4 @@
 name LEVEL 4
-version 2
 
 block 2000 750 2
 block 2100 750 2

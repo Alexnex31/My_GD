@@ -61,7 +61,7 @@ static void advance(sim_t *s, vec2_t d, double t)
 
     s->tick_left *= 1.0 - t;
     s->st.distance = s->tick_x0 + p->vx * (1.0 - s->tick_left);
-    p->pos.x = PLAYER_SPAWN_X + s->st.distance;
+    p->pos.x = s->lvl.hdr.start.pos.x + s->st.distance;
     p->pos.y += d.y * t;
     s->legs += 1;
 }

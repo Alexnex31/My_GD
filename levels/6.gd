@@ -1,5 +1,4 @@
 name LEVEL 6
-version 2
 
 spike 1600 750 2
 spike 2600 775 2

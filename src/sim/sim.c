@@ -13,31 +13,57 @@
 #include "sim/modes.h"
 #include "sim/sim.h"
 
-/* Every attempt starts here, the first one like every retry (3.4). */
+/* The player the level's start_ fields describe (7.2). */
+static player_t start_player(const level_start_t *start)
+{
+    return (player_t){
+        .pos = start->pos,
+        .prev_pos = start->pos,
+        .vx = PER_TICK(SCROLL_SPEED) * start->speed_mult,
+        .gravity_dir = start->gravity_dir,
+        .mode = start->mode,
+        .hold = HOLD_FRESH,              /* a hold carried into the attempt is fresh */
+        .support_normal = {0.0, (double)-start->gravity_dir},
+        .alive = true,
+    };
+}
+
+/*
+** Standing on a floor at the first tick: the ground, or the corridor's floor
+** when the attempt starts inside one. Anywhere else the attempt starts in the
+** air, and the jump zone of the first tick decides from there (4.3).
+*/
+static bool starts_on_the_floor(const sim_t *s)
+{
+    const player_t *p = &s->st.player;
+    const ship_bounds_t *b = &s->st.bounds;
+    double feet = p->pos.y + MODES[p->mode].half * p->gravity_dir;
+
+    if (b->active)
+        return feet == (p->gravity_dir > 0 ? b->bottom : b->top);
+    return p->gravity_dir > 0 && feet == GROUND_Y;
+}
+
+/* Every attempt starts here, the first one like every retry (3.4, 7.2). */
 void sim_reset(sim_t *s)
 {
     run_state_t *st = &s->st;
+    const level_start_t *start = &s->lvl.hdr.start;
 
-    st->player = (player_t){
-        .pos = {PLAYER_SPAWN_X, PLAYER_SPAWN_Y},
-        .prev_pos = {PLAYER_SPAWN_X, PLAYER_SPAWN_Y},
-        .vx = PER_TICK(SCROLL_SPEED),
-        .gravity_dir = 1,
-        .mode = MODE_CUBE,
-        .grounded = true,
-        .can_jump = true,
-        .hold = HOLD_FRESH,              /* a hold carried into the attempt is fresh */
-        .support_normal = {0.0, -1.0},   /* standing on the ground */
-        .alive = true,
-    };
+    st->player = start_player(start);
     st->cam = (camera_t){{0.0, 0.0}};
     st->bounds = (ship_bounds_t){0};
     st->tick = 0;
     st->distance = 0.0;
-    st->speed_mult = 1.0;
+    st->speed_mult = start->speed_mult;
     st->first_active = 0;
     st->complete = false;
     memset(st->spent, 0, st->spent_words * sizeof(uint64_t));
+    if (MODES[start->mode].corridor_height > 0.0)
+        corridor_from_center(s, start->pos.y);
+    st->player.grounded = starts_on_the_floor(s);
+    st->player.can_jump = st->player.grounded;
+    st->cam.pos.y = camera_rest_y(&st->player, &st->bounds);
 }
 
 /* The tick, in the order of 3.4: forces, movement, effects, camera. */

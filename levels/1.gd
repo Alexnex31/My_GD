@@ -1,5 +1,4 @@
 name LEVEL 1
-version 2
 
 spike 1000 750 2
 spike 3000 750 2
