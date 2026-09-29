@@ -58,7 +58,7 @@ static void test_block_flat(void)
 
     CHECK(o.hitbox.kind == SHAPE_POLY);
     CHECK(o.hitbox.nverts == 4);
-    CHECK(o.hitbox.naxes == 0);
+    CHECK(o.hitbox.naxes == 2);              /* y and x only: no own axis (G.2) */
     CHECK(same_rect(o.hitbox.aabb, r));
     CHECK(count_faces(&o.hitbox, FACE_HORIZONTAL) == 2);
     CHECK(count_faces(&o.hitbox, FACE_VERTICAL) == 2);
@@ -76,7 +76,7 @@ static void test_block_quarter_turns(void)
         object_t o = make(OBJ_BLOCK, r, deg);
 
         CHECK(same_rect(o.hitbox.aabb, r));
-        CHECK(o.hitbox.naxes == 0);
+        CHECK(o.hitbox.naxes == 2);
         CHECK(count_faces(&o.hitbox, FACE_TILTED) == 0);
         CHECK(clockwise(&o.hitbox));
     }
@@ -86,11 +86,11 @@ static void test_block_tilted(void)
 {
     object_t o = make(OBJ_BLOCK, (rect_t){1000.0, 700.0, 100.0, 100.0}, 30.0);
 
-    CHECK(o.hitbox.naxes == 2);
+    CHECK(o.hitbox.naxes == 4);              /* y, x, and its two own axes */
     CHECK(count_faces(&o.hitbox, FACE_TILTED) == 4);
     CHECK(clockwise(&o.hitbox));
-    CHECK(fabs(vlen(o.hitbox.axes[0]) - 1.0) < 1e-12);
-    CHECK(fabs(vlen(o.hitbox.axes[1]) - 1.0) < 1e-12);
+    CHECK(fabs(vlen(o.hitbox.axes[2]) - 1.0) < 1e-12);
+    CHECK(fabs(vlen(o.hitbox.axes[3]) - 1.0) < 1e-12);
     CHECK(o.hitbox.aabb.w > 100.0 && o.hitbox.aabb.w < 141.5);
 }
 
@@ -100,7 +100,7 @@ static void test_slope(void)
     int tilted = -1;
 
     CHECK(o.hitbox.nverts == 3);
-    CHECK(o.hitbox.naxes == 1);
+    CHECK(o.hitbox.naxes == 3);              /* y, x, and the slope's own */
     CHECK(count_faces(&o.hitbox, FACE_HORIZONTAL) == 1);
     CHECK(count_faces(&o.hitbox, FACE_VERTICAL) == 1);
     CHECK(count_faces(&o.hitbox, FACE_TILTED) == 1);
@@ -160,14 +160,14 @@ static void test_spike_rotated(void)
     object_t o = make(OBJ_SPIKE, (rect_t){1000.0, 0.0, 100.0, 100.0}, 180.0);
 
     CHECK(same_rect(o.hitbox.aabb, (rect_t){1030.0, 0.0, 40.0, 80.0}));
-    CHECK(o.hitbox.naxes == 0);
+    CHECK(o.hitbox.naxes == 2);
 }
 
 static void test_axes_and_projections(void)
 {
     object_t o = make(OBJ_BLOCK, (rect_t){0.0, 0.0, 100.0, 100.0}, 45.0);
 
-    CHECK(o.hitbox.naxes == 2);
+    CHECK(o.hitbox.naxes == 4);
     for (int k = 0; k < o.hitbox.naxes; k++) {
         double lo = dot(o.hitbox.verts[0], o.hitbox.axes[k]);
         double hi = lo;

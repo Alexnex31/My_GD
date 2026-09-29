@@ -27,9 +27,11 @@ static bool sat_axis(vec2_t c, double h, vec2_t d, int k,
     const hitbox_t *hb, sat_t *s)
 {
     vec2_t a = hitbox_axis(hb, k);
-    double r = h * (fabs(a.x) + fabs(a.y));
-    double lo = hitbox_lo(hb, k) - r;
-    double hi = hitbox_hi(hb, k) + r;
+    double r = h * hitbox_extent(hb, k);
+    double raw_lo = hitbox_lo(hb, k);
+    double raw_hi = hitbox_hi(hb, k);
+    double lo = raw_lo - r;
+    double hi = raw_hi + r;
     double p = dot(c, a);
     double v = dot(d, a);
     double t0 = 0.0;
@@ -49,7 +51,7 @@ static bool sat_axis(vec2_t c, double h, vec2_t d, int k,
         s->t_in = t0;
         s->n_in = v > 0.0 ? (vec2_t){-a.x, -a.y} : a;
         s->k_in = k;
-        s->offset = v > 0.0 ? -hitbox_lo(hb, k) : hitbox_hi(hb, k);
+        s->offset = v > 0.0 ? -raw_lo : raw_hi;
     }
     s->t_out = fmin(s->t_out, t1);
     return s->t_in < s->t_out;
@@ -59,7 +61,7 @@ static bool sat_box_poly(vec2_t c, double h, vec2_t d, const hitbox_t *hb,
     sat_t *s)
 {
     *s = (sat_t){-INFINITY, INFINITY, {0.0, 0.0}, -1, 0.0};
-    for (int k = 0; k < hb->naxes + 2; k++)
+    for (int k = 0; k < hb->naxes; k++)
         if (!sat_axis(c, h, d, k, hb, s))
             return false;
     return s->t_in <= 1.0 && s->t_out > 0.0;
@@ -95,10 +97,9 @@ double sweep_box_touch(vec2_t c, double h, vec2_t d, const hitbox_t *hb)
 
 bool overlap_box_poly(vec2_t c, double h, const hitbox_t *hb)
 {
-    for (int k = 0; k < hb->naxes + 2; k++) {
-        vec2_t a = hitbox_axis(hb, k);
-        double r = h * (fabs(a.x) + fabs(a.y));
-        double p = dot(c, a);
+    for (int k = 0; k < hb->naxes; k++) {
+        double r = h * hitbox_extent(hb, k);
+        double p = dot(c, hitbox_axis(hb, k));
 
         if (p + r <= hitbox_lo(hb, k) || p - r >= hitbox_hi(hb, k))
             return false;                    /* apart, or exactly touching */
@@ -143,40 +144,41 @@ bool sweep_circle_plane(vec2_t c, double r, vec2_t d, double sy, double side,
     return sweep_plane(c, r, d, sy, side, out);
 }
 
+/* The point of edge i closest to c (G.4). */
+static vec2_t edge_closest(vec2_t c, const hitbox_t *hb, int i)
+{
+    vec2_t a = hb->verts[i];
+    vec2_t e = vsub(hb->verts[(i + 1) % hb->nverts], a);
+    double u = dot(vsub(c, a), e) / dot(e, e);
+
+    return vadd(a, vscale(e, fmin(fmax(u, 0.0), 1.0)));
+}
+
 /*
-** Closest point of a convex polygon to c, and whether c is inside it (G.4).
-** dist is 0 when inside.
+** Squared distance from c to a convex polygon, 0 when c is inside it (G.4).
+** Squared on purpose: the caller takes one square root instead of one per
+** edge, and sqrt(min) is the same double as min(sqrt) since sqrt is monotone
+** and correctly rounded.
 */
-static double poly_closest(vec2_t c, const hitbox_t *hb, vec2_t *out)
+static double poly_dist2(vec2_t c, const hitbox_t *hb)
 {
     bool inside = true;
     double best = INFINITY;
 
     for (int i = 0; i < hb->nverts; i++) {
-        vec2_t a = hb->verts[i];
-        vec2_t e = vsub(hb->verts[(i + 1) % hb->nverts], a);
-        double u = dot(vsub(c, a), e) / dot(e, e);
-        vec2_t q;
-        double dist;
+        vec2_t f = vsub(c, edge_closest(c, hb, i));
+        double dist2 = dot(f, f);
 
         if (dot(hb->face_n[i], c) > hb->face_off[i])
             inside = false;
-        u = fmin(fmax(u, 0.0), 1.0);
-        q = vadd(a, vscale(e, u));
-        dist = vlen(vsub(c, q));
-        if (dist < best) {
-            best = dist;
-            *out = q;
-        }
+        best = fmin(best, dist2);
     }
     return inside ? 0.0 : best;
 }
 
 double poly_distance(vec2_t c, const hitbox_t *hb)
 {
-    vec2_t q;
-
-    return poly_closest(c, hb, &q);
+    return sqrt(poly_dist2(c, hb));
 }
 
 bool overlap_circle_poly(vec2_t c, double r, const hitbox_t *hb)
@@ -184,19 +186,46 @@ bool overlap_circle_poly(vec2_t c, double r, const hitbox_t *hb)
     return poly_distance(c, hb) < r;         /* touching is not overlapping */
 }
 
+/*
+** Closest point of the outline to c, its distance, and which side c is on.
+** This one runs only on a contact that is already there, so it keeps the
+** per-edge square root: the point it picks stays exactly the one it picked.
+*/
+static double outline_closest(vec2_t c, const hitbox_t *hb, vec2_t *out,
+    bool *inside)
+{
+    double best = INFINITY;
+
+    *inside = true;
+    for (int i = 0; i < hb->nverts; i++) {
+        vec2_t p = edge_closest(c, hb, i);
+        double dist = vlen(vsub(c, p));
+
+        if (dot(hb->face_n[i], c) > hb->face_off[i])
+            *inside = false;
+        if (dist < best) {
+            best = dist;
+            *out = p;
+        }
+    }
+    return best;
+}
+
 /* The normal of a contact that is already there at t = 0 (G.4). */
 static vec2_t stuck_normal(vec2_t c, const hitbox_t *hb)
 {
-    vec2_t q;
-    int best = 0;
+    vec2_t q = {0.0, 0.0};
+    bool inside = true;
+    double dist = outline_closest(c, hb, &q, &inside);
+    int shallow = 0;
 
-    if (poly_closest(c, hb, &q) > 0.0)
-        return vscale(vsub(c, q), 1.0 / vlen(vsub(c, q)));
+    if (!inside && dist > 0.0)
+        return vscale(vsub(c, q), 1.0 / dist);
     for (int i = 1; i < hb->nverts; i++)     /* inside: the shallowest face */
         if (hb->face_off[i] - dot(hb->face_n[i], c)
-            < hb->face_off[best] - dot(hb->face_n[best], c))
-            best = i;
-    return hb->face_n[best];
+            < hb->face_off[shallow] - dot(hb->face_n[shallow], c))
+            shallow = i;
+    return hb->face_n[shallow];
 }
 
 static void circle_faces(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
@@ -205,18 +234,21 @@ static void circle_faces(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     for (int i = 0; i < hb->nverts; i++) {
         vec2_t n = hb->face_n[i];
         vec2_t a = hb->verts[i];
-        vec2_t b = hb->verts[(i + 1) % hb->nverts];
+        vec2_t b;
+        vec2_t e;
         double den = dot(n, d);
         double t;
         vec2_t p;
 
-        if ((fok != NULL && !fok(hb, i, g)) || den >= 0.0)
-            continue;                        /* filtered out, or not moving into it */
+        if (den >= 0.0 || (fok != NULL && !fok(hb, i, g)))
+            continue;                        /* not moving into it, or filtered out */
         t = (hb->face_off[i] + r - dot(n, c)) / den;
         if (t < 0.0 || t > 1.0 || t >= out->t)
             continue;
+        b = hb->verts[(i + 1) % hb->nverts];
+        e = vsub(b, a);
         p = vsub(vadd(c, vscale(d, t)), vscale(n, r));   /* the touch point */
-        if (dot(vsub(p, a), vsub(b, a)) < 0.0 || dot(vsub(p, b), vsub(b, a)) > 0.0)
+        if (dot(vsub(p, a), e) < 0.0 || dot(vsub(p, b), e) > 0.0)
             continue;                        /* beyond the face's ends */
         out->t = t;
         out->normal = n;
@@ -229,16 +261,22 @@ static void circle_vertices(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
 {
     double a = dot(d, d);
 
-    for (int i = 0; a > 0.0 && i < hb->nverts; i++) {
-        vec2_t f = vsub(c, hb->verts[i]);
-        double b = dot(f, d);
-        double cc = dot(f, f) - r * r;
-        double disc = b * b - a * cc;
+    if (a <= 0.0)
+        return;                              /* the circle doesn't move */
+    for (int i = 0; i < hb->nverts; i++) {
+        vec2_t f;
+        double b;
+        double cc;
+        double disc;
         double t;
         vec2_t n;
 
         if (vok != NULL && !vok(hb, i, g))
             continue;
+        f = vsub(c, hb->verts[i]);
+        b = dot(f, d);
+        cc = dot(f, f) - r * r;
+        disc = b * b - a * cc;
         if (disc < 0.0)
             continue;                        /* the path misses this corner */
         t = (-b - sqrt(disc)) / a;           /* the entering root */
@@ -253,19 +291,11 @@ static void circle_vertices(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     }
 }
 
-bool sweep_circle_poly(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
+bool sweep_circle_clear(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out)
 {
     contact_t best = {INFINITY, {0.0, 0.0}, false, 0.0, 0};
 
-    if (poly_distance(c, hb) < r) {          /* already overlapping: contact now */
-        out->t = 0.0;
-        out->normal = stuck_normal(c, hb);
-        out->flat = false;
-        out->offset = 0.0;
-        out->surface = 0;
-        return dot(out->normal, d) < 0.0;
-    }
     circle_faces(c, r, d, hb, fok, g, &best);
     circle_vertices(c, r, d, hb, vok, g, &best);
     if (best.t == INFINITY)
@@ -274,15 +304,41 @@ bool sweep_circle_poly(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     return true;
 }
 
-double sweep_circle_touch(vec2_t c, double r, vec2_t d, const hitbox_t *hb)
+/* The contact of a circle that is already inside the shape: now, at t = 0. */
+static bool circle_stuck(vec2_t c, vec2_t d, const hitbox_t *hb,
+    contact_t *out)
+{
+    out->t = 0.0;
+    out->normal = stuck_normal(c, hb);
+    out->flat = false;
+    out->offset = 0.0;
+    out->surface = 0;
+    return dot(out->normal, d) < 0.0;
+}
+
+bool sweep_circle_poly(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
+    face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out)
+{
+    if (poly_distance(c, hb) < r)            /* already overlapping: contact now */
+        return circle_stuck(c, d, hb, out);
+    return sweep_circle_clear(c, r, d, hb, fok, vok, g, out);
+}
+
+double sweep_circle_touch_clear(vec2_t c, double r, vec2_t d,
+    const hitbox_t *hb)
 {
     contact_t best = {INFINITY, {0.0, 0.0}, false, 0.0, 0};
 
-    if (poly_distance(c, hb) < r)
-        return 0.0;
     circle_faces(c, r, d, hb, NULL, 0.0, &best);
     circle_vertices(c, r, d, hb, NULL, 0.0, &best);
     return best.t;
+}
+
+double sweep_circle_touch(vec2_t c, double r, vec2_t d, const hitbox_t *hb)
+{
+    if (poly_distance(c, hb) < r)
+        return 0.0;
+    return sweep_circle_touch_clear(c, r, d, hb);
 }
 
 int clip_half_plane(const vec2_t *in, int n, double y_line, double g,
@@ -378,8 +434,8 @@ double poly_points_distance(vec2_t c, const vec2_t *v, int n)
         if (cross(e, vsub(c, a)) < 0.0)      /* clockwise on screen: inside is >= 0 */
             inside = false;
         u = fmin(fmax(u, 0.0), 1.0);
-        q = vadd(a, vscale(e, u));
-        best = fmin(best, vlen(vsub(c, q)));
+        q = vsub(c, vadd(a, vscale(e, u)));
+        best = fmin(best, dot(q, q));        /* squared: one sqrt at the end */
     }
-    return inside ? 0.0 : best;
+    return inside ? 0.0 : sqrt(best);
 }

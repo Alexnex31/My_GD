@@ -691,9 +691,9 @@ typedef struct hitbox {       /* full shape: area, not outline (3.0) */
     rect_t aabb;              /* world-space bounds: broadphase, first axes     */
     int nverts;               /* poly: 3 or 4, world space, clockwise on screen */
     vec2_t verts[HB_MAX_VERTS];
-    int naxes;                /* poly: separating axes other than x and y       */
+    int naxes;                /* separating axes: [0] is y, [1] is x, then its own */
     vec2_t axes[HB_MAX_VERTS];     /* unit edge normals, pointing outward      */
-    double axis_lo[HB_MAX_VERTS];   /* the shape's projection on each axis      */
+    double axis_lo[HB_MAX_AXES];    /* the shape's projection on each axis      */
     double axis_hi[HB_MAX_VERTS];
     uint8_t face_kind[HB_MAX_VERTS];   /* edge i = verts[i] -> verts[i + 1]:
                                           FACE_HORIZONTAL, FACE_VERTICAL, FACE_TILTED */
@@ -1312,9 +1312,9 @@ bool sweep_box_poly(vec2_t c, double h, vec2_t d, const hitbox_t *hb, contact_t 
     int k_in = -1;
     double offset = 0.0;
 
-    for (int k = 0; k < hb->naxes + 2; k++) {
+    for (int k = 0; k < hb->naxes; k++) {
         vec2_t a = hitbox_axis(hb, k);          /* k = 0: y, 1: x, then the shape's axes */
-        double r = h * (fabs(a.x) + fabs(a.y));   /* the square's projection radius */
+        double r = h * hitbox_extent(hb, k);      /* the square's projection radius */
         double lo = hitbox_lo(hb, k) - r;       /* where the center may be, on this axis */
         double hi = hitbox_hi(hb, k) + r;
         double p = c.x * a.x + c.y * a.y;
@@ -3111,14 +3111,15 @@ Everything Phases 3–5 use but only describe in words. Write these functions fi
 
 ### G.2 Building a hitbox (load time, 4.2)
 
-1. Vertices from the type's local shape, rotated around the rect's center, each coordinate rounded to the 1/1024 px grid.
+1. Vertices from the type's local shape, rotated around the rect's center, each coordinate rounded to the 1/1024 px grid. `cos` and `sin` are taken **once per shape**, not once per vertex, and the four quarter turns are written out rather than computed: `cos(90 deg)` is `6.1e-17` in `double`, not `0`, and levels are mostly objects at 0, 90, 180 and 270 degrees. The grid rounding hides that error at the coordinates a level uses, but writing the exact values means a face that should be horizontal is horizontal by construction, at any coordinate.
 2. **Orientation.** Signed area `A = 0.5 * sum(cross(V[i], V[i+1]))`. With y down, clockwise on screen gives `A > 0`; if `A < 0`, reverse the vertex order. (`A == 0` is a degenerate object: reject it at load.)
 3. **AABB**: min and max of the vertices.
 4. **Face kinds**, per edge, on the rounded coordinates: `A.y == B.y` horizontal, `A.x == B.x` vertical, otherwise tilted.
 5. **Axes**: for each edge, `n = (e.y, -e.x) / |e|`. Drop it if `n.x == 0 || n.y == 0` (the x and y axes are always tested anyway). Drop it if an axis already kept is parallel: `fabs(dot(n, a)) >= 1 - 1e-12` (an axis and its opposite are the same separating axis). A rectangle keeps 2, a right triangle 1 to 3.
 6. **Projections**: for each kept axis `a`, `axis_lo = min(dot(V[i], a))`, `axis_hi = max(dot(V[i], a))`.
    Also store, **per edge** (not deduplicated, one per face): `face_n[i] = (e.y, -e.x) / |e|` and `face_off[i] = dot(face_n[i], V[i])`. The circle's sweep and the step-up work face by face, so they need these; the axes are only for the square's SAT.
-7. The two implicit axes: `hitbox_axis(h, 0) = (0, 1)` with `lo = aabb.y`, `hi = aabb.y + aabb.h`; `hitbox_axis(h, 1) = (1, 0)` with `lo = aabb.x`, `hi = aabb.x + aabb.w`. Index `k >= 2` reads `h->axes[k - 2]`.
+7. The two implicit axes are **stored like the others**, first: `axes[0] = (0, 1)` with `lo = aabb.y`, `hi = aabb.y + aabb.h`; `axes[1] = (1, 0)` with `lo = aabb.x`, `hi = aabb.x + aabb.w`; the shape's own axes follow from index 2, and `naxes` counts all of them (so `naxes >= 2` always, and a plain block has exactly 2). A sweep then reads `h->axes[k]`, `h->axis_lo[k]`, `h->axis_hi[k]` with no branch and no `k - 2`, which is what `hitbox_axis`, `hitbox_lo` and `hitbox_hi` are: `static inline` array reads (they are called a few times per tick per candidate, so a cross-file call was costing more than the work).
+8. Also per axis, `axis_extent[k] = fabs(a.x) + fabs(a.y)`, the factor turning the player's half size into its radius on that axis. It is 1 for the two implicit axes, and it saves recomputing two `fabs` and an addition on every test.
 
 ### G.3 Square against a polygon
 
@@ -3129,10 +3130,9 @@ The swept version is 4.3's `sweep_box_poly`. The static one, used by the touch t
    Touching is not overlapping (3.0). */
 bool overlap_box_poly(vec2_t c, double h, const hitbox_t *hb)
 {
-    for (int k = 0; k < hb->naxes + 2; k++) {
-        vec2_t a = hitbox_axis(hb, k);
-        double r = h * (fabs(a.x) + fabs(a.y));
-        double p = dot(c, a);
+    for (int k = 0; k < hb->naxes; k++) {
+        double r = h * hitbox_extent(hb, k);
+        double p = dot(c, hitbox_axis(hb, k));
 
         if (p + r <= hitbox_lo(hb, k) || p - r >= hitbox_hi(hb, k))
             return false;                      /* separated, or exactly touching */
@@ -3177,6 +3177,13 @@ Take the candidate with the smallest `t`; on a tie, the face (a face contact is 
 The sweep takes the two predicates of G.9 (`face_ok`, `vertex_ok`) and skips the faces and vertices they reject; passing none means "all of them", which is what the touch tests and the step-up's ceiling check use.
 
 **Already touching** (`cc <= 0` for some vertex, or the center is inside the inflated shape): contact at `t = 0`. Its normal is the direction from the closest point of the polygon to the center, or, if the center is inside the polygon itself, the normal of the face with the smallest `off - dot(n, c)`. The neutral sweep never needs this case (`first_event` skips shapes the shape already overlaps, 4.4); the touch tests do.
+
+**Square roots.** `poly_distance` walks the edges keeping **squared** distances and takes a single `sqrt` at the end, instead of one per edge. That is not an approximation: `sqrt` is monotone and, by IEEE 754, correctly rounded, so `sqrt(min dᵢ²)` is the same `double` as `min sqrt(dᵢ²)`. The rule for the rest of the engine, the reason this one is safe, and the line not to cross:
+
+- **Comparing** two distances, or keeping the smallest, can be done squared. The ordering is the same and the value that comes out is the same.
+- **Returning** a distance, or normalizing a vector by its length, needs the real value: `sqrt` once, then.
+- **Never** turn `sqrt(x) < threshold` into `x < threshold²` to save that last root. It is the same value in exact arithmetic but not in `double`: a squared threshold rounds, and a distance one ulp under the threshold can land on the wrong side of it. Those comparisons are where "touching is not a collision" (3.0) is decided, so a one-ulp change there is a behaviour change, which is exactly what determinism forbids.
+- `stuck_normal` needs the closest **point**, not just its distance, so it keeps a `sqrt` per edge: the point it picks then stays the point the per-edge comparison picked. It only ever runs on a contact that is already there, so it is not on the hot path.
 
 **Distance to a convex polygon** (used by `overlap_circle_poly`, and by the jump zone):
 
@@ -3333,6 +3340,8 @@ So the corner between a tilted face and a flat one is **not** a support candidat
 
 Resting on a face is touching, not overlapping (3.0), so a supported player is never skipped by its own floor.
 
+**One overlap test, not two.** The circle of radius `half` is inscribed in the square of half extent `half`, so every point of the circle is a point of the square: if the circle overlapped the object, the square would too. The contrapositive is what the code uses — when `overlap_box_poly` says the square is clear, the circle is clear as well and its own test is skipped. Only when the square *is* already inside (rare: the player is clipped into a block) does the circle's distance get computed, to tell the two cases apart. Both shapes are then swept with the "already clear" entry points (`sweep_circle_clear`, `sweep_circle_touch_clear`), which don't repeat the overlap test their caller has just done. This is why the two tests sit in one `try_shapes` and not one in each filter: on the common path a candidate costs one SAT pass and the sweeps, with no distance and no square root at all.
+
 ```c
 static void keep(event_t *out, const contact_t *c)      /* strictly earlier wins */
 {
@@ -3349,8 +3358,7 @@ static void try_square(sim_t *s, size_t i, vec2_t d, event_t *out)
     const hitbox_t *h = &s->lvl.objects[i].hitbox;
     contact_t c;
 
-    if (overlap_box_poly(p->pos, MODES[p->mode].half, h))
-        return;                                         /* already inside it: skip */
+    /* the caller checked is_passed and that the square is clear of h */
     if (!sweep_box_poly(p->pos, MODES[p->mode].half, d, h, &c) || c.t > out->t)
         return;
     if (c.flat && c.normal.y * p->gravity_dir > 0.0)
@@ -3368,13 +3376,29 @@ static void try_circle(sim_t *s, size_t i, vec2_t d, event_t *out)
     double g = p->gravity_dir;
     contact_t c;
 
-    if (overlap_circle_poly(p->pos, MODES[p->mode].half, h))
-        return;
-    if (!sweep_circle_poly(p->pos, MODES[p->mode].half, d, h, circle_face_ok,
+    if (!sweep_circle_clear(p->pos, MODES[p->mode].half, d, h, circle_face_ok,
             circle_vertex_ok, g, &c) || c.t > out->t)
         return;
     c.surface = (long)i;
     keep(out, &c);
+}
+
+/* Both shapes against one object, sharing the one overlap test they need. */
+static void try_shapes(sim_t *s, size_t i, vec2_t d, event_t *out)
+{
+    const player_t *p = &s->st.player;
+    const hitbox_t *h = &s->lvl.objects[i].hitbox;
+    double half = MODES[p->mode].half;
+    bool in_square;
+
+    if (is_passed(s, i))
+        return;
+    in_square = overlap_box_poly(p->pos, half, h);
+    if (!in_square)
+        try_square(s, i, d, out);
+    if (in_square && overlap_circle_poly(p->pos, half, h))
+        return;                                /* inside with both shapes */
+    try_circle(s, i, d, out);
 }
 
 static bool first_event(sim_t *s, vec2_t d, vec2_t vel, event_t *out)
@@ -3384,10 +3408,9 @@ static bool first_event(sim_t *s, vec2_t d, vec2_t vel, event_t *out)
     for (size_t k = 0; k < s->nb_cand; k++) {
         size_t i = s->cand[k];
 
-        if (OBJ_CATEGORY[s->lvl.objects[i].type] != CAT_NEUTRAL || is_passed(s, i))
+        if (OBJ_CATEGORY[s->lvl.objects[i].type] != CAT_NEUTRAL)
             continue;
-        try_square(s, i, d, out);              /* keeps it if strictly earlier than out->t */
-        try_circle(s, i, d, out);
+        try_shapes(s, i, d, out);              /* keeps it if strictly earlier than out->t */
     }
     try_surfaces(s, d, out);
     try_steps(s, d, vel, out);                 /* G.7; only if it starts strictly earlier */
@@ -3446,6 +3469,7 @@ Start from `14695981039346656037ULL`. The sim never produces a NaN (G.10), so th
 - **`t` is always clamped** to `[0, 1]` before use, and a contact at `t = 0` is legal (already touching and moving in).
 - **The only tolerances in the engine** are `CONTACT_SKIN` (1/1024 px: how far the circle is placed off a tilted face, and the `2 ×` growth of the jump zone), `RISE_EPSILON` (1/4096 px/tick: the momentum comparisons of the jump zone and the step), the 1/1024 px grid at load, and the `1e-12` axis-deduplication test at load. Nothing else compares with an epsilon; everywhere else, exact comparisons are the specification.
 - **Build with `-ffp-contract=off`** (Phase 1) so no `a * b + c` is fused: with contraction, two compilers can disagree in the last bit and the determinism tests fail.
+- **Optimizing the geometry is allowed only when the result is bit for bit the same.** Removing a redundant `sqrt` (G.4), precomputing a value at load time, hoisting a call out of a loop, turning an accessor into `static inline`: all fine, because the arithmetic that produces a number doesn't change. Reassociating a sum, replacing a division by a multiplication by the reciprocal, comparing a squared value against a squared threshold, or `-ffast-math`: not fine, however tempting the speed is. The test for "is this optimization allowed" is mechanical — run the engine before and after on the same levels and hash **every tick** of the run (`sim_state_hash`, 8.1): the two hashes have to match exactly, on levels covering the square, the circle, slopes and steps. If they differ at all, the change is out, whichever version looks more correct.
 
 ---
 
@@ -3495,11 +3519,11 @@ Pure functions, no player, no tick. This is the step to be slow on: everything l
 | `static rect_t bounds_of(const vec2_t *v, int n)` | AABB | G.2 |
 | `static void ensure_clockwise(vec2_t *v, int n)` | signed area, reverse if negative | G.2 |
 | `static void build_faces(hitbox_t *h)` | `face_kind`, `face_n`, `face_off` per edge | G.2 |
-| `static void build_axes(hitbox_t *h)` | keep non-axis-parallel normals, deduplicate, fill `axis_lo/hi` | G.2 |
+| `static void build_axes(hitbox_t *h)` | seed y and x, keep non-axis-parallel normals, deduplicate, fill `axis_lo/hi/extent` | G.2 |
 | `void hitbox_build_poly(hitbox_t *h, const vec2_t *local, int n, rect_t rect, double deg)` | the whole build | 4.2, G.2 |
 | `void hitbox_build_circle(hitbox_t *h, rect_t rect, double r)` | saws; a `SHAPE_CIRCLE` hitbox | FEATURES 10.6 |
 | `void hitbox_for_object(object_t *o)` | local shape from the type, then `hitbox_build_*` | 4.2 table |
-| `vec2_t hitbox_axis(const hitbox_t *h, int k)` | `k = 0` → `(0,1)`, `k = 1` → `(1,0)`, else `axes[k-2]` | G.2 |
+| `vec2_t hitbox_axis(const hitbox_t *h, int k)` (inline) | `h->axes[k]`: `[0]` is y, `[1]` is x, then the shape's own | G.2 |
 | `double hitbox_lo(const hitbox_t *h, int k)`, `hitbox_hi` | the matching projections | G.2 |
 | `bool up_facing_horizontal_face(const hitbox_t *h, int i, double g, face_t *out)` | edge `i` if horizontal and facing the player's up | G.7 |
 
@@ -3601,6 +3625,7 @@ The first version moves a cube on the ground and on block tops. No circle, no sl
 | `static bool circle_face_ok(const hitbox_t *h, int i, double g)` | tilted, or facing the ceiling | G.9 |
 | `static bool circle_vertex_ok(const hitbox_t *h, int i, double g)` | between two tilted faces, or a ceiling corner | G.9 |
 | `static void try_circle(sim_t *s, size_t i, vec2_t d, event_t *out)` | the circle's candidates | G.9 |
+| `static void try_shapes(sim_t *s, size_t i, vec2_t d, event_t *out)` | both shapes, sharing one overlap test | G.9 |
 | `static bool step_event(const sim_t *s, vec2_t d, vec2_t vel, face_t f, double *t)` | when the step happens inside the leg | 4.4, G.7 |
 | `static void try_steps(sim_t *s, vec2_t d, vec2_t vel, event_t *out)` | the highest step, over every candidate's up-facing faces | 4.4 |
 | `static bool lift_hits_surface(const sim_t *s, double y, double lift)` | refuse a lift into a boundary | G.7 |

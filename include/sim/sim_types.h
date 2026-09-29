@@ -43,6 +43,7 @@ typedef enum hold_state {     /* 3.4: GD's buffered clicks and orb locking */
 } hold_state_t;
 
 #define HB_MAX_VERTS 4
+#define HB_MAX_AXES (HB_MAX_VERTS + 2)   /* y and x, then the shape's own (G.2) */
 
 typedef enum shape_kind { SHAPE_POLY, SHAPE_CIRCLE } shape_kind_t;
 typedef enum face_kind { FACE_HORIZONTAL, FACE_VERTICAL, FACE_TILTED } face_kind_t;
@@ -52,10 +53,11 @@ typedef struct hitbox {       /* full shape: area, not outline (3.0) */
     rect_t aabb;              /* world-space bounds: broadphase, first axes     */
     int nverts;               /* poly: 3 or 4, world space, clockwise on screen */
     vec2_t verts[HB_MAX_VERTS];
-    int naxes;                /* poly: separating axes other than x and y       */
-    vec2_t axes[HB_MAX_VERTS];     /* unit edge normals, pointing outward      */
-    double axis_lo[HB_MAX_VERTS];   /* the shape's projection on each axis      */
-    double axis_hi[HB_MAX_VERTS];
+    int naxes;                /* separating axes: [0] is y, [1] is x, then its own */
+    vec2_t axes[HB_MAX_AXES];       /* unit edge normals, pointing outward      */
+    double axis_lo[HB_MAX_AXES];    /* the shape's projection on each axis      */
+    double axis_hi[HB_MAX_AXES];
+    double axis_extent[HB_MAX_AXES];   /* |a.x| + |a.y|: a square's radius on it */
     uint8_t face_kind[HB_MAX_VERTS];   /* edge i = verts[i] -> verts[i + 1]:
                                           FACE_HORIZONTAL, FACE_VERTICAL, FACE_TILTED */
     vec2_t face_n[HB_MAX_VERTS];       /* edge i's outward unit normal (G.2)       */

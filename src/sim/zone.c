@@ -99,8 +99,8 @@ void update_can_jump(sim_t *s)
             continue;
         if (!rect_overlap(o->hitbox.aabb, zone))
             continue;
-        touched = zone_dark(p, &o->hitbox, y_line)
-            || zone_light(&o->hitbox, zone);
+        touched = zone_light(&o->hitbox, zone)    /* segments first: no sqrt */
+            || zone_dark(p, &o->hitbox, y_line);
     }
     p->can_jump = touched && p->vy <= p->surface_rise + RISE_EPSILON;
 }

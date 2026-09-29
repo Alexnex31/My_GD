@@ -97,6 +97,7 @@ static bool through_x_axis(const contact_t *c)
     return c->normal.y == 0.0;
 }
 
+/* The caller has checked is_passed and that the square is clear of the shape. */
 static void try_square(sim_t *s, size_t i, vec2_t d, event_t *out)
 {
     const player_t *p = &s->st.player;
@@ -104,8 +105,6 @@ static void try_square(sim_t *s, size_t i, vec2_t d, event_t *out)
     double half = MODES[p->mode].half;
     contact_t c;
 
-    if (is_passed(s, i) || overlap_box_poly(p->pos, half, h))
-        return;                              /* inside it: the inner box decides */
     if (!sweep_box_poly(p->pos, half, d, h, &c))
         return;
     if (c.flat && c.normal.y * p->gravity_dir > 0.0)
@@ -180,6 +179,7 @@ static bool circle_vertex_ok(const hitbox_t *h, int i, double g)
     return h->face_n[prev].y * g > 0.0 || h->face_n[i].y * g > 0.0;
 }
 
+/* Same preconditions, for the circle: the caller knows it is clear of it. */
 static void try_circle(sim_t *s, size_t i, vec2_t d, event_t *out)
 {
     const player_t *p = &s->st.player;
@@ -187,13 +187,34 @@ static void try_circle(sim_t *s, size_t i, vec2_t d, event_t *out)
     double half = MODES[p->mode].half;
     contact_t c;
 
-    if (is_passed(s, i) || overlap_circle_poly(p->pos, half, h))
-        return;
-    if (!sweep_circle_poly(p->pos, half, d, h, circle_face_ok, circle_vertex_ok,
-        p->gravity_dir, &c))
+    if (!sweep_circle_clear(p->pos, half, d, h, circle_face_ok,
+        circle_vertex_ok, p->gravity_dir, &c))
         return;
     c.surface = (long)i;
     keep(out, &c);
+}
+
+/*
+** Both shapes against one object. The circle is inscribed in the square, so
+** a square that doesn't overlap the shape proves the circle doesn't either:
+** the circle's own distance test is needed only in the rare case where the
+** square is already inside (4.3).
+*/
+static void try_shapes(sim_t *s, size_t i, vec2_t d, event_t *out)
+{
+    const player_t *p = &s->st.player;
+    const hitbox_t *h = &s->lvl.objects[i].hitbox;
+    double half = MODES[p->mode].half;
+    bool in_square;
+
+    if (is_passed(s, i))
+        return;
+    in_square = overlap_box_poly(p->pos, half, h);
+    if (!in_square)
+        try_square(s, i, d, out);            /* inside it: the inner box decides */
+    if (in_square && overlap_circle_poly(p->pos, half, h))
+        return;
+    try_circle(s, i, d, out);
 }
 
 /* The corridor's ceiling, or the ground once gravity is flipped (G.7). */
@@ -285,7 +306,8 @@ static double circle_lift_death(sim_t *s, vec2_t lift)
         if (OBJ_CATEGORY[o->type] != CAT_NEUTRAL
             || overlap_circle_poly(p->pos, half, &o->hitbox))
             continue;
-        death = fmin(death, sweep_circle_touch(p->pos, half, lift, &o->hitbox));
+        death = fmin(death,
+            sweep_circle_touch_clear(p->pos, half, lift, &o->hitbox));
     }
     return death;
 }
@@ -324,8 +346,7 @@ static bool first_event(sim_t *s, vec2_t d, vec2_t vel, event_t *out)
 
         if (OBJ_CATEGORY[s->lvl.objects[i].type] != CAT_NEUTRAL)
             continue;
-        try_square(s, i, d, out);
-        try_circle(s, i, d, out);
+        try_shapes(s, i, d, out);
     }
     try_surfaces(s, d, out);
     try_steps(s, d, vel, out);               /* contacts first, then steps (G.9) */

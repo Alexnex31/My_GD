@@ -38,6 +38,16 @@ bool sweep_circle_plane(vec2_t c, double r, vec2_t d, double sy, double side,
 bool sweep_circle_poly(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out);
 double sweep_circle_touch(vec2_t c, double r, vec2_t d, const hitbox_t *hb);
+
+/*
+** The same two for a caller that has **already** checked the circle is clear
+** of hb (4.4 does, before every sweep): they skip the overlap test instead of
+** computing the same distance a second time.
+*/
+bool sweep_circle_clear(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
+    face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out);
+double sweep_circle_touch_clear(vec2_t c, double r, vec2_t d,
+    const hitbox_t *hb);
 double poly_distance(vec2_t c, const hitbox_t *hb);     /* 0 when inside */
 double poly_points_distance(vec2_t c, const vec2_t *v, int n);   /* same, raw */
 bool overlap_circle_poly(vec2_t c, double r, const hitbox_t *hb);

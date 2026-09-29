@@ -44,6 +44,11 @@ static inline double vlen(vec2_t a)
     return sqrt(dot(a, a));
 }
 
-bool rect_overlap(rect_t a, rect_t b);   /* touching is not overlapping (3.0) */
+/* Touching is not overlapping (3.0). Inline: the broadphase calls it per object. */
+static inline bool rect_overlap(rect_t a, rect_t b)
+{
+    return a.x < b.x + b.w && b.x < a.x + a.w
+        && a.y < b.y + b.h && b.y < a.y + a.h;
+}
 
 #endif
