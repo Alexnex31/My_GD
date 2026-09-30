@@ -199,7 +199,8 @@ void hitbox_for_object(object_t *o)
         return;
     }
     if (o->type == OBJ_SPIKE)
-        r = (rect_t){r.x + 0.3 * r.w, r.y + 0.2 * r.h, 0.4 * r.w, 0.8 * r.h};
+        r = (rect_t){r.x + SPIKE_BOX_X * r.w, r.y + SPIKE_BOX_Y * r.h,
+            SPIKE_BOX_W * r.w, SPIKE_BOX_H * r.h};
     rect_corners(r, v);
     hitbox_build_poly(&o->hitbox, v, 4, o->rect, o->rotation);
 }

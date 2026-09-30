@@ -84,6 +84,7 @@ typedef struct textures {
     sfTexture *ground;
     sfTexture *spike;
     sfTexture *block;
+    sfTexture *cube_portal;
     sfTexture *player_icon;
     sfTexture *ship_icon;
     sfTexture *end_level_background;

@@ -18,9 +18,20 @@
     #define LEVEL_END_PADDING   500.0   /* level ends 500 px after the last object */
     #define KILL_CEILING_MARGIN 600.0    /* flipped gravity only: kill line above the highest object (4.7) */
 
+    /* Object shapes (4.2). The spike's box is res/spike_hitbox.png, measured:
+       26 x 43 px at (37, 25) in a 100 x 100 sprite, well clear of the base. */
+    #define SPIKE_BOX_X         0.37
+    #define SPIKE_BOX_Y         0.25
+    #define SPIKE_BOX_W         0.26
+    #define SPIKE_BOX_H         0.43
+    /* A portal's hitbox, measured in the real game: 1.2 blocks wide, 2.8 tall,
+       around the center of the cell the level gives it (4.2, 7.2). */
+    #define PORTAL_BOX_W        1.2
+    #define PORTAL_BOX_H        2.8
+
     /* Player */
     #define PLAYER_HALF         50.0    /* rigid square 100x100, circle radius 50 (4.3) */
-    #define PLAYER_SCREEN_X     350.0
+    #define PLAYER_SCREEN_X     500.0   /* the player's x on screen: 26% of the view (9.1) */
     #define PLAYER_SPAWN_X      350.0
     #define PLAYER_SPAWN_Y      (GROUND_Y - PLAYER_HALF)   /* 800, on the ground */
 
@@ -44,9 +55,14 @@
     #define CUBE_MAX_FALL       (2.6 * V_UNIT)     /* 2700.4 px/s                        */
     #define CUBE_SPIN           324      /* deg/s, the icon's spin in the air (cosmetic) */
     #define RISE_EPSILON        (1.0 / 4096.0)   /* px/tick, jump-zone momentum test (4.3) */
-    #define SHIP_GRAVITY        (0.99 * A_UNIT)    /* ours: 10678.9 px/s^2               */
-    #define SHIP_THRUST         (2.24 * A_UNIT)    /* ours: 24162.7 px/s^2               */
-    #define SHIP_MAX_VY         (2.24 * V_UNIT)    /* ours: 2326.5 px/s                  */
+    /* The ship: GD never published these, so they are ours, chosen from the arc
+       they draw rather than from a number (6.9). The cap is exactly the scroll
+       speed, so the ship never moves steeper than 45 degrees. Thrust is exactly
+       twice gravity, which makes rising and falling pick up speed at the same
+       rate: both reach the cap in 0.23 s, about 2.4 blocks of level. */
+    #define SHIP_GRAVITY        (0.42 * A_UNIT)    /* ours: 4530.5 px/s^2                */
+    #define SHIP_THRUST         (0.84 * A_UNIT)    /* ours: 9061.0 px/s^2, = 2x gravity  */
+    #define SHIP_MAX_VY         (1.0 * V_UNIT)     /* ours: 1038.6 px/s, = the scroll    */
 
     /* Contacts (4.4) */
     #define FLOOR_MIN_DOT       0.64279 /* cos(50 deg): steeper than 50 deg is a wall     */
@@ -60,10 +76,15 @@
     #define CONTACT_SKIN        (1.0 / 1024.0)   /* gap kept from tilted faces (4.4)     */
 
     /* Camera (screen y of the player's center) */
-    #define CAM_TOP_MARGIN      200.0
-    #define CAM_BOTTOM_MARGIN   790.0
+    /* The camera's dead zone (3.5): a band CAM_ZONE_HEIGHT tall in the middle of
+       the screen. Inside it the camera doesn't move at all, so ordinary jumps
+       leave the view still; leaving it pulls the camera along, eased. */
+    #define CAM_ZONE_HEIGHT     300.0
+    #define CAM_ZONE_TOP        ((VIEW_HEIGHT - CAM_ZONE_HEIGHT) / 2.0)   /* 390 */
+    #define CAM_ZONE_BOTTOM     ((VIEW_HEIGHT + CAM_ZONE_HEIGHT) / 2.0)   /* 690 */
     #define CAM_TAU             0.08    /* seconds, smoothing time constant (3.5)          */
     #define CAM_LERP            0.0507502406   /* = 1 - exp(-1/(TICK_RATE*CAM_TAU)) */
+    #define CAM_SNAP_EPSILON    (1.0 / 64.0)   /* closer than this: the corridor is reached */
 
     /* Ship corridor (5.2) */
     #define CORRIDOR_MAX_HEIGHT 1000.0   /* the tallest mode corridor (ship, UFO, wave) */

@@ -938,6 +938,14 @@ Both count in **GD blocks**: a block is the player's size, so **1 block = our 10
 | Black orb | −2.6 | straight toward the floor, at the fall cap |
 | Ship, UFO, ball, wave | not published | ours (7–9), except the UFO's hop height |
 
+**The ship, and how its numbers were chosen.** GD publishes nothing here, so guessing a number is guessing twice: once at the value and once at the units. Instead the ship is defined by the **arc it draws**, which is what a player actually feels, and the constants fall out of it:
+
+- The vertical cap is exactly the scroll speed (`SHIP_MAX_VY = 1.0 × V_UNIT`), so the ship never travels steeper than **45 degrees**. That single rule is most of the feel: a ship that can move vertically faster than the level scrolls reads as violent whatever the other numbers are.
+- Gravity (`0.36 × A_UNIT`) drops the ship across the full 10-block corridor in **1.00 s**, about 10 blocks of level.
+- Thrust (`1.20 × A_UNIT`) lifts it back in **1.02 s**, so climbing and falling are symmetric and the ship answers a press immediately.
+
+The first version of these (0.99, 2.24, 2.24) crossed the corridor in 0.49 s falling and 0.63 s climbing, with a vertical cap of 23.3 blocks/s — more than twice the horizontal speed. Gravity was also **stronger than the cube's** (0.99 against 0.876), which is backwards: GD's ship is the floatier of the two. Measure a change here with the arc, not with the constants.
+
 A negative value is a speed **toward the floor the player is falling to**: for the flip objects (blue pad, blue orb, green orb) it's applied after the flip, so it throws the player at its new floor; the black orb doesn't flip, so it slams the player at the floor it already had. Blue keeps the same 1.37 for mini, and green the same 1.91.
 
 **Jump and hop heights:**

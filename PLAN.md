@@ -570,7 +570,8 @@ So the simulation stores velocities in **px per tick** and accelerations in **px
 
     /* Player */
     #define PLAYER_HALF         50.0    /* rigid square 100x100, circle radius 50 (4.3) */
-    #define PLAYER_SCREEN_X     350.0
+    #define PLAYER_SCREEN_X     500.0   /* 26% of the view: the player is not pinned
+                                           to the left edge (9.1) */
     #define PLAYER_SPAWN_X      350.0
     #define PLAYER_SPAWN_Y      (GROUND_Y - PLAYER_HALF)   /* 800, on the ground */
 
@@ -594,9 +595,13 @@ So the simulation stores velocities in **px per tick** and accelerations in **px
     #define CUBE_MAX_FALL       (2.6 * V_UNIT)     /* 2700.4 px/s                        */
     #define CUBE_SPIN           324      /* deg/s, the icon's spin in the air (cosmetic) */
     #define RISE_EPSILON        (1.0 / 4096.0)   /* px/tick, jump-zone momentum test (4.3) */
-    #define SHIP_GRAVITY        (0.99 * A_UNIT)    /* ours: 10678.9 px/s^2               */
-    #define SHIP_THRUST         (2.24 * A_UNIT)    /* ours: 24162.7 px/s^2               */
-    #define SHIP_MAX_VY         (2.24 * V_UNIT)    /* ours: 2326.5 px/s                  */
+    /* The ship: GD never published these, so they are ours, chosen from the arc
+       they draw rather than from a number (FEATURES 6.9). The cap is exactly the
+       scroll speed, so the ship never moves steeper than 45 degrees; each crosses
+       the 10-block corridor in about a second, climbing as fast as it falls. */
+    #define SHIP_GRAVITY        (0.36 * A_UNIT)    /* ours: 3883.3 px/s^2                */
+    #define SHIP_THRUST         (1.20 * A_UNIT)    /* ours: 12944.2 px/s^2               */
+    #define SHIP_MAX_VY         (1.0 * V_UNIT)     /* ours: 1038.6 px/s, = the scroll    */
 
     /* Contacts (4.4) */
     #define FLOOR_MIN_DOT       0.64279 /* cos(50 deg): steeper than 50 deg is a wall     */
@@ -1056,34 +1061,50 @@ A smoothed follow, in the sim (it's deterministic and cheap, and FEATURES' out-o
 ```c
 void camera_follow(camera_t *c, const player_t *p, const ship_bounds_t *b)
 {
-    double sy = p->pos.y - c->pos.y;           /* player's screen y */
-    double target = c->pos.y;
+    double target = 0.0;
 
-    if (b->active) {
-        c->pos.y = b->top - (VIEW_HEIGHT - (b->bottom - b->top)) / 2.0;   /* the corridor,
-                                                       centered on screen (5.2) */
-        return;
+    if (b->active) {                           /* the corridor, centered (5.2) */
+        target = b->top - (VIEW_HEIGHT - (b->bottom - b->top)) / 2.0;
+        c->pos.y = at_rest(c->pos.y, target) ? target
+            : c->pos.y + (target - c->pos.y) * CAM_LERP;
+        return;                                /* eased onto it, never cut */
     }
-    if (sy < CAM_TOP_MARGIN)
-        target = p->pos.y - CAM_TOP_MARGIN;
-    else if (sy > CAM_BOTTOM_MARGIN)
-        target = p->pos.y - CAM_BOTTOM_MARGIN;
-    else if (p->grounded && c->pos.y < 0.0)
-        target = 0.0;                          /* back to the ground view after flying */
+    target = follow_target(p, c);              /* the zone, below */
     if (target > 0.0)
         target = 0.0;                          /* never below the ground view */
     c->pos.y += (target - c->pos.y) * CAM_LERP;
 }
+
+/* Nothing new while the player is inside the zone; otherwise the edge it left. */
+static double follow_target(const player_t *p, const camera_t *c)
+{
+    double screen_y = p->pos.y - c->pos.y;
+
+    if (screen_y < CAM_ZONE_TOP)
+        return p->pos.y - CAM_ZONE_TOP;        /* above it: the camera rises */
+    if (screen_y > CAM_ZONE_BOTTOM)
+        return p->pos.y - CAM_ZONE_BOTTOM;     /* below it: the camera drops */
+    return c->pos.y;
+}
 ```
 
-- When the player's center leaves the 200..790 band on screen, the camera eases toward keeping it at the edge of the band.
-- After a ship section, once the player is grounded, it eases back to the ground view. (Today, in level 7, the ground stays at screen y 600 for the rest of the attempt after the ship section.)
-- It never shows below the ground view (today's camera can overshoot a few pixels).
+- **Two behaviours, and only two.** A mode with a corridor (ship, UFO, wave, ball, spider) locks on it, eased. A mode without one (cube, robot) has **nothing to snap to**: a **dead zone** 300 px tall in the middle of the screen (screen y 390..690). Inside it the camera does not move; leaving it pulls the camera to that edge, eased. Nothing depends on `grounded`, and there is no "return to the ground view" — that rule is what made the camera drop on its own once the player landed.
+- Measured, at `CAM_TAU = 0.08 s`:
+
+| what the player does | camera moves |
+|---|---|
+| runs on flat ground, 5 s | **0.0 px** |
+| jumps (2.13 blocks, screen y 800 → 587) | **0.0 px** — a normal jump stays inside the zone |
+| falls 7 blocks from the air | 290 px, worst tick 8.3 |
+| starts 12 blocks up and falls | 790 px, worst tick 11.0 |
+
+- The zone is why an ordinary jump leaves the view perfectly still while a real climb or fall still follows. `CAM_ZONE_HEIGHT` is the knob: bigger means the camera ignores more, smaller means it follows sooner.
+- It never shows below the ground view.
 - `CAM_LERP` is derived from a **time constant** (`CAM_TAU`, 3.2), so the camera feels the same at any tick rate; a unit test recomputes it from `TICK_RATE` in double.
 - In a corridor, the camera is **locked** in y with the corridor **centered on screen**: a 1000 px corridor leaves 40 px above and below, an 800 px one 140 px (5.2). It doesn't follow the player inside the corridor; it's released when the player leaves it, and then eases back to the follow rule above.
 - The lock is set directly by the portal, so entering a corridor is a cut, not a pan. If that feels abrupt in play-testing, `center_corridor` can leave the camera where it is and let a transition ease into the locked position over a few ticks: a presentation choice (11.2).
 
-Horizontal camera: `cam.x = player.x - PLAYER_SCREEN_X`, always (the game layer computes it).
+Horizontal camera: `cam.x = player.x - PLAYER_SCREEN_X`, always (the game layer computes it). `PLAYER_SCREEN_X` is 500 of the 1920 wide view, so the player sits about a quarter in from the left with room to read what is coming; it is presentation only and changes nothing in the simulation, where the player's world x is `PLAYER_SPAWN_X + distance`.
 
 ### 3.6 Fixed-timestep loop (game layer)
 
@@ -1183,7 +1204,8 @@ At load, `hitbox.c` builds each object's shape from its type, **then** rotates i
 |---|---|---|
 | `block` | neutral | the full rect |
 | `slope` | neutral | right triangle `(x, y+h)`, `(x+w, y)`, `(x+w, y+h)`: rises from left to right, 45° for a square |
-| `spike` | harm | `{x + 0.3w, y + 0.2h, 0.4w, 0.8h}`: the middle 40%, from 20% below the tip to the base. Forgiving like GD's, and proportional to the spike's size |
+| `spike` | harm | `{x + 0.37w, y + 0.25h, 0.26w, 0.43h}`: measured off `res/spike_hitbox.png` (a 26 x 43 px box at (37, 25) in the 100 x 100 sprite). Narrow, and it stops well above the base, so brushing a spike's foot or its sloped sides is not a death. Proportional to the spike's size |
+| `portal` | interactive | **1.2 blocks wide and 2.8 tall**, measured in GD, around the center of the cell the line writes (7.2). A derived axis is centered on that cell, so the corridor a mode portal opens (5.2) doesn't move; an explicit `w=` or `h=` anchors at the cell's corner like any other object |
 | `portal` | interactive | the full rect |
 
 (Today's spike box is `{x + 30, y + size * 10, 40, 100 - size * 10}`: identical for `size 2`, but fixed 40 px wide and reaching 50 px below a `size 1` spike's sprite, into the ground. The proportional box fixes other sizes; level 2's size-1 spike at `(1000, 800)` is the one to play-test.)
@@ -2143,6 +2165,7 @@ Optional `key=value` fields, any object:
 | Field | Meaning | Default |
 |---|---|---|
 | `rot=<degrees>` | rotation, any angle, clockwise, around the rect's center (4.4) | `0` |
+| (portals) | a portal with no `w=`/`h=` is `1.2 x size` wide and `2.8 x size` tall, centered on its cell: GD's portals are tall and narrow (4.2) | |
 | `w=<units>` | width in grid units (50 px) | `size` |
 | `h=<units>` | height in grid units | `size` |
 | `group=<n>[,<n>...]` | reserved for GD-style triggers (5.1): parsed, stored nowhere yet, one warning per level | none |
@@ -2422,6 +2445,8 @@ void level_render(gd_t *gd, level_t *lv)
 ```
 
 The sim's camera y goes straight into the view; the horizontal part is derived from the player.
+
+**The corridor is eased onto, not cut to.** A portal opens the corridor on one tick, and the camera's resting place jumps by hundreds of pixels; assigning it directly made the view drop 190 px in a single tick on level 7 (45 600 px/s), which reads as the camera falling. So `camera_follow` lerps onto the corridor with the same `CAM_LERP` as everywhere else, and locks exactly once it is within `CAM_SNAP_EPSILON` (1/64 px) of it — about 200 ticks, under a second. `sim_reset` still places the camera **at** its resting point (`camera_rest_y`), because an attempt has nothing to ease from. Only corridor gamemodes (ship, UFO, wave, ball, spider) ever lock: the cube and the robot use the margins below, and in a cube level the camera does not move at all on flat ground.
 
 **Pixel snapping.** The camera moves 4.3275 px per tick at 240 Hz (GD's normal speed), so its position is usually fractional. A view centered on a fractional position samples textures between texels: tiles shimmer and thin seams appear between adjacent blocks. Round the camera to a whole **screen** pixel before building the view:
 

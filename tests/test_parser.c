@@ -188,11 +188,11 @@ static void test_fields(void)
         "spike 1000 0 2 rot=180\n"
         "slope 2000 750 2\n");
     CHECK(warnings == 0);
-    /* sorted by hitbox left edge: the spike (1030), the slope, the block */
+    /* sorted by hitbox left edge: the spike (1037), the slope, the block */
     CHECK(s.lvl.objects[2].rect.w == 400.0 && s.lvl.objects[2].rect.h == 50.0);
     CHECK(s.lvl.objects[0].rotation == 180.0);
-    CHECK(s.lvl.objects[0].hitbox.aabb.x == 1030.0);
-    CHECK(s.lvl.objects[0].hitbox.aabb.y == 0.0);
+    CHECK(s.lvl.objects[0].hitbox.aabb.x == 1037.0);
+    CHECK(s.lvl.objects[0].hitbox.aabb.y == 32.0);
     CHECK(s.lvl.objects[1].hitbox.nverts == 3);
     sim_free(&s);
 }

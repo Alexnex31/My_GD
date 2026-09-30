@@ -102,15 +102,29 @@ static void test_corridor_bounds(void)
     sim_free(&s);
 }
 
-/* Inside a corridor the camera is locked on it, centered on screen (3.5). */
+/*
+** The camera settles on the corridor and then stays locked on it (3.5). It
+** is eased onto it, never cut: a portal that teleported the camera read as a
+** violent fall on screen.
+*/
 static void test_camera_locks_on_the_corridor(void)
 {
     sim_t s;
     double expected;
+    double biggest = 0.0;
+    double previous;
 
-    load(&s, "portal 1000 0 4 ship\n");
+    load(&s, "portal 1000 0 4 ship\nblock 100000 700 2\n");
     cross_at(&s, 1000.0, 100.0);
     expected = s.st.bounds.top - (VIEW_HEIGHT - 1000.0) / 2.0;
+    for (int i = 0; i < 240 && s.st.player.alive; i++) {
+        previous = s.st.cam.pos.y;
+        sim_tick(&s, i % 2 ? HELD : NONE);
+        if (fabs(s.st.cam.pos.y - previous) > biggest)
+            biggest = fabs(s.st.cam.pos.y - previous);
+    }
+    CHECK(biggest < 30.0);                    /* eased in, not teleported */
+    CHECK(s.st.cam.pos.y == expected);        /* one second later: locked */
     for (int i = 0; i < 60 && s.st.player.alive; i++) {
         sim_tick(&s, i % 2 ? HELD : NONE);    /* whatever the player does */
         CHECK(s.st.cam.pos.y == expected);
@@ -153,8 +167,9 @@ static void test_ship_flies_in_the_corridor(void)
     /* the far block keeps the level from ending mid-flight */
     load(&s, "portal 1000 0 4 ship\nblock 100000 700 2\n");
     cross_at(&s, 1000.0, 100.0);
-    for (int i = 0; i < 900 && s.st.player.alive; i++) {
-        sim_tick(&s, i % 300 < 150 ? HELD : NONE);
+    /* a corridor crossing takes about a second, so the phases are 300 ticks */
+    for (int i = 0; i < 1800 && s.st.player.alive; i++) {
+        sim_tick(&s, i % 600 < 300 ? HELD : NONE);
         touched_ceiling |= s.st.player.pos.y - PLAYER_HALF <= s.st.bounds.top + 1.0;
         touched_floor |= s.st.player.grounded;
         CHECK(s.st.player.pos.y - PLAYER_HALF >= s.st.bounds.top - 0.01);

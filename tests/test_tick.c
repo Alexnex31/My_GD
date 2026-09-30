@@ -189,8 +189,8 @@ static void test_spikes(void)
     while (s.st.player.alive && s.st.player.pos.x < 1200.0)
         sim_tick(&s, NONE);
     CHECK(!s.st.player.alive);
-    CHECK(s.st.player.pos.x + PLAYER_HALF >= 1030.0);   /* the spike's box */
-    CHECK(s.st.player.pos.x + PLAYER_HALF < 1030.0 + PER_TICK(SCROLL_SPEED));
+    CHECK(s.st.player.pos.x + PLAYER_HALF >= 1037.0);   /* the spike's box */
+    CHECK(s.st.player.pos.x + PLAYER_HALF < 1037.0 + PER_TICK(SCROLL_SPEED));
     sim_free(&s);
     /* the same spike 100 px higher: the square passes under it */
     load(&s, "spike 1000 600 2\n");

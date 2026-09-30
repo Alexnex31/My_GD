@@ -31,6 +31,8 @@ void free_textures(textures_t *res)
         sfTexture_destroy(res->spike);
     if (res->block != NULL)
         sfTexture_destroy(res->block);
+    if (res->cube_portal != NULL)
+        sfTexture_destroy(res->cube_portal);
     if (res->player_icon != NULL)
         sfTexture_destroy(res->player_icon);
     if (res->ship_icon != NULL)
@@ -70,6 +72,7 @@ textures_t *load_textures(void)
     res->ground = load_texture("res/ground.png");
     res->spike = load_texture("res/spike.png");
     res->block = load_texture("res/block.png");
+    res->cube_portal = load_texture("res/cube_portal.png");
     res->player_icon = load_texture("res/player_icon.png");
     res->ship_icon = load_texture("res/ship_icon.png");
     res->end_level_background = load_texture("res/end_level_background.png");

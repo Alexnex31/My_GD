@@ -33,9 +33,18 @@ static sfTexture *texture_for(gd_t *gd, const object_t *o)
     if (o->type == OBJ_SPIKE)
         return gd->res->spike;
     if (o->type == OBJ_PORTAL)
-        return o->portal_mode == MODE_SHIP ? gd->res->ship_icon
-            : gd->res->player_icon;
+        return gd->res->cube_portal;         /* 100x200, tinted by mode (9.2) */
     return gd->res->block;
+}
+
+/* Cyan for the cube, pink for the ship: GD's own portal colours. */
+static sfColor portal_tint(const object_t *o, bool spent)
+{
+    sfColor c = o->portal_mode == MODE_SHIP ? (sfColor){255, 120, 220, 255}
+        : (sfColor){0, 230, 230, 255};
+
+    c.a = spent ? 140 : 255;
+    return c;
 }
 
 /* One sprite reused for every object, scaled to the object's own rect. */
@@ -52,9 +61,10 @@ static void draw_object(gd_t *gd, level_t *lv, const object_t *o)
     sfSprite_setRotation(s, (float)o->rotation);
     sfSprite_setPosition(s, (sfVector2f){(float)(o->rect.x + o->rect.w / 2.0),
         (float)(o->rect.y + o->rect.h / 2.0)});
-    sfSprite_setColor(s, o->type == OBJ_PORTAL && is_spent(&lv->sim.st,
-        (size_t)(o - lv->sim.lvl.objects))
-        ? (sfColor){255, 255, 255, 140} : sfWhite);
+    sfSprite_setColor(s, o->type == OBJ_PORTAL
+        ? portal_tint(o, is_spent(&lv->sim.st,
+            (size_t)(o - lv->sim.lvl.objects)))
+        : sfWhite);
     sfRenderWindow_drawSprite(gd->w, s, NULL);
 }
 

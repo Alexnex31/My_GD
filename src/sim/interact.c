@@ -73,8 +73,7 @@ void corridor_from_center(sim_t *s, double center)
         top = GROUND_Y - height;
     b->active = true;
     b->top = top;
-    b->bottom = top + height;
-    s->st.cam.pos.y = top - (VIEW_HEIGHT - height) / 2.0;   /* locked (3.5) */
+    b->bottom = top + height;   /* the camera eases onto it, camera_follow (3.5) */
 }
 
 /*

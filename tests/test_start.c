@@ -56,13 +56,13 @@ static void test_start_position(void)
     CHECK(s.st.distance == 0.0 && sim_percent(&s) == 0.0);
     CHECK(!s.st.player.grounded && !s.st.player.can_jump);   /* in the air */
     CHECK(s.lvl.end_shift == 5100.0 + LEVEL_END_PADDING - 2000.0);
-    CHECK(s.st.cam.pos.y == 0.0);          /* y = 300 is inside the margins */
+    CHECK(s.st.cam.pos.y == 300.0 - CAM_ZONE_TOP);   /* above the zone: pulled up */
     sim_tick(&s, (input_t){false, false});
     CHECK(s.st.player.pos.x == 2000.0 + PER_TICK(SCROLL_SPEED));
     sim_free(&s);
     /* high above the ground the camera starts where it would have settled */
     load(&s, "start_y -500\nblock 5000 700 2\n");
-    CHECK(s.st.cam.pos.y == -500.0 - CAM_TOP_MARGIN);
+    CHECK(s.st.cam.pos.y == -500.0 - CAM_ZONE_TOP);
     sim_free(&s);
     /* the level still completes, 500 px past the last object */
     load(&s, "start_x 2000\nblock 3000 200 2\n");   /* out of the cube's way */

@@ -103,6 +103,31 @@ static int parse_units(const char *val, double *px)
     return 0;
 }
 
+/*
+** A portal is not the square cell it is written in: it is 1.2 blocks wide and
+** 2.8 tall, GD's own proportions (4.2). Each axis is derived only when the
+** line doesn't give it, and a derived axis is centered on the cell the level
+** wrote, so the corridor a mode portal opens (5.2) stays where the level put
+** it. An explicit w= or h= anchors at the cell's corner, like every other
+** object (7.2): the line said exactly what it wanted.
+*/
+static void portal_shape(object_t *o, bool given_w, bool given_h)
+{
+    double block = o->size * UNIT;            /* the cell as written: 1 block */
+    vec2_t center = {o->rect.x + block / 2.0, o->rect.y + block / 2.0};
+
+    if (o->type != OBJ_PORTAL)
+        return;
+    if (!given_w) {                          /* derived: centered on the cell */
+        o->rect.w = block * PORTAL_BOX_W;
+        o->rect.x = center.x - o->rect.w / 2.0;
+    }
+    if (!given_h) {
+        o->rect.h = block * PORTAL_BOX_H;
+        o->rect.y = center.y - o->rect.h / 2.0;
+    }
+}
+
 /* One key=value field; an unknown key is ignored, the line stays (7.2). */
 static int parse_field(object_t *o, char *tok, parse_ctx_t *ctx)
 {
@@ -173,6 +198,8 @@ static int parse_object(char *line, object_t *o, parse_ctx_t *ctx)
     double x = 0.0;
     double y = 0.0;
     int size = 0;
+    bool given_h = false;
+    bool given_w = false;
 
     if (n < 1 || type_from_name(tok[0], &o->type) != 0)
         return 1;                             /* not an object: a header field */
@@ -187,11 +214,15 @@ static int parse_object(char *line, object_t *o, parse_ctx_t *ctx)
     }
     *o = (object_t){.type = o->type, .line = ctx->lineno, .size = size,
         .rect = {x, y, size * UNIT, size * UNIT}};
-    for (int i = first_field; i < n; i++)
-        if (parse_field(o, tok[i], ctx) != 0) {
+    for (int i = first_field; i < n; i++) {
+        given_h = given_h || strncmp(tok[i], "h=", 2) == 0;
+        given_w = given_w || strncmp(tok[i], "w=", 2) == 0;
+        if (parse_field(o, tok[i], ctx) != 0) {  /* it splits tok in place */
             warn(ctx, "invalid field value, line skipped");
             return -1;
         }
+    }
+    portal_shape(o, given_w, given_h);
     return object_init(o, word, ctx);
 }
 

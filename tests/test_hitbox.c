@@ -149,7 +149,8 @@ static void test_spike(void)
 {
     object_t o = make(OBJ_SPIKE, (rect_t){1000.0, 750.0, 100.0, 100.0}, 0.0);
 
-    CHECK(same_rect(o.hitbox.aabb, (rect_t){1030.0, 770.0, 40.0, 80.0}));
+    /* res/spike_hitbox.png: 26 x 43 at (37, 25) of the 100 x 100 sprite */
+    CHECK(same_rect(o.hitbox.aabb, (rect_t){1037.0, 775.0, 26.0, 43.0}));
     CHECK(count_faces(&o.hitbox, FACE_TILTED) == 0);
     CHECK(clockwise(&o.hitbox));
 }
@@ -159,7 +160,7 @@ static void test_spike_rotated(void)
 {
     object_t o = make(OBJ_SPIKE, (rect_t){1000.0, 0.0, 100.0, 100.0}, 180.0);
 
-    CHECK(same_rect(o.hitbox.aabb, (rect_t){1030.0, 0.0, 40.0, 80.0}));
+    CHECK(same_rect(o.hitbox.aabb, (rect_t){1037.0, 32.0, 26.0, 43.0}));
     CHECK(o.hitbox.naxes == 2);
 }
 

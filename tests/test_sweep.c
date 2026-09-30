@@ -99,9 +99,9 @@ static void test_touch_and_tunneling(void)
     hitbox_t b = block(1000.0, 700.0, 100.0, 100.0, 0.0);
 
     hitbox_for_object(&s);
-    /* the spike box is 1030..1070: crossed in one 200 px move, not skipped */
+    /* the spike box is 1037..1063: crossed in one 200 px move, not skipped */
     CHECK(sweep_box_touch((vec2_t){900.0, 750.0}, HALF, (vec2_t){200.0, 0.0},
-        &s.hitbox) == 0.4);
+        &s.hitbox) == (1037.0 - 950.0) / 200.0);
     CHECK(sweep_box_touch((vec2_t){900.0, 750.0}, HALF, (vec2_t){10.0, 0.0},
         &s.hitbox) == INFINITY);
     /* a touch sweep ignores which way the face looks */
