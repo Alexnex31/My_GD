@@ -43,6 +43,13 @@ static inline double hitbox_extent(const hitbox_t *h, int k)
     return h->axis_extent[k];
 }
 
+/*
+** The bounds the object is DRAWN in: its rect, rotated, which is not its
+** hitbox (a spike's box is inset inside its sprite, 4.2). The renderer buckets
+** and culls with this, or sprites pop in and out at the edge of the view (9.2).
+*/
+rect_t object_drawn_bounds(const object_t *o);
+
 /* Edge i, if it is horizontal and faces the player's up (G.7). Inline: the
 ** step search asks it about every edge of every candidate, every leg. */
 static inline bool up_facing_horizontal_face(const hitbox_t *h, int i,

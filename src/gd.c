@@ -27,6 +27,8 @@ void free_textures(textures_t *res)
         sfTexture_destroy(res->onli_button);
     if (res->ground != NULL)
         sfTexture_destroy(res->ground);
+    if (res->explosion != NULL)
+        sfTexture_destroy(res->explosion);
     if (res->spike != NULL)
         sfTexture_destroy(res->spike);
     if (res->block != NULL)
@@ -70,6 +72,7 @@ textures_t *load_textures(void)
     res->opt_button = load_texture("res/param_button.png");
     res->onli_button = load_texture("res/online_button.png");
     res->ground = load_texture("res/ground.png");
+    res->explosion = load_texture("res/explos.png");
     res->spike = load_texture("res/spike.png");
     res->block = load_texture("res/block.png");
     res->cube_portal = load_texture("res/cube_portal.png");
@@ -121,6 +124,7 @@ music_t *load_musics(void)
 void free_gd(gd_t *gd)
 {
     progress_free(&gd->progress);
+    sfTexture_destroy(gd->atlas);
     sfView_destroy(gd->ui_view);
     sfView_destroy(gd->level_view);
     free_textures(gd->res);
@@ -152,6 +156,7 @@ gd_t *create_gd(void)
     gd->event = xcalloc(1, sizeof(sfEvent));
     gd->menu = 'm';
     snprintf(gd->selected_id, sizeof(gd->selected_id), "1");
+    atlas_build(gd);
     progress_load(&gd->progress, SAVE_PATH);
     return gd;
 }

@@ -185,6 +185,20 @@ static void rect_corners(rect_t r, vec2_t *out)
     out[3] = (vec2_t){r.x, r.y + r.h};
 }
 
+rect_t object_drawn_bounds(const object_t *o)
+{
+    vec2_t c = {o->rect.x + o->rect.w / 2.0, o->rect.y + o->rect.h / 2.0};
+    vec2_t v[HB_MAX_VERTS];
+    double cs = 0.0;
+    double sn = 0.0;
+
+    rotation_of(o->rotation, &cs, &sn);
+    rect_corners(o->rect, v);
+    for (int i = 0; i < 4; i++)
+        v[i] = rotate_point(v[i], c, cs, sn);
+    return bounds_of(v, 4);
+}
+
 /* Local shape per type, before rotation (4.2). */
 void hitbox_for_object(object_t *o)
 {

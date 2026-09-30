@@ -17,6 +17,14 @@
 
 typedef struct gd gd_t;
 
+/* One slice of the level's static geometry, built once at load (9.2). */
+typedef struct render_chunk {
+    float left;                   /* the leftmost drawn x of its objects  */
+    float right;                  /* the rightmost: a sprite can stick out */
+    sfVertexBuffer *layer[LAYER_COUNT];
+    sfVertexArray *array[LAYER_COUNT];   /* the fallback, same vertices    */
+} render_chunk_t;
+
 typedef enum level_state {
     LEVEL_PLAYING,
     LEVEL_DYING,                  /* the explosion, then a respawn (6.1)    */
@@ -41,10 +49,27 @@ typedef struct level {
     sfInt64 accumulator;          /* microseconds x TICK_RATE (3.6)           */
     sfClock *clock;
     level_stats_t stats;
-    sfSprite *object_sprite;      /* one sprite, reused per object (7.3)      */
+    render_chunk_t *chunks;       /* the level's static geometry (9.2)        */
+    size_t nb_chunks;
     sfSprite *player_sprite;
     sfSprite *ground_sprite;
+    sfSprite *strip_sprite;       /* the corridor's floor and ceiling (5.3)   */
+    sfSprite *explosion_sprite;   /* the death animation (6.1)                */
+    ship_bounds_t drawn_bounds;   /* what the strips showed last frame        */
+    ship_bounds_t fading_bounds;  /* a corridor that just went away (5.3)     */
+    float fade_left;              /* seconds of fade still to draw            */
+    sfInt64 frame_us;             /* the frame the renderer is drawing        */
     sfText *hud_text;
+    sfText *attempt_text;         /* drawn in the world, it scrolls away (9.5) */
+    sfRectangleShape *bar_back;   /* the progress bar, created once            */
+    sfRectangleShape *bar_fill;
+    sfRectangleShape *flash;      /* the white flash at the end (9.8)          */
+    char shown_percent[16];       /* the string on screen: only set when it changes */
+    float end_time;               /* seconds since the level was completed (9.8) */
+    uint64_t *seen_spent;         /* the spent bits the last frame drew (9.2)  */
+    sfSprite *flash_sprite;       /* an object that just fired, fading out     */
+    size_t flash_index[MAX_FLASHES];
+    float flash_left[MAX_FLASHES];
     struct end_level_screen *end_screen;
 } level_t;
 
@@ -66,6 +91,11 @@ void level_flush_stats(level_t *lv, gd_t *gd);
 
 /* One tick's input (3.6). Polled per tick, so `pressed` lasts exactly one. */
 input_t input_for_tick(gd_t *gd);
+
+/* The static geometry: built once per level, drawn a few calls per frame. */
+void level_build_chunks(level_t *lv, gd_t *gd);
+void level_free_chunks(level_t *lv);
+void render_objects(gd_t *gd, level_t *lv, float cam_x);
 
 /* The camera the renderer uses: the player's x, the sim's y, pixel snapped. */
 vec2_t level_camera(gd_t *gd, const level_t *lv);

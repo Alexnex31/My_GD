@@ -206,8 +206,33 @@ static void test_rect_overlap(void)
     CHECK(rect_overlap(a, (rect_t){10.0, 10.0, 10.0, 10.0}));      /* contained */
 }
 
+/*
+** What the renderer buckets and culls with (9.2): the sprite's own rect,
+** rotated. For a spike it is much bigger than the hitbox.
+*/
+static void test_drawn_bounds(void)
+{
+    object_t o = make(OBJ_SPIKE, (rect_t){1000.0, 750.0, 100.0, 100.0}, 0.0);
+    rect_t d = object_drawn_bounds(&o);
+
+    CHECK(same_rect(d, (rect_t){1000.0, 750.0, 100.0, 100.0}));
+    CHECK(d.x < o.hitbox.aabb.x);            /* the sprite reaches past it */
+    CHECK(d.x + d.w > o.hitbox.aabb.x + o.hitbox.aabb.w);
+    o = make(OBJ_BLOCK, (rect_t){1000.0, 700.0, 100.0, 100.0}, 90.0);
+    d = object_drawn_bounds(&o);
+    CHECK(same_rect(d, (rect_t){1000.0, 700.0, 100.0, 100.0}));   /* a quarter turn */
+    o = make(OBJ_BLOCK, (rect_t){0.0, 0.0, 100.0, 100.0}, 45.0);
+    d = object_drawn_bounds(&o);
+    CHECK(fabs(d.w - 141.42) < 0.02 && fabs(d.h - 141.42) < 0.02);
+    CHECK(fabs(d.x + 20.71) < 0.02);         /* it sticks out on both sides */
+    o = make(OBJ_BLOCK, (rect_t){1000.0, 700.0, 400.0, 50.0}, 0.0);
+    d = object_drawn_bounds(&o);
+    CHECK(same_rect(d, (rect_t){1000.0, 700.0, 400.0, 50.0}));
+}
+
 void test_hitbox(void)
 {
+    test_drawn_bounds();
     test_block_flat();
     test_block_quarter_turns();
     test_block_tilted();

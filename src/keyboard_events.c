@@ -248,7 +248,8 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
                 return;
         }
         if (gd->event->type == sfEvtMouseButtonPressed
-            && (*level)->state == LEVEL_COMPLETE) {
+            && (*level)->state == LEVEL_COMPLETE
+            && (*level)->end_time >= END_FLIGHT + END_FLASH) {
             pixel = (sfVector2i){gd->event->mouseButton.x,
                 gd->event->mouseButton.y};
             pos = sfRenderWindow_mapPixelToCoords(gd->w, pixel, gd->ui_view);

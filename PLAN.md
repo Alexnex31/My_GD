@@ -2413,6 +2413,16 @@ CSFML adds a C-to-C++ call on top of SFML, and every `sfRenderWindow_drawSprite`
 
 With this, a frame is about ten draw calls: background, ground, up to 3 layers × 3 visible chunks of objects, corridor strips, player, HUD texts.
 
+**Measured**, with every `sfRenderWindow_draw*` counted by the wrappers of item 6:
+
+| level | objects | chunks | draw calls per frame |
+|---|---|---|---|
+| levels/7 | 4 | 5 | 8–12 |
+| levels/6 | 349 | 32 | 9–11 |
+| a generated stress level | 3000 | 293 | 10–11 |
+
+Flat from four objects to three thousand, which is the whole point: the count follows what is **on screen**, never what the level contains.
+
 ### 9.1 Views
 
 - `gd->ui_view`: a fixed 1920×1080 view for menus and the HUD (`sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H})`). Don't use the window's default view: it changes when the window is resized.

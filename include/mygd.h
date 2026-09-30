@@ -80,6 +80,18 @@ void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd);
 void keyboard_events_playing(level_t **level, gd_t *gd);
 
 
+/* Every draw goes through these, so the overlay can count them (9.0). */
+void draw_sprite(gd_t *gd, const sfSprite *sprite, const sfRenderStates *rs);
+void draw_text(gd_t *gd, const sfText *text);
+void draw_rect(gd_t *gd, const sfRectangleShape *shape);
+void draw_vertex_buffer(gd_t *gd, const sfVertexBuffer *buf,
+    const sfRenderStates *rs);
+void draw_vertex_array(gd_t *gd, const sfVertexArray *array,
+    const sfRenderStates *rs);
+
+/* One texture for every object image, built at startup (9.2). */
+void atlas_build(gd_t *gd);
+
 /* The letterbox of 9.7, applied to both views on every resize. */
 void apply_letterbox(gd_t *gd, unsigned int w, unsigned int h);
 

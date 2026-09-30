@@ -151,14 +151,14 @@ static void draw_numbers(gd_t *gd, level_t *lv, float ms)
 
     snprintf(text, sizeof(text),
         "tick %ld  x %.2f  y %.2f\nvx %.4f  vy %.4f  rise %.4f\n"
-        "grounded %d  can_jump %d  mode %s\n%.2f%%  %.2f ms",
+        "grounded %d  can_jump %d  mode %s\n%.2f%%  %.2f ms  %d draw calls",
         lv->sim.st.tick, p->pos.x, p->pos.y, p->vx, p->vy, p->surface_rise,
         p->grounded, p->can_jump, MODES[p->mode].name, sim_percent(&lv->sim),
-        ms);
+        ms, gd->draw_calls);
     sfText_setString(lv->hud_text, text);
     sfText_setCharacterSize(lv->hud_text, 26);
     sfText_setPosition(lv->hud_text, (sfVector2f){40.0f, 120.0f});
-    sfRenderWindow_drawText(gd->w, lv->hud_text, NULL);
+    draw_text(gd, lv->hud_text);
     sfText_setCharacterSize(lv->hud_text, 40);
 }
 
@@ -179,7 +179,7 @@ void render_debug_overlay(gd_t *gd, level_t *lv, vec2_t cam)
     draw_bounds(va, lv, (float)cam.x);
     draw_player_shapes(va, lv);
     draw_tick_events(va, lv);
-    sfRenderWindow_drawVertexArray(gd->w, va, NULL);
+    draw_vertex_array(gd, va, NULL);
     sfRenderWindow_setView(gd->w, gd->ui_view);
     draw_numbers(gd, lv, ms);
     sfRenderWindow_setView(gd->w, gd->level_view);

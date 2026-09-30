@@ -82,6 +82,7 @@ typedef struct textures {
     sfTexture *opt_button;
     sfTexture *onli_button;
     sfTexture *ground;
+    sfTexture *explosion;
     sfTexture *spike;
     sfTexture *block;
     sfTexture *cube_portal;
@@ -113,6 +114,9 @@ typedef struct gd {
     char selected_id[24];         /* the level file's digits (7.2)            */
     bool was_held;                /* last tick's jump input, for the edge     */
     bool debug_overlay;           /* F3 (9.6)                                 */
+    int draw_calls;               /* this frame's, counted in draw.c (9.0)    */
+    sfTexture *atlas;             /* every object image in one texture (9.2)  */
+    sfFloatRect atlas_rect[OBJ_TYPE_COUNT];
     progress_t progress;          /* attempts and best, loaded once (6.4)     */
 } gd_t;
 
