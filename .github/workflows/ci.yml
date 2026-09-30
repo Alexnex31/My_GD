@@ -1,0 +1,33 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libcsfml-dev xvfb
+
+      - name: Build with warnings as errors
+        run: make CFLAGS="-Wall -Wextra -Werror -Iinclude -MMD -MP -ffp-contract=off -O2"
+
+      # The simulation only: no window, no audio. Runs under ASan and UBSan.
+      - name: Unit and determinism tests
+        run: make test
+
+      # Exit 1 only on a file that cannot be read or has invalid lines (7.4);
+      # every other finding is printed and does not fail the build.
+      - name: Every level loads without invalid lines
+        run: |
+          for f in levels/*.gd; do
+            ./my_gd --check "$f" || exit 1
+          done
+
+      # It must still be running after 5 s: a crash or an early exit fails.
+      - name: The game starts and keeps running
+        run: |
+          ALSOFT_DRIVERS=null xvfb-run -a timeout 5 ./my_gd
+          test $? -eq 124

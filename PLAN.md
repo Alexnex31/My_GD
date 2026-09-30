@@ -2249,9 +2249,11 @@ Loader (`sim_load` reads the file into memory, then `sim_load_mem` does the work
 
 ### 7.4 A `--check` mode
 
-Add `./my_gd --check levels/10280.gd`: loads the level with the sim only (no window), prints warnings, and runs the bot (Phase 8).
+Add `./my_gd --check levels/10280.gd`: loads the level with the sim only (no window), prints warnings, and runs the bot (Phase 8). **Implemented** in `src/check.c`, bot line included as a placeholder until Phase 8 exists.
 
-Warnings: invalid lines, identical objects on top of each other, objects below the ground, neutral surfaces steeper than 50° facing up where the player could land (they act as walls, 4.4), unknown fields, more than `MAX_CANDIDATES` objects within one tick's reach (4.1), and anything past the end.
+Warnings: invalid lines, identical objects on top of each other, objects below the ground, neutral surfaces steeper than 50° facing up where the player could land (they act as walls, 4.4), unknown fields, and more than `MAX_CANDIDATES` objects within one tick's reach (4.1).
+
+"Anything past the end" turned out to be impossible to hit: `end_shift` is measured **from** the rightmost object (4.1), so nothing can ever be past it. What can be unreachable is the opposite case, which the check reports instead: objects sitting **behind the spawn** when a level moves it with `start_x` (7.2).
 
 The bot's result is **information, never a failure**. The bot is a heuristic search with a time limit, so "no path found" can be wrong; it prints `bot: no path found (furthest 83%) - check it by hand` and moves on. You decide whether it matters.
 
@@ -2390,10 +2392,15 @@ jobs:
         run: make test
       - name: Every level loads without invalid lines
         run: for f in levels/*; do ./my_gd --check "$f" || exit 1; done
-      - name: Fuzz the parser for 60 s
-        run: sudo apt-get install -y clang && make fuzz_parser && ./fuzz_parser -max_total_time=60 levels tests/levels
       - name: Smoke test
         run: ALSOFT_DRIVERS=null xvfb-run -a timeout 5 ./my_gd; test $? -eq 124
+```
+
+The fuzzing step waits for `tests/fuzz/fuzz_parser.c`, which doesn't exist yet; the `fuzz_parser` target in the Makefile is ready for it:
+
+```yaml
+      - name: Fuzz the parser for 60 s
+        run: sudo apt-get install -y clang && make fuzz_parser && ./fuzz_parser -max_total_time=60 levels
 ```
 
 ---

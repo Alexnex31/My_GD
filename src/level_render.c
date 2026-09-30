@@ -154,16 +154,37 @@ static void render_explosion(gd_t *gd, level_t *lv)
     draw_sprite(gd, lv->explosion_sprite, NULL);
 }
 
+/*
+** One tiled strip, 1200 px deep so the ground never ends inside the view
+** whatever the camera does in a corridor (9.3). One draw call, and it works
+** with a tile of any size: the texture is repeated, not stretched.
+*/
 static void render_ground(gd_t *gd, level_t *lv, float cam_x)
 {
-    sfVector2u size = sfTexture_getSize(gd->res->ground);
-    float x = floorf(cam_x / (float)size.x) * (float)size.x;
+    sfVector2u ts = sfTexture_getSize(gd->res->ground);
+    float x = floorf(cam_x / (float)ts.x) * (float)ts.x;
 
-    for (int i = 0; i < 3; i++) {
-        sfSprite_setPosition(lv->ground_sprite,
-            (sfVector2f){x + i * (float)size.x, (float)GROUND_Y});
-        draw_sprite(gd, lv->ground_sprite, NULL);
-    }
+    sfSprite_setTextureRect(lv->ground_sprite,
+        (sfIntRect){0, 0, (int)VIEW_W + 2 * (int)ts.x, 1200});
+    sfSprite_setPosition(lv->ground_sprite, (sfVector2f){x, (float)GROUND_Y});
+    draw_sprite(gd, lv->ground_sprite, NULL);
+}
+
+/*
+** The background scrolls at a tenth of the camera, in the UI view, so it
+** stays put while the world moves past it (9.3). One draw call.
+*/
+static void render_background(gd_t *gd, level_t *lv, vec2_t cam)
+{
+    sfVector2u ts = sfTexture_getSize(gd->res->level_background);
+
+    sfSprite_setTextureRect(lv->background_sprite,
+        (sfIntRect){(int)(cam.x * 0.1), (int)(cam.y * 0.1),
+            (int)VIEW_W, (int)VIEW_H});
+    sfSprite_setPosition(lv->background_sprite, (sfVector2f){0.0f, 0.0f});
+    sfSprite_setScale(lv->background_sprite, (sfVector2f){1.0f, 1.0f});
+    draw_sprite(gd, lv->background_sprite, NULL);
+    (void)ts;
 }
 
 /* Texture, origin and scale for the current mode: both draw paths need them. */
@@ -252,6 +273,8 @@ static void render_end_sequence(gd_t *gd, level_t *lv, vec2_t cam)
 
     sfView_setCenter(gd->level_view, (sfVector2f){(float)cam.x + VIEW_W / 2.0f,
         (float)cam.y + VIEW_H / 2.0f});
+    sfRenderWindow_setView(gd->w, gd->ui_view);
+    render_background(gd, lv, cam);
     sfRenderWindow_setView(gd->w, gd->level_view);
     render_ground(gd, lv, (float)cam.x);
     render_objects(gd, lv, (float)cam.x);
@@ -286,6 +309,8 @@ void level_render(gd_t *gd, level_t *lv)
         print_cursor(gd->cursor, gd->w);
         return;
     }
+    sfRenderWindow_setView(gd->w, gd->ui_view);
+    render_background(gd, lv, cam);          /* screen space, parallax (9.3) */
     sfView_setCenter(gd->level_view, (sfVector2f){(float)cam.x + VIEW_W / 2.0f,
         (float)cam.y + VIEW_H / 2.0f});
     sfRenderWindow_setView(gd->w, gd->level_view);

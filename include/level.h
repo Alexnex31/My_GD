@@ -53,6 +53,7 @@ typedef struct level {
     size_t nb_chunks;
     sfSprite *player_sprite;
     sfSprite *ground_sprite;
+    sfSprite *background_sprite;  /* parallax, in the UI view (9.3)           */
     sfSprite *strip_sprite;       /* the corridor's floor and ceiling (5.3)   */
     sfSprite *explosion_sprite;   /* the death animation (6.1)                */
     ship_bounds_t drawn_bounds;   /* what the strips showed last frame        */

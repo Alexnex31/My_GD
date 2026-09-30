@@ -76,7 +76,12 @@ level_t *level_start(gd_t *gd, const char *id)
     sfSprite_setTexture(lv->flash_sprite, gd->atlas, sfTrue);
     lv->player_sprite = sfSprite_create();
     lv->ground_sprite = sfSprite_create();
+    sfTexture_setRepeated(gd->res->ground, sfTrue);      /* tiled, not stretched */
     sfSprite_setTexture(lv->ground_sprite, gd->res->ground, sfTrue);
+    lv->background_sprite = sfSprite_create();
+    sfTexture_setRepeated(gd->res->level_background, sfTrue);
+    sfSprite_setTexture(lv->background_sprite, gd->res->level_background,
+        sfTrue);
     sfTexture_setRepeated(gd->res->block, sfTrue);   /* the corridor strips (5.3) */
     lv->strip_sprite = sfSprite_create();
     sfSprite_setTexture(lv->strip_sprite, gd->res->block, sfTrue);
@@ -121,6 +126,7 @@ void level_free(level_t *lv, gd_t *gd)
     free(lv->seen_spent);
     sfSprite_destroy(lv->player_sprite);
     sfSprite_destroy(lv->ground_sprite);
+    sfSprite_destroy(lv->background_sprite);
     sfSprite_destroy(lv->strip_sprite);
     sfSprite_destroy(lv->explosion_sprite);
     sfText_destroy(lv->hud_text);

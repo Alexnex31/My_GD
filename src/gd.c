@@ -264,6 +264,10 @@ int main(int argc, char **argv)
         chdir_to_executable();
         return main_loop(create_gd());
     }
+    if (argc == 3 && strcmp(argv[1], "--check") == 0) {
+        chdir_to_executable();
+        return level_check(argv[2]);
+    }
     if (argc == 2 && strcmp(argv[1], "-h") == 0) {
         my_putstr("GD :)\n");
         my_putstr("🭀 🭁 🭂 🭃 🭄 🭅 🭆 🭇 🭈 🭉 🭊 🭋 🭌 🭍 🭎 🭏 🭐 🭑 🭒 🭓 🭔 🭕 🭖 🭗 🭘 🭙\n");

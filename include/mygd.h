@@ -80,6 +80,9 @@ void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd);
 void keyboard_events_playing(level_t **level, gd_t *gd);
 
 
+/* ./my_gd --check <level>: load it with the sim only and report (7.4). */
+int level_check(const char *path);
+
 /* Every draw goes through these, so the overlay can count them (9.0). */
 void draw_sprite(gd_t *gd, const sfSprite *sprite, const sfRenderStates *rs);
 void draw_text(gd_t *gd, const sfText *text);
