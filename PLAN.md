@@ -454,7 +454,7 @@ src/sim/            pure C, depends only on libc and libm
     player.c        input, gravity, rotation
     progress.c      attempts / best, save file
     alloc.c         the simulation's own calloc-or-exit
-    bot.c           the solver (Phase 8), also used by --check (planned)
+    bot.c           the solver (Phase 8), also used by --check
 
 include/            game headers: mygd.h, struct.h, level.h, view.h ...
 src/                the game: CSFML, window, audio, menus
@@ -2256,7 +2256,7 @@ Loader (`sim_load` reads the file into memory, then `sim_load_mem` does the work
 
 ### 7.4 A `--check` mode
 
-Add `./my_gd --check levels/10280.gd`: loads the level with the sim only (no window), prints warnings, and runs the bot (Phase 8). **Implemented** in `src/check.c`, bot line included as a placeholder until Phase 8 exists.
+Add `./my_gd --check levels/10280.gd`: loads the level with the sim only (no window), prints warnings, and runs the bot (Phase 8). **Implemented** in `src/check.c`, bot line included (8.3).
 
 Warnings: invalid lines, identical objects on top of each other, objects below the ground, neutral surfaces steeper than 50° facing up where the player could land (they act as walls, 4.4), unknown fields, and more than `MAX_CANDIDATES` objects within one tick's reach (4.1).
 
@@ -2359,7 +2359,7 @@ The bot answers "is every level still beatable?" for any physics settings. It ex
 - **Snapshots instead of replays.** At each decision it saves a run-state snapshot (3.3). Backtracking restores the snapshot instead of replaying the level from tick 0, so the cost of a retry is proportional to the distance from the decision, not to the level length. On long levels this is the difference between seconds and minutes.
 - A **dead-state memo** makes it fast: when both choices at a decision have failed, it stores `sim_physics_hash` (3.3) as dead, and later runs that reach the same state stop immediately. Hashing every field that decides the future (corridor, spent objects, hold state, and every FEATURES field) means two states are only merged when they really are the same, so the memo can't hide a path; leaving out the camera, which decides nothing, lets it merge states that only differ in how the camera got there. (The lab's version keyed on tick, y rounded to 0.5 px, vy and mode only, which can in theory merge states that differ in camera height or used orbs.)
 
-The lab's `core_prototype/nsolve.c` is a complete working version (about 80 lines) to adapt to your final `sim_t`. On your 7 levels it finishes in under 0.1 s total. It lives in `src/sim/bot.c`, because both the tests and `--check` (7.4) use it.
+The lab's `core_prototype/nsolve.c` is a complete working version (about 80 lines) to adapt to your final `sim_t`. On your 7 levels it finishes in under 0.1 s total. It lives in `src/sim/bot.c`, because both the tests and `--check` (7.4) use it. **Implemented** there: `bot_solve` returns the verdict, the attempts, the furthest percentage and, when it finds a path, the button on every tick of the run, which `tests/test_bot.c` replays from `sim_reset` to prove the snapshots changed nothing.
 
 **The bot never blocks anything.** It's a search with a cap on attempts, and its decisions are coarser than a human's (every 12 ticks in a ship), so "not completable" can be wrong. Its results are **warnings**:
 
@@ -2920,14 +2920,14 @@ Files marked *(planned)* don't exist yet; everything else is in the repository.
 include/
     sim/constants.h  sim/sim_types.h  sim/sim.h  sim/level.h  sim/progress.h
     sim/hitbox.h  sim/sweep.h  sim/geom.h  sim/modes.h  sim/alloc.h  sim/internal.h
-    sim/bot.h        (planned, 8.3)
+    sim/bot.h
     view.h           (VIEW_W, VIEW_H, render layers)
     level.h          (the level scene: level_t, chunks, death, respawn, progress)
     input.h          (bindings, input_t sampling; planned, FEATURES 1)
     mygd.h  struct.h (game-side includes, structs and prototypes)
 src/sim/             level_parse.c  level_build.c  hitbox.c  sweep.c  move.c  zone.c
                      interact.c  player.c  camera.c  modes.c  sim.c  hash.c  alloc.c
-                     progress.c  bot.c (planned)
+                     progress.c  bot.c
 src/                 gd.c  window.c  input.c  keyboard_events.c  draw.c  check.c
                      level.c  level_render.c  level_chunks.c  atlas.c  debug_overlay.c
                      end_screen.c  main_menu.c  option_menu.c  editor_menu.c
@@ -2935,8 +2935,8 @@ src/                 gd.c  window.c  input.c  keyboard_events.c  draw.c  check.c
                      scene.c  audio.c (planned, 10.1 and 10.3)
 tests/               main.c  test.h  test_constants.c  test_hitbox.c  test_sweep.c
                      test_circle.c  test_parser.c  test_start.c  test_tick.c
-                     test_slopes.c  test_portal.c  test_progress.c
-                     test_bot.c  levels/ (Appendix D)  (planned)
+                     test_slopes.c  test_portal.c  test_progress.c  test_bot.c
+                     levels/ (Appendix D, planned)
 tests/fuzz/          fuzz_parser.c (planned, 8.1)
 levels/              <id>.gd, named after the level's id (7.2)
 res/                 assets  (CREDITS.md planned, 12.2)

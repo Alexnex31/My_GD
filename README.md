@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 7 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, then the game layer with death, respawn, progress and the F3 overlay). The bot (Step 8) is next, then the features of `FEATURES.md`. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). The features of `FEATURES.md` are next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -94,14 +94,14 @@ src/            game layer (window, scenes, menus, rendering)
 src/sim/        the simulation: no SFML, no globals, deterministic
 levels/         level files
 res/            textures, fonts, sounds
-tests/          unit tests and engine tests (the bot: planned)
+tests/          unit tests, engine tests, the bot
 PLAN.md         the rewrite: architecture, engine, phases
 FEATURES.md     gamemodes, objects, editor, music, options, tests
 ```
 
 ## Tests
 
-`make test` builds a test binary that links **only** the simulation, so it needs no window and no CSFML. It covers the collision cases engines usually get wrong (seams between blocks, exact gaps, containment, tunneling at high speed, slopes, step-ups, the jump zone), pins the physics constants, and checks that the same inputs give the same state hash twice. A bot that walks each level with the real engine and reports whether it found a way through is planned next: information, never a build failure. Details in `PLAN.md` 8.
+`make test` builds a test binary that links **only** the simulation, so it needs no window and no CSFML. It covers the collision cases engines usually get wrong (seams between blocks, exact gaps, containment, tunneling at high speed, slopes, step-ups, the jump zone), pins the physics constants, and checks that the same inputs give the same state hash twice. A bot walks each level with the real engine and reports whether it found a way through: information, never a build failure. `--check` prints the same line. Details in `PLAN.md` 8.
 
 ## Physics numbers
 
