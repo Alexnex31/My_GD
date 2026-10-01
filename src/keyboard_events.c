@@ -7,6 +7,29 @@
 
 #include "mygd.h"
 
+/*
+** Every scene polls through here, so a resize letterboxes the views (9.7)
+** whatever scene is showing.
+*/
+static bool poll_event(gd_t *gd)
+{
+    if (!sfRenderWindow_pollEvent(gd->w, gd->event))
+        return false;
+    if (gd->event->type == sfEvtResized)
+        apply_letterbox(gd, gd->event->size.width, gd->event->size.height);
+    return true;
+}
+
+/* A click in window pixels, in the menus' 1920x1080 space (9.1, 9.7). */
+static sfVector2i click_pos(gd_t *gd)
+{
+    sfVector2i pixel = {gd->event->mouseButton.x, gd->event->mouseButton.y};
+    sfVector2f pos = sfRenderWindow_mapPixelToCoords(gd->w, pixel,
+        gd->ui_view);
+
+    return (sfVector2i){(int)pos.x, (int)pos.y};
+}
+
 void play_button(main_m_t **menu, gd_t *gd)
 {
     free_main_menu(*menu);
@@ -52,7 +75,9 @@ void buttons_menu(main_m_t **menu, gd_t *gd, int mx, int my)
 
 void keyboard_events_main_menu(main_m_t **menu, gd_t *gd)
 {
-    while (sfRenderWindow_pollEvent(gd->w, gd->event)) {
+    sfVector2i pos;
+
+    while (poll_event(gd)) {
         if (gd->event->type == sfEvtClosed) {
             close_window(gd->w);
             return;
@@ -66,7 +91,8 @@ void keyboard_events_main_menu(main_m_t **menu, gd_t *gd)
             return;
         }
         if (gd->event->type == sfEvtMouseButtonPressed && gd->event->mouseButton.button == sfMouseLeft) {
-            buttons_menu(menu, gd, gd->event->mouseButton.x, gd->event->mouseButton.y);
+            pos = click_pos(gd);
+            buttons_menu(menu, gd, pos.x, pos.y);
             return;
         }
     }
@@ -81,7 +107,7 @@ void go_back_option_main(option_m_t **om, gd_t *gd)
 
 void keyboard_events_option_menu(option_m_t **om, gd_t *gd)
 {
-    while (sfRenderWindow_pollEvent(gd->w, gd->event)) {
+    while (poll_event(gd)) {
         if (gd->event->type == sfEvtClosed) {
             close_window(gd->w);
             return;
@@ -102,7 +128,7 @@ void go_back_editorm_main(editor_m_t **editor_m, gd_t *gd)
 
 void keyboard_events_editor_menu(editor_m_t **editor_m, gd_t *gd)
 {
-    while (sfRenderWindow_pollEvent(gd->w, gd->event)) {
+    while (poll_event(gd)) {
         if (gd->event->type == sfEvtClosed) {
             close_window(gd->w);
             return;
@@ -152,7 +178,9 @@ void handle_level_buttons_click(level_list_t **lvl_list, gd_t *gd, int mx, int m
 
 void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
 {
-    while (sfRenderWindow_pollEvent(gd->w, gd->event)) {
+    sfVector2i pos;
+
+    while (poll_event(gd)) {
         if (gd->event->type == sfEvtClosed) {
             close_window(gd->w);
             return;
@@ -162,7 +190,8 @@ void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
             return;
         }
         if (gd->event->type == sfEvtMouseButtonPressed && gd->event->mouseButton.button == sfMouseLeft) {
-            handle_level_buttons_click(lvl_list, gd, gd->event->mouseButton.x, gd->event->mouseButton.y);
+            pos = click_pos(gd);
+            handle_level_buttons_click(lvl_list, gd, pos.x, pos.y);
             return;
         }
     }
@@ -228,18 +257,15 @@ static void playing_key(level_t **level, gd_t *gd, sfKeyCode key)
 
 void keyboard_events_playing(level_t **level, gd_t *gd)
 {
-    sfVector2i pixel;
-    sfVector2f pos;
+    sfVector2i pos;
 
-    while (sfRenderWindow_pollEvent(gd->w, gd->event)) {
+    while (poll_event(gd)) {
         if (gd->event->type == sfEvtClosed) {
             level_free(*level, gd);
             *level = NULL;
             close_window(gd->w);
             return;
         }
-        if (gd->event->type == sfEvtResized)
-            apply_letterbox(gd, gd->event->size.width, gd->event->size.height);
         if (gd->event->type == sfEvtGainedFocus)
             sfClock_restart((*level)->clock);   /* no burst after a pause */
         if (gd->event->type == sfEvtKeyPressed) {
@@ -250,10 +276,8 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
         if (gd->event->type == sfEvtMouseButtonPressed
             && (*level)->state == LEVEL_COMPLETE
             && (*level)->end_time >= END_FLIGHT + END_FLASH) {
-            pixel = (sfVector2i){gd->event->mouseButton.x,
-                gd->event->mouseButton.y};
-            pos = sfRenderWindow_mapPixelToCoords(gd->w, pixel, gd->ui_view);
-            handle_end_screen_click(level, gd, (int)pos.x, (int)pos.y);
+            pos = click_pos(gd);
+            handle_end_screen_click(level, gd, pos.x, pos.y);
             return;
         }
     }

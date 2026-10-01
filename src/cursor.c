@@ -14,13 +14,13 @@ void free_cursor(cursor_t *cursor)
     free(cursor);
 }
 
+/* Drawn in the current view, so the mouse's pixel is mapped into it (9.7). */
 void print_cursor(cursor_t *cursor, sfRenderWindow *window)
 {
-    sfVector2f v;
-    float x = (float)(sfMouse_getPositionRenderWindow(window).x);
-    float y = (float)(sfMouse_getPositionRenderWindow(window).y);
+    sfVector2i pixel = sfMouse_getPositionRenderWindow(window);
+    sfVector2f v = sfRenderWindow_mapPixelToCoords(window, pixel,
+        sfRenderWindow_getView(window));
 
-    v = create_vector_f(x, y);
     sfSprite_setPosition(cursor->cursor_s, v);
     sfRenderWindow_drawSprite(window, cursor->cursor_s, NULL);
 }
