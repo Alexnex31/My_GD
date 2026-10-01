@@ -437,21 +437,28 @@ include/sim/        simulation headers (no SFML)
     sim_types.h     rect_t, vec2_t, hitbox_t, object_t, player_t, run_state_t, sim_t ...
     constants.h     every physics and layout constant
     progress.h      progress store API
+    level.h, hitbox.h, sweep.h, geom.h, modes.h, alloc.h   one per module
+    internal.h      the tick's pieces, shared inside the simulation only
 src/sim/            pure C, depends only on libc and libm
-    level_load.c    parse a level (file or memory buffer) into objects
+    level_parse.c   parse a level (file or memory buffer) into objects
+    level_build.c   hitboxes, sort, reach, end of level; sim_load, sim_free
     hitbox.c        hitbox shapes at load (rotation, separating axes)
-    sweep.c         swept box vs shape: time of impact and normal (4.3)
-    sim.c           sim_reset, sim_tick, snapshots, state hash
-    collision.c     broadphase, move_and_collide, contact responses, harm, interactive
+    sweep.c         swept box and circle vs shape: time of impact and normal (4.3)
+    move.c          broadphase, move_and_collide, contact responses, steps, harm
+    zone.c          the jump zone (4.3)
+    interact.c      interactive objects, portals, corridors (4.6, 5)
+    sim.c           sim_reset, sim_tick, snapshots
+    hash.c          state and physics hashes (G.11)
     modes.c         the MODES table (3.3; FEATURES 6.1 extends it)
     camera.c        camera math (numbers only, no sfView)
-    player.c        input, integration, rotation
+    player.c        input, gravity, rotation
     progress.c      attempts / best, save file
-    bot.c           the solver (Phase 8), also used by --check
+    alloc.c         the simulation's own calloc-or-exit
+    bot.c           the solver (Phase 8), also used by --check (planned)
 
-include/            game headers: mygd.h, struct.h, view.h ...
+include/            game headers: mygd.h, struct.h, level.h, view.h ...
 src/                the game: CSFML, window, audio, menus
-    gd.c, scene.c, input.c, level.c (owns a sim_t + visuals), level_render.c, ...
+    gd.c, window.c, input.c, level.c (owns a sim_t + visuals), level_render.c, ...
 ```
 
 Rules:
@@ -2343,7 +2350,7 @@ The collision engine gets its own tests, each a tiny level given as a string, a 
 - **Squeezed:** a player driven into a V-shaped notch narrower than itself dies (the inner box) instead of looping, and `distance` still advances by exactly `vx` on every tick before that.
 - **Corners:** a box reaching a block's top-left corner exactly at the same time horizontally and vertically lands (the tie goes to the vertical axis).
 
-### 8.3 The bot### 8.3 The bot (the most valuable test)
+### 8.3 The bot (the most valuable test)
 
 The bot answers "is every level still beatable?" for any physics settings. It explores inputs depth-first:
 
@@ -2354,9 +2361,9 @@ The bot answers "is every level still beatable?" for any physics settings. It ex
 
 The lab's `core_prototype/nsolve.c` is a complete working version (about 80 lines) to adapt to your final `sim_t`. On your 7 levels it finishes in under 0.1 s total. It lives in `src/sim/bot.c`, because both the tests and `--check` (7.4) use it.
 
-**The bot never blocks anything.** It's a search with a cap on attempts, and its decisions are coarser than a human's (every 3 ticks in a ship), so "not completable" can be wrong. Its results are **warnings**:
+**The bot never blocks anything.** It's a search with a cap on attempts, and its decisions are coarser than a human's (every 12 ticks in a ship), so "not completable" can be wrong. Its results are **warnings**:
 
-- `make test` runs it for every level and every rule combination you care about (at least: all legacy, all new) and prints a table (`level6  legacy: OK  new: no path found, furthest 83%`), but the test run's exit status only depends on the real tests (unit, replay, determinism).
+- `make test` runs it on every level and prints one line each (`level6  no path found, furthest 83%`), but the test run's exit status only depends on the real tests (unit, engine, determinism).
 - `--check` prints the same line and exits 0 (7.4).
 - The editor's Verify button shows it as information (FEATURES 11.10).
 
@@ -2907,28 +2914,39 @@ The first four are real bugs; `top_kill_y` points at bug-adjacent code (the ceil
 
 All headers are in `include/`.
 
+Files marked *(planned)* don't exist yet; everything else is in the repository.
+
 ```text
 include/
-    sim/constants.h  sim/sim_types.h  sim/sim.h  sim/progress.h  sim/bot.h
-    view.h           (VIEW_W, VIEW_H, render layers, render prototypes)
-    input.h          (bindings, input_t sampling)
+    sim/constants.h  sim/sim_types.h  sim/sim.h  sim/level.h  sim/progress.h
+    sim/hitbox.h  sim/sweep.h  sim/geom.h  sim/modes.h  sim/alloc.h  sim/internal.h
+    sim/bot.h        (planned, 8.3)
+    view.h           (VIEW_W, VIEW_H, render layers)
+    level.h          (the level scene: level_t, chunks, death, respawn, progress)
+    input.h          (bindings, input_t sampling; planned, FEATURES 1)
     mygd.h  struct.h (game-side includes, structs and prototypes)
-src/sim/             level_load.c  hitbox.c  sweep.c  sim.c  collision.c  camera.c  player.c  modes.c
-                     progress.c  bot.c
-src/                 main.c  gd.c  scene.c  input.c  audio.c  level.c  level_render.c
-                     atlas.c  end_screen.c  debug_overlay.c  main_menu.c  option_menu.c
-                     editor_menu.c  level_list_menu.c  button.c  cursor.c  (my_* helpers still in use)
-tests/               test_main.c  test_loader.c  test_progress.c  test_collision.c
-                     test_rotation.c  test_replay.c  test_determinism.c  test_bot.c
-                     replays/level1.txt ...  levels/ (Appendix D)
-tests/fuzz/          fuzz_parser.c
-levels/              level1 ... (no progress headers after migration)
-res/                 assets + CREDITS.md
+src/sim/             level_parse.c  level_build.c  hitbox.c  sweep.c  move.c  zone.c
+                     interact.c  player.c  camera.c  modes.c  sim.c  hash.c  alloc.c
+                     progress.c  bot.c (planned)
+src/                 gd.c  window.c  input.c  keyboard_events.c  draw.c  check.c
+                     level.c  level_render.c  level_chunks.c  atlas.c  debug_overlay.c
+                     end_screen.c  main_menu.c  option_menu.c  editor_menu.c
+                     level_list_menu.c  button.c  cursor.c  (my_* helpers still in use)
+                     scene.c  audio.c (planned, 10.1 and 10.3)
+tests/               main.c  test.h  test_constants.c  test_hitbox.c  test_sweep.c
+                     test_circle.c  test_parser.c  test_start.c  test_tick.c
+                     test_slopes.c  test_portal.c  test_progress.c
+                     test_bot.c  levels/ (Appendix D)  (planned)
+tests/fuzz/          fuzz_parser.c (planned, 8.1)
+levels/              <id>.gd, named after the level's id (7.2)
+res/                 assets  (CREDITS.md planned, 12.2)
 build/               release/ and debug/ objects (ignored by git)
 .github/workflows/ci.yml
 ```
 
-Deleted: `physics.c`, `get_level.c`, `portal.c`, `music.c`, `utilitary.c` (replaced by `snprintf`), unused `my_*` helpers.
+Rotation is tested in `test_hitbox.c`, determinism and snapshots in `test_tick.c`; replay tests went away with v3.
+
+Deleted: `physics.c`, `get_level.c`, `portal.c`, `music.c`. Still to go: `utilitary.c` (replaced by `snprintf`) and the unused `my_*` helpers.
 
 If you follow a coding style with function length limits, the snippets here are written for readability; split them as needed without changing the structure.
 
@@ -3683,7 +3701,7 @@ The first version moves a cube on the ground and on block tops. No circle, no sl
 | `static bool zone_surface(const sim_t *s)` | the ground and corridor boundaries in the zone | G.6 |
 | `void update_can_jump(sim_t *s)` | the zone plus the momentum test | 4.3 |
 
-**`tests/test_slopes.c`, `tests/test_steps.c`, `tests/test_zone.c`** — done when the 8.2 bullets for slopes, seams, ledges, step-up, "step-up needs downward momentum", face kinds, the jump zone and "no jump buffer" pass, at 0.5×, 1× and 4× speed.
+**`tests/test_circle.c`** (the circle's sweeps and filters), **`tests/test_slopes.c`** (slopes, steps, head hits) and the jump-zone cases of **`tests/test_tick.c`** — done when the 8.2 bullets for slopes, seams, ledges, step-up, "step-up needs downward momentum", face kinds, the jump zone and "no jump buffer" pass, at 0.5×, 1× and 4× speed.
 
 ---
 
@@ -3704,7 +3722,7 @@ The first version moves a cube on the ground and on block tops. No circle, no sl
 
 Spikes need nothing new: `leg_deaths` already sweeps the rigid square against `CAT_HARM` (step 4).
 
-**`tests/test_interact.c`** — done when: a portal acts exactly once per crossing and is skipped afterwards; the corridor bounds match the examples of 5.2 and the camera stays locked; a same-mode portal switches corridors; the old boundaries stop existing on that tick; `vy`, position and gravity are untouched by a portal; a spike touched only by the square's corner kills, and one exactly grazing it doesn't.
+**`tests/test_portal.c`** (spikes: `tests/test_tick.c`) — done when: a portal acts exactly once per crossing and is skipped afterwards; the corridor bounds match the examples of 5.2 and the camera stays locked; a same-mode portal switches corridors; the old boundaries stop existing on that tick; `vy`, position and gravity are untouched by a portal; a spike touched only by the square's corner kills, and one exactly grazing it doesn't.
 
 ---
 

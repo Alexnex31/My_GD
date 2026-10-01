@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: mid-rewrite.** The deterministic simulation described in `PLAN.md` is being written phase by phase: its geometry and level loader are in, the tick is next. The old game code is still what `./my_gd` builds, but it reads the previous level format, so **it can't open the levels in this repository any more**; it gets replaced by the new engine's game layer at Step 7 of `PLAN.md` Appendix H. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 7 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, then the game layer with death, respawn, progress and the F3 overlay). The bot (Step 8) is next, then the features of `FEATURES.md`. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -10,7 +10,7 @@ The player runs right at a constant speed and only ever presses one button. Bloc
 
 Under the hood it's split in two:
 
-- **the simulation** (`src/sim/`, planned): pure C, no SFML, a fixed 240 Hz timestep, `double` everywhere, no randomness. The same level plus the same inputs gives the same run on any machine, which is what makes replays, checkpoints and the test bot possible;
+- **the simulation** (`src/sim/`): pure C, no SFML, a fixed 240 Hz timestep, `double` everywhere, no randomness. The same level plus the same inputs gives the same run on any machine, which is what makes replays, checkpoints and the test bot possible;
 - **the game layer**: window, rendering, audio, menus, input. It reads the simulation and draws it, and never decides anything about the physics.
 
 The physics is a *semi*-physics engine: one body moves, it has a velocity, forces change that velocity, and its shapes are swept through the level every tick. The player has a rigid square (horizontal faces, spikes, portals), an inscribed circle (slopes and ceilings) and a small inner box that kills on contact. `PLAN.md` section 3 and 4 describe all of it precisely.
@@ -28,7 +28,7 @@ Requires a C compiler, `make` and **CSFML 2.6** (graphics, window, audio, system
 ```sh
 make              # release build -> ./my_gd
 make debug        # -g3 -O0 with ASan and UBSan -> ./my_gd_debug
-make test         # build and run the unit tests (planned, sim only: no CSFML needed)
+make test         # build and run the unit tests (sim only: no CSFML needed)
 make fuzz_parser  # level-parser fuzzer, needs clang (planned)
 make re           # rebuild from scratch
 ```
@@ -40,20 +40,22 @@ Objects and dependency files go to `build/release` or `build/debug`, so the two 
 ```sh
 ./my_gd           # the game
 ./my_gd -h        # usage
+./my_gd --check levels/1.gd   # load a level without a window and report on it
 ```
 
 The game finds its `res/` and `levels/` folders next to the executable, so it can be started from anywhere.
 
-Exit code `84` means a missing asset, an unreadable level or a bad argument, with a message saying which.
+Exit code `84` means a missing asset, an unreadable level or a bad argument, with a message saying which. `--check` exits `1` when the level can't be read or has invalid lines, `0` otherwise.
 
 ## Controls
 
 | Action | Key |
 |---|---|
 | Jump / hold | `Space`, `Up`, or left click |
-| Pause | `Escape` |
-| Restart the attempt | `R` *(planned)* |
-| Debug overlay (hitboxes, contacts, tick, speeds) | `F3` *(planned)* |
+| Back to the level list | `Escape` |
+| Restart the attempt | `R` |
+| Debug overlay (hitboxes, contacts, tick, speeds) | `F3` |
+| Pause | *(planned)* |
 
 Rebindable keys, a gamepad and the options screen are planned (`FEATURES.md` 2 and 5).
 
@@ -89,17 +91,17 @@ The full grammar, including the planned `pad`, `orb`, `saw`, `speed`, `mini` and
 ```text
 include/        headers (include/sim/ for the simulation)
 src/            game layer (window, scenes, menus, rendering)
-src/sim/        the simulation: no SFML, no globals, deterministic   (planned)
+src/sim/        the simulation: no SFML, no globals, deterministic
 levels/         level files
 res/            textures, fonts, sounds
-tests/          unit tests, engine tests, the bot                     (planned)
+tests/          unit tests and engine tests (the bot: planned)
 PLAN.md         the rewrite: architecture, engine, phases
 FEATURES.md     gamemodes, objects, editor, music, options, tests
 ```
 
 ## Tests
 
-`make test` builds a test binary that links **only** the simulation, so it needs no window and no CSFML. It covers the collision cases engines usually get wrong (seams between blocks, exact gaps, containment, tunneling at high speed, slopes, step-ups, the jump zone), pins the physics constants, and checks that the same inputs give the same state hash twice. A bot walks each level with the real engine and reports whether it found a way through: information, never a build failure. Details in `PLAN.md` 8.
+`make test` builds a test binary that links **only** the simulation, so it needs no window and no CSFML. It covers the collision cases engines usually get wrong (seams between blocks, exact gaps, containment, tunneling at high speed, slopes, step-ups, the jump zone), pins the physics constants, and checks that the same inputs give the same state hash twice. A bot that walks each level with the real engine and reports whether it found a way through is planned next: information, never a build failure. Details in `PLAN.md` 8.
 
 ## Physics numbers
 
