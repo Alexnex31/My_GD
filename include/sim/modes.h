@@ -19,6 +19,7 @@ typedef struct mode_ops {
     double head_restitution;   /* ceiling hit: < 0 dies, else share of vy bounced back */
     double corridor_height;   /* the corridor this mode's portal opens, px; 0: none (5.2) */
     bool keep_vy_on_surface;  /* sliding on a surface doesn't reset vy (the wave)   */
+    int bot_decision_ticks;   /* the bot's choices: 0 when it can jump, else every N ticks (8.3) */
 } mode_ops_t;
 
 extern const mode_ops_t MODES[MODE_COUNT];

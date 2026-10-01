@@ -21,6 +21,7 @@ int main(void)
     test_portal();
     test_start();
     test_progress();
+    test_bot();
     if (failures == 0)
         printf("all tests passed\n");
     else

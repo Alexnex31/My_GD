@@ -6,6 +6,7 @@
 */
 
 #include "mygd.h"
+#include "sim/bot.h"
 #include "sim/modes.h"
 
 static int g_bad_lines;
@@ -124,6 +125,17 @@ static int check_behind_spawn(const level_data_t *lvl)
     return found;
 }
 
+/* Whether the bot finds a way through: information, never a failure. */
+static void report_bot(sim_t *s)
+{
+    bot_result_t r = bot_solve(s, BOT_MAX_ATTEMPTS);
+    char line[128];
+
+    bot_describe(&r, line, sizeof(line));
+    dprintf(2, "  bot: %s\n", line);
+    bot_result_free(&r);
+}
+
 /*
 ** Loads with the simulation only, no window. Exit 1 when the file cannot be
 ** read or has invalid lines; everything else is information (7.4).
@@ -148,7 +160,7 @@ int level_check(const char *path)
     issues += check_crowding(&s.lvl);
     issues += check_behind_spawn(&s.lvl);
     dprintf(2, "  %d invalid line(s), %d warning(s)\n", g_bad_lines, issues);
-    dprintf(2, "  bot: not implemented yet (Phase 8)\n");
+    report_bot(&s);
     sim_free(&s);
     return g_bad_lines > 0;
 }

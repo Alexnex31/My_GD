@@ -22,7 +22,7 @@ const mode_ops_t MODES[MODE_COUNT] = {
     [MODE_SHIP] = {.name = "ship", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
         .gravity = PER_TICK2(SHIP_GRAVITY),
         .max_fall = PER_TICK(SHIP_MAX_VY), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .corridor_height = 1000.0},
+        .corridor_height = 1000.0, .bot_decision_ticks = 12},
 };
 
 int mode_from_name(const char *name)

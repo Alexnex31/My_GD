@@ -18,5 +18,6 @@ void test_slopes(void);
 void test_portal(void);
 void test_start(void);
 void test_progress(void);
+void test_bot(void);
 
 #endif
