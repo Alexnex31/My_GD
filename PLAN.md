@@ -1541,7 +1541,7 @@ static void head_hit(player_t *p, const contact_t *c, vec2_t *vel)
 }
 ```
 
-Under a **tilted** ceiling that comes down toward the player, the bounce alone could leave it rising into the slope; `follow` is the rise speed that runs exactly along that ceiling at speed `vx` (the same formula as `land`), and the player's rise speed is capped by it, so a ship slides along a descending ceiling instead of hitting it again every sub-step. On a flat ceiling `follow` is 0 and changes nothing. FEATURES 6.1 gives the other modes: UFO and ball bounce, wave dies (except against corridor boundaries).
+Under a **tilted** ceiling that comes down toward the player, the bounce alone could leave it rising into the slope; `follow` is the rise speed that runs exactly along that ceiling at speed `vx` (the same formula as `land`), and the player's rise speed is capped by it, so a ship slides along a descending ceiling instead of hitting it again every sub-step. On a flat ceiling `follow` is 0 and changes nothing. Where that ceiling turns flat, nothing pushes the ship down any more and it **keeps** the downward speed it had, its thrust only slowly taking it back up (about 80 px below a 45° ceiling at 1×): intended, the same "the player keeps that speed" rule as 3.4, and pinned by `test_ship_slides_under_a_descending_ceiling`. FEATURES 6.1 gives the other modes: UFO and ball bounce, wave dies (except against corridor boundaries).
 
 **Wall: pass into it.** A surface steeper than 50° doesn't stop the player: the move continues untouched and the object joins the tick's passed list, which `first_event` skips for the rest of the tick (G.9):
 
