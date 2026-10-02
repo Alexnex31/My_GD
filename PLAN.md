@@ -628,7 +628,6 @@ So the simulation stores velocities in **px per tick** and accelerations in **px
     #define CAM_LERP            0.0507502406   /* = 1 - exp(-1/(TICK_RATE*CAM_TAU)) */
 
     /* Ship corridor (5.2) */
-    #define CORRIDOR_MAX_HEIGHT 1000.0   /* the tallest mode corridor (ship, UFO, wave) */
     #define VIEW_HEIGHT         1080.0   /* logical screen height the camera reasons in (9.1) */
 
     /* Death */
@@ -1123,9 +1122,9 @@ void handle_playing(gd_t *gd, level_t **level)
 
     if (*level == NULL)
         *level = level_start(gd, gd->selected_level_id);
-    lv = *level;
-    if (lv == NULL || level_poll_events(level, gd) != 0)
+    if (*level == NULL || level_poll_events(level, gd) != 0)
         return;                                   /* scene changed */
+    lv = *level;                                  /* after the events: Retry replaces it */
     frame_us = sfClock_restart(lv->clock).microseconds;
     if (frame_us > 250000)
         frame_us = 250000;                        /* no spiral of death after a hitch */
@@ -1147,7 +1146,9 @@ Why:
 
 `input_for_tick(gd)` returns the `input_t` for the next tick. In Phase 10 it's simply `{input_held(gd), false}`; FEATURES 1 adds exact `pressed` edges without changing this loop.
 
-Restart `lv->clock` when the level starts, after respawn, and on `sfEvtGainedFocus`, so a pause doesn't dump a burst of ticks.
+Restart `lv->clock` at the very end of `level_start` (after the chunks are built: loading isn't play time), after respawn, and on `sfEvtGainedFocus`, so a pause doesn't dump a burst of ticks.
+
+**The click that starts a level isn't a jump.** Play and Retry are left clicks, and the button is usually still down on the level's first tick; a hold carried into an attempt is fresh (3.4), so the cube would jump at tick 0. `level_start` calls `input_level_started`, which ignores the mouse until that click is released (the keyboard is never ignored) and clears `was_held`, left over from the previous level.
 
 `level_step` wraps the sim with the game rules:
 
@@ -1691,7 +1692,7 @@ With normal gravity, whatever goes up comes back down. With **flipped** gravity 
 The limit is fixed in the world, computed once at load:
 
 ```c
-kill_y = min(highest hitbox top among all objects, GROUND_Y - CORRIDOR_MAX_HEIGHT)
+kill_y = min(highest hitbox top among all objects, GROUND_Y - modes_tallest_corridor())
     - KILL_CEILING_MARGIN;                                  /* margin 600 px */
 ```
 
@@ -1707,7 +1708,7 @@ It exists **only while gravity is flipped**, in every mode. With normal gravity 
 
 Why 600 px: with flipped gravity, anything above the highest object has nothing left to land on, so the line only has to stay clear of what a flipped player can legitimately reach: a corridor's ceiling (below), and an upward-falling player passing just above the top of the level's highest structure on its way to landing on it from the side. 600 px leaves room for both without letting a lost run drag on.
 
-Corridors are never above the kill line. The tallest corridor is 1000 px (5.2), so a centered corridor's ceiling is at most 525 px above its portal's top (500 px, plus up to 25 px of grid snapping), and the portal is an object, so its top is at or below the highest hitbox top: the ceiling stays at least 75 px under the line. A corridor pushed up against the ground has its ceiling at `GROUND_Y - CORRIDOR_MAX_HEIGHT` = −150, which is why that value is part of the `min`: without it, a level whose highest object is a portal at y = 650 would put the kill line at y = 50, far below that corridor's ceiling, and the ship would die touching it.
+Corridors are never above the kill line. The tallest corridor is 1000 px (5.2), so a centered corridor's ceiling is at most 525 px above its portal's top (500 px, plus up to 25 px of grid snapping), and the portal is an object, so its top is at or below the highest hitbox top: the ceiling stays at least 75 px under the line. A corridor pushed up against the ground has its ceiling at `GROUND_Y - modes_tallest_corridor()` = −150, which is why that value is part of the `min`. It is computed from `MODES[]`, not written down a second time, so a mode added with a taller corridor moves the line with it: without it, a level whose highest object is a portal at y = 650 would put the kill line at y = 50, far below that corridor's ceiling, and the ship would die touching it.
 
 The renderer doesn't draw the line (GD has no visible ceiling), but the debug overlay does (9.6).
 
@@ -1824,7 +1825,7 @@ static void center_corridor(sim_t *s, const object_t *portal)
 ```
 
 - **A mode portal never moves the player.** It only changes the gamemode (and with it the corridor): same position, same `vx` and `vy`, same gravity, same hold. A player entering a portal near its top edge continues from exactly there; it isn't pulled to the portal's center or anywhere else. What happens afterwards is the new mode's own logic: a wave, for example, sets its 45° motion from the next tick (FEATURES 8). (Today, a ship portal teleports the player by 250 px, F3, because the world is shifted twice: a bug of the old implementation.)
-- **Corridor**: as tall as the new mode says (`corridor_height`, 3.3), centered on the portal that created it, then **snapped to the grid**: its top moves to the nearest multiple of 50 (on an exact tie, the lower one, `floor(v + 0.5)`, so the result doesn't depend on the sign), which puts the bottom on the grid too. Level designers can then line blocks up with the corridor's surfaces exactly. Finally it's pushed up if needed so it never goes below the ground (how GD does it).
+- **Corridor**: as tall as the new mode says (`corridor_height`, 3.3), centered on the portal that created it, then **snapped to the grid**: its top moves to the nearest multiple of 50 (on an exact tie, the lower one, `floor(v + 0.5)`, so the result doesn't depend on the sign), which puts the bottom on the grid too. Level designers can then line blocks up with the corridor's surfaces exactly. Then, if the player isn't wholly inside it, it moves along the grid just enough to hold the player: a portal taller than the corridor (size 7 and up, or an explicit `h=`) can be touched more than half a corridor from its center, and a mode portal never moves the player. Finally it's pushed up if needed so it never goes below the ground (how GD does it).
 - **Heights are GD's**, converted to our units (1 GD block = 1 player = 100 px, FEATURES 6.9): **ship, UFO and wave 1000 px** (10 blocks), **ball 800 px** (8), and later spider 900 and swing 1000. The cube (and later the robot) has no corridor at all. Every height is a multiple of 50, so the grid snapping keeps both surfaces on grid lines.
 - Examples with a 1000 px corridor: a 200 px ship portal at y = 250 has its center at 350, top 350 − 500 = −150, already on the grid: corridor −150..850, its floor exactly on the ground. One at y = 650: center 750, top 250, bottom 1250 is below the ground, so it's pushed up to −150..850 too. A ball portal (800 px) at y = 250: top 350 − 400 = −50: corridor −50..750.
 - Its ceiling and floor are neutral surfaces in the sweep (4.3): the ship bounces off the ceiling like off a block's underside, and lands and slides on the floor.
@@ -2015,8 +2016,7 @@ Problems with storing progress in the level files (the first line, rewritten by 
 New module `src/sim/progress.c` (pure C, so it's unit-testable):
 
 ```c
-#define SAVE_DIR   "save"
-#define SAVE_PATH  "save/progress.txt"
+#define SAVE_PATH  "save/progress.txt"   /* its folder is made on save */
 
 typedef struct progress_entry {
     char id[24];            /* the level file's digits, e.g. "10280" (7.2) */
@@ -2053,7 +2053,7 @@ File format, one line per level, `key=value` fields after the id:
 - Using `key=value` from the start (instead of positional numbers) means new fields (the song override of FEATURES 4.6, practice best, anything later) never need a format migration. Missing fields take defaults; unknown fields are kept in `extra` and written back, so an older build doesn't destroy a newer build's data.
 - Load: read a line, take the id (first word), then split the rest on spaces and each field on the first `=`. Numbers with `strtof`/`strtol`, checking the end pointer.
 - **The id is the level file's name without `.gd`**, digits only (7.2), so it's always safe in a path and in this space-separated format. A file in `levels/` that isn't `<digits>.gd` is skipped by the level list with a warning ("rename it to play it").
-- Save: `mkdir(SAVE_DIR, 0755)` (ignore `EEXIST`), write `save/progress.txt.tmp`, `fflush`, `fsync(fileno(f))`, check that `fclose` returns 0 (that's when write errors surface), then `rename()` it over `save/progress.txt`. A crash or power loss mid-save leaves the old file intact (`fsync` makes sure the new content is on disk before the rename makes it visible).
+- Save: `mkdir` the store's own folder (`save/` for `SAVE_PATH`, ignore `EEXIST`), write `save/progress.txt.tmp`, `fflush`, `fsync(fileno(f))`, check that `fclose` returns 0 (that's when write errors surface), then `rename()` it over `save/progress.txt`. A crash or power loss mid-save leaves the old file intact (`fsync` makes sure the new content is on disk before the rename makes it visible).
 - **Only playing creates an entry.** The level list and the end screen only read the store (`progress_find`); `progress_get` is for the flush when a level is left. A save skips an entry with nothing in it, so browsing the list never fills the file with `attempts=0 best=0.00` lines.
 - **`best` never rounds up to 100.** A death at 99.996% would print as `100.00` with `%.2f` and read back as a level beaten. `progress_printable` caps anything below 100 at 99.99 for the file and the level list.
 - Load once in `create_gd`, free in `free_gd`.
@@ -2268,7 +2268,7 @@ Warnings: invalid lines, identical objects on top of each other, objects below t
 
 The bot's result is **information, never a failure**. The bot is a heuristic search with a time limit, so "no path found" can be wrong; it prints `bot: no path found (furthest 83%) - check it by hand` and moves on. You decide whether it matters.
 
-Exit code: 1 if the file can't be loaded or has invalid lines; 0 otherwise, whatever the bot says. This makes level-making safer without ever blocking you, and CI can run it on every level.
+Exit code: 1 if the file can't be loaded or has invalid lines; 0 otherwise, whatever the bot says. This makes level-making safer without ever blocking you, and CI can run it on every level. **An invalid line is an object line the loader skipped** (`lvl.skipped_lines`, counted by `level_parse_mem`): the level lost something its author wrote. An ignored field, an unknown header key or a rejected header value is a warning: the line, or the object, is still there, and a newer file read by an older build must still pass. The path is taken as given, relative to where you run it: unlike the game, `--check` doesn't move to the executable's folder.
 
 ### 7.5 Level list
 
@@ -2313,7 +2313,7 @@ What to test (levels are given as strings to `sim_load_mem`, no temp files):
 - **Interactive objects:** a portal acts once per attempt (count mode changes while crossing: exactly 1); after acting its bit is set and the sweep never collects it again (count `interactive_act` calls); `sim_reset` clears the bitset; a portal never changes the player's position or speed except the mode's speed limits; a second ship portal while in ship mode moves the corridor to the second portal. Corridor bounds for a **ship** portal at y = 250 (200 px tall) are −150 and 850 (centered at 350, 1000 px tall → −150..850); for one at y = 650 they're −150 and 850 too (250..1250, then pushed above the ground); a **ball** portal (800 px) at y = 250 gives −50..750. While the corridor is active, `cam.pos.y` equals `top - (1080 - height) / 2` on every tick whatever the player does; after a cube portal it follows again.
 - **Physics constants:** a jump from flat ground has apex 213.32 ± 0.05 px (GD's 2.1333 blocks, 11.1) and lasts 102 ticks (0.425 s), counting from the tick whose input starts the jump to the first tick with `grounded` true again, and covers 441.4 px. (The legacy lab tool reports 38 frames at 60 Hz for the same jump: it counts from the frame before the input is applied.) Each trigonometric literal in `constants.h` matches its formula computed in double, and `CAM_LERP` matches `TICK_RATE` and `CAM_TAU`.
 - **Determinism:** run the same input script twice and compare `sim_state_hash` after every tick. Snapshots: save at tick 500, run 300 ticks, restore, run the same 300 ticks: identical hashes.
-- **Fuzzing:** `tests/fuzz/fuzz_parser.c` feeds random bytes to `sim_load_mem` and runs 200 ticks with alternating input. Built with clang's libFuzzer and ASan/UBSan (`make fuzz_parser`), seeded with every file in `levels/` and `tests/levels/`. The parser reads files people download and edit by hand, so it's the most exposed code in the game; a fuzzer finds the crashes unit tests don't think of.
+- **Fuzzing:** `tests/fuzz/fuzz_parser.c` feeds random bytes to `sim_load_mem` and runs 200 ticks with alternating input. Built with clang's libFuzzer and ASan/UBSan (`make fuzz_parser`), seeded with every file in `levels/` (read only: new inputs go to `build/fuzz_corpus`, never into `levels/`). **Implemented**; CI runs it for 60 s. The parser reads files people download and edit by hand, so it's the most exposed code in the game; a fuzzer finds the crashes unit tests don't think of.
 
 ```c
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
@@ -2403,16 +2403,20 @@ jobs:
         run: make test
       - name: Every level loads without invalid lines
         run: for f in levels/*; do ./my_gd --check "$f" || exit 1; done
-      - name: Smoke test
-        run: ALSOFT_DRIVERS=null xvfb-run -a timeout 5 ./my_gd; test $? -eq 124
-```
-
-The fuzzing step waits for `tests/fuzz/fuzz_parser.c`, which doesn't exist yet; the `fuzz_parser` target in the Makefile is ready for it:
-
-```yaml
       - name: Fuzz the parser for 60 s
-        run: sudo apt-get install -y clang && make fuzz_parser && ./fuzz_parser -max_total_time=60 levels
+        run: |
+          sudo apt-get install -y clang
+          make fuzz_parser
+          mkdir -p build/fuzz_corpus
+          ./fuzz_parser -max_total_time=60 build/fuzz_corpus levels
+      - name: Smoke test
+        run: |
+          code=0
+          ALSOFT_DRIVERS=null xvfb-run -a timeout 5 ./my_gd || code=$?
+          test "$code" -eq 124
 ```
+
+GitHub runs each `run:` with `bash -e`: a bare `timeout ...; test $? -eq 124` exits on the 124 itself and the step can never pass, which is why the code is caught with `||` first. libFuzzer writes the new inputs it finds into its **first** folder, so `levels/` is passed second, as seeds only.
 
 ---
 
@@ -2493,7 +2497,7 @@ static vec2_t snap_camera(gd_t *gd, float x, float y)
 
 **Atlas.** At startup, load every object image (`block.png`, `spike.png`, `cube_portal.png`, later pads and orbs) as an `sfImage`, copy them side by side into one atlas image with `sfImage_copyImage`, and create one `sfTexture` from it. Keep each image's rectangle in the atlas (`gd->atlas_rect[type]`).
 
-**Vertices.** Each object is two triangles (6 vertices, `sfTriangles`): the rect's four corners, rotated around its center by `rotation` (the same function as the hitbox, 4.4), with texture coordinates from the atlas and a vertex color (white, or the portal tint: cyan for cube, pink for ship).
+**Vertices.** Each object is two triangles (6 vertices, `sfTriangles`): the rect's four corners, rotated around its center by `rotation` (the same function as the hitbox, 4.4), with texture coordinates from the atlas and a vertex color (white, or the portal tint: cyan for cube, pink for ship). **A slope is drawn as its hitbox's triangle** (bottom left, top right, bottom right, 4.2), with the texture cut along the same diagonal, so what you see is what the circle walks on; its second triangle collapses to a point and draws nothing, which keeps every object at 6 vertices. Types drawn from the same image file (the slope uses `block.png`) load it once and share its atlas rectangle.
 
 ```c
 static void append_object(sfVertex *v, const object_t *o, sfFloatRect tex, sfColor col)
@@ -2764,7 +2768,7 @@ Keep the trigonometric literals and `CAM_LERP` in sync with their formulas: the 
 
 ### 11.3 Interpolation
 
-Render the player at `prev_pos + (pos - prev_pos) * alpha`, with `alpha = lv->accumulator / 1000000.0` (the fraction of a tick left in the accumulator, 3.6). At 240 Hz the difference is small, but it's free and removes any stepping when the display rate isn't a divisor of the tick rate. The camera uses the interpolated position too. It's presentation only: the sim never sees it.
+Render the player at `prev_pos + (pos - prev_pos) * alpha`, with `alpha = lv->accumulator / 1000000.0` (the fraction of a tick left in the accumulator, 3.6). At 240 Hz the difference is small, but it's free and removes any stepping when the display rate isn't a divisor of the tick rate. The camera uses the interpolated position too. It's presentation only: the sim never sees it. **Implemented** in `level_render.c` (`drawn_player_pos`): the sprite and the camera's x use it; the camera's y and the F3 overlay's shapes stay on the tick's own values, so the overlay shows exactly what the sim tested.
 
 ---
 
@@ -2935,13 +2939,13 @@ src/sim/             level_parse.c  level_build.c  hitbox.c  sweep.c  move.c  zo
 src/                 gd.c  window.c  input.c  keyboard_events.c  draw.c  check.c
                      level.c  level_render.c  level_chunks.c  atlas.c  debug_overlay.c
                      end_screen.c  main_menu.c  option_menu.c  editor_menu.c
-                     level_list_menu.c  button.c  cursor.c  (my_* helpers still in use)
+                     level_list_menu.c  button.c  cursor.c
                      scene.c  audio.c (planned, 10.1 and 10.3)
 tests/               main.c  test.h  test_constants.c  test_hitbox.c  test_sweep.c
                      test_circle.c  test_parser.c  test_start.c  test_tick.c
                      test_slopes.c  test_portal.c  test_progress.c  test_bot.c
                      levels/ (Appendix D, planned)
-tests/fuzz/          fuzz_parser.c (planned, 8.1)
+tests/fuzz/          fuzz_parser.c (8.1)
 levels/              <id>.gd, named after the level's id (7.2)
 res/                 assets  (CREDITS.md planned, 12.2)
 build/               release/ and debug/ objects (ignored by git)
@@ -2950,7 +2954,7 @@ build/               release/ and debug/ objects (ignored by git)
 
 Rotation is tested in `test_hitbox.c`, determinism and snapshots in `test_tick.c`; replay tests went away with v3.
 
-Deleted: `physics.c`, `get_level.c`, `portal.c`, `music.c`. Still to go: `utilitary.c` (replaced by `snprintf`) and the unused `my_*` helpers.
+Deleted: `physics.c`, `get_level.c`, `portal.c`, `music.c`, then `utilitary.c` (its `xcalloc` was a copy of `sim_xcalloc`, which the game layer now calls; its number formatting is `snprintf`'s) and every `my_*` helper (`-h` prints with `printf`).
 
 If you follow a coding style with function length limits, the snippets here are written for readability; split them as needed without changing the structure.
 

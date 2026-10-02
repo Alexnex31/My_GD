@@ -29,7 +29,7 @@ Requires a C compiler, `make` and **CSFML 2.6** (graphics, window, audio, system
 make              # release build -> ./my_gd
 make debug        # -g3 -O0 with ASan and UBSan -> ./my_gd_debug
 make test         # build and run the unit tests (sim only: no CSFML needed)
-make fuzz_parser  # level-parser fuzzer, needs clang (planned)
+make fuzz_parser  # level-parser fuzzer, needs clang
 make re           # rebuild from scratch
 ```
 
@@ -45,7 +45,7 @@ Objects and dependency files go to `build/release` or `build/debug`, so the two 
 
 The game finds its `res/` and `levels/` folders next to the executable, so it can be started from anywhere.
 
-Exit code `84` means a missing asset, an unreadable level or a bad argument, with a message saying which. `--check` exits `1` when the level can't be read or has invalid lines, `0` otherwise.
+Exit code `84` means a missing asset, an unreadable level or a bad argument, with a message saying which. `--check` exits `1` when the level can't be read or has invalid lines (object lines it had to skip), `0` otherwise: ignored fields and unknown header keys are only warnings. Its path is relative to where you run it.
 
 ## Controls
 
@@ -102,7 +102,7 @@ FEATURES.md     gamemodes, objects, editor, music, options, tests
 
 ## Tests
 
-`make test` builds a test binary that links **only** the simulation, so it needs no window and no CSFML. It covers the collision cases engines usually get wrong (seams between blocks, exact gaps, containment, tunneling at high speed, slopes, step-ups, the jump zone), pins the physics constants, and checks that the same inputs give the same state hash twice. A bot walks each level with the real engine and reports whether it found a way through: information, never a build failure. `--check` prints the same line. Details in `PLAN.md` 8.
+`make test` builds a test binary that links **only** the simulation, so it needs no window and no CSFML. It covers the collision cases engines usually get wrong (seams between blocks, exact gaps, containment, tunneling at high speed, slopes, step-ups, the jump zone), pins the physics constants, and checks that the same inputs give the same state hash twice. A bot walks each level with the real engine and reports whether it found a way through: information, never a build failure. `--check` prints the same line. `make fuzz_parser` builds a libFuzzer target that feeds random bytes to the level loader and plays them; CI runs it for 60 s. Details in `PLAN.md` 8.
 
 ## Physics numbers
 
