@@ -26,8 +26,19 @@ jobs:
             ./my_gd --check "$f" || exit 1
           done
 
+      # Random bytes as level files, under ASan/UBSan (8.1). New inputs go to
+      # the first folder; levels/ only seeds it and is never written.
+      - name: Fuzz the parser for 60 s
+        run: |
+          sudo apt-get install -y clang
+          make fuzz_parser
+          mkdir -p build/fuzz_corpus
+          ./fuzz_parser -max_total_time=60 build/fuzz_corpus levels
+
       # It must still be running after 5 s: a crash or an early exit fails.
+      # The step's shell runs with -e, so the expected 124 is caught, not fatal.
       - name: The game starts and keeps running
         run: |
-          ALSOFT_DRIVERS=null xvfb-run -a timeout 5 ./my_gd
-          test $? -eq 124
+          code=0
+          ALSOFT_DRIVERS=null xvfb-run -a timeout 5 ./my_gd || code=$?
+          test "$code" -eq 124
