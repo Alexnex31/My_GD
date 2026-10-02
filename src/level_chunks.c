@@ -9,7 +9,7 @@
 #include "sim/hitbox.h"
 #include "sim/modes.h"
 
-#define VERTS_PER_OBJECT 6        /* two triangles */
+#define VERTS_PER_OBJECT 6        /* two triangles; a slope's second is empty */
 
 static draw_layer_t layer_of(const object_t *o)
 {
@@ -29,11 +29,18 @@ static sfColor object_color(const object_t *o)
         : (sfColor){0, 230, 230, 255};
 }
 
-/* Two triangles for one object, its own rect rotated, from the atlas (9.2). */
+/*
+** Two triangles for one object, its own rect rotated, from the atlas (9.2).
+** A slope is its hitbox's triangle (bottom left, top right, bottom right,
+** 4.2), the texture cut along the same diagonal; its second triangle is a
+** single point, which draws nothing and keeps every object 6 vertices.
+*/
 static void append_object(sfVertex *v, const object_t *o, sfFloatRect tex,
     sfColor col)
 {
-    static const int order[6] = {0, 1, 2, 0, 2, 3};
+    static const int quad[6] = {0, 1, 2, 0, 2, 3};
+    static const int slope[6] = {3, 1, 2, 2, 2, 2};
+    const int *order = o->type == OBJ_SLOPE ? slope : quad;
     vec2_t c = {o->rect.x + o->rect.w / 2.0, o->rect.y + o->rect.h / 2.0};
     vec2_t p[4] = {{o->rect.x, o->rect.y}, {o->rect.x + o->rect.w, o->rect.y},
         {o->rect.x + o->rect.w, o->rect.y + o->rect.h},
@@ -82,7 +89,7 @@ static void fill_chunk_bounds(render_chunk_t *ch, const object_t *o)
 static void build_vertices(level_t *lv, gd_t *gd, size_t *counts,
     sfVertex **buf)
 {
-    size_t *filled = xcalloc(lv->nb_chunks * LAYER_COUNT, sizeof(size_t));
+    size_t *filled = sim_xcalloc(lv->nb_chunks * LAYER_COUNT, sizeof(size_t));
 
     for (size_t i = 0; i < lv->sim.lvl.nb_objects; i++) {
         const object_t *o = &lv->sim.lvl.objects[i];
@@ -137,15 +144,16 @@ void level_build_chunks(level_t *lv, gd_t *gd)
         right = fmax(right, d.x + d.w);
     }
     lv->nb_chunks = (size_t)(right / CHUNK_W) + 1;
-    lv->chunks = xcalloc(lv->nb_chunks, sizeof(render_chunk_t));
+    lv->chunks = sim_xcalloc(lv->nb_chunks, sizeof(render_chunk_t));
     for (size_t c = 0; c < lv->nb_chunks; c++)
         lv->chunks[c] = (render_chunk_t){INFINITY, -INFINITY, {NULL}, {NULL}};
-    counts = xcalloc(lv->nb_chunks * LAYER_COUNT, sizeof(size_t));
+    counts = sim_xcalloc(lv->nb_chunks * LAYER_COUNT, sizeof(size_t));
     count_objects(lv, counts);
-    buf = xcalloc(lv->nb_chunks * LAYER_COUNT, sizeof(sfVertex *));
+    buf = sim_xcalloc(lv->nb_chunks * LAYER_COUNT, sizeof(sfVertex *));
     for (size_t k = 0; k < lv->nb_chunks * LAYER_COUNT; k++)
         if (counts[k] > 0)
-            buf[k] = xcalloc(counts[k] * VERTS_PER_OBJECT, sizeof(sfVertex));
+            buf[k] = sim_xcalloc(counts[k] * VERTS_PER_OBJECT,
+                sizeof(sfVertex));
     build_vertices(lv, gd, counts, buf);
     upload(lv, counts, buf);
     for (size_t k = 0; k < lv->nb_chunks * LAYER_COUNT; k++)

@@ -155,11 +155,8 @@ static void draw_numbers(gd_t *gd, level_t *lv, float ms)
         lv->sim.st.tick, p->pos.x, p->pos.y, p->vx, p->vy, p->surface_rise,
         p->grounded, p->can_jump, MODES[p->mode].name, sim_percent(&lv->sim),
         ms, gd->draw_calls);
-    sfText_setString(lv->hud_text, text);
-    sfText_setCharacterSize(lv->hud_text, 26);
-    sfText_setPosition(lv->hud_text, (sfVector2f){40.0f, 120.0f});
-    draw_text(gd, lv->hud_text);
-    sfText_setCharacterSize(lv->hud_text, 40);
+    sfText_setString(lv->debug_text, text);
+    draw_text(gd, lv->debug_text);
 }
 
 void render_debug_overlay(gd_t *gd, level_t *lv, vec2_t cam)

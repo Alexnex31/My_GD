@@ -9,13 +9,16 @@
 #include "sim/bot.h"
 #include "sim/modes.h"
 
-static int g_bad_lines;
+static int g_loader_messages;
 
-/* The loader's own warnings: an invalid line is what makes the exit code 1. */
+/*
+** The loader's messages. Only the lines it skipped make the exit code 1
+** (lvl.skipped_lines); an ignored field or header value is a warning.
+*/
 static void loader_warning(const char *msg)
 {
     dprintf(2, "  %s\n", msg);
-    g_bad_lines += 1;
+    g_loader_messages += 1;
 }
 
 static int warn(const char *fmt, int line, double x)
@@ -144,8 +147,9 @@ int level_check(const char *path)
 {
     sim_t s;
     int issues = 0;
+    int bad = 0;
 
-    g_bad_lines = 0;
+    g_loader_messages = 0;
     dprintf(2, "%s:\n", path);
     if (sim_load(&s, path, loader_warning) != 0) {
         dprintf(2, "  cannot be read\n");
@@ -159,8 +163,10 @@ int level_check(const char *path)
     issues += check_steep_faces(&s.lvl);
     issues += check_crowding(&s.lvl);
     issues += check_behind_spawn(&s.lvl);
-    dprintf(2, "  %d invalid line(s), %d warning(s)\n", g_bad_lines, issues);
+    issues += g_loader_messages - s.lvl.skipped_lines;
+    bad = s.lvl.skipped_lines;
+    dprintf(2, "  %d invalid line(s), %d warning(s)\n", bad, issues);
     report_bot(&s);
     sim_free(&s);
-    return g_bad_lines > 0;
+    return bad > 0;
 }

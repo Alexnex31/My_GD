@@ -20,9 +20,9 @@ void print_button(button_t *b, sfRenderWindow *w)
 
 button_t *create_button(float x, float y, int size, sfTexture *texture)
 {
-    button_t *b = xcalloc(1, sizeof(button_t));
+    button_t *b = sim_xcalloc(1, sizeof(button_t));
 
-    b->pos = create_vector_f(x, y);
+    b->pos = (sfVector2f){x, y};
     b->pressed = 'n';
     b->size = size;
     b->sprite = sfSprite_create();

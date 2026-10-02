@@ -113,6 +113,7 @@ typedef struct gd {
     char menu;
     char selected_id[24];         /* the level file's digits (7.2)            */
     bool was_held;                /* last tick's jump input, for the edge     */
+    bool click_latched;           /* the click that started the level is down */
     bool debug_overlay;           /* F3 (9.6)                                 */
     int draw_calls;               /* this frame's, counted in draw.c (9.0)    */
     sfTexture *atlas;             /* every object image in one texture (9.2)  */

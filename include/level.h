@@ -60,7 +60,8 @@ typedef struct level {
     ship_bounds_t fading_bounds;  /* a corridor that just went away (5.3)     */
     float fade_left;              /* seconds of fade still to draw            */
     sfInt64 frame_us;             /* the frame the renderer is drawing        */
-    sfText *hud_text;
+    sfText *hud_text;             /* the percentage: set only when it changes */
+    sfText *debug_text;           /* F3's numbers, its own: never the HUD's   */
     sfText *attempt_text;         /* drawn in the world, it scrolls away (9.5) */
     sfRectangleShape *bar_back;   /* the progress bar, created once            */
     sfRectangleShape *bar_fill;
@@ -92,6 +93,9 @@ void level_flush_stats(level_t *lv, gd_t *gd);
 
 /* One tick's input (3.6). Polled per tick, so `pressed` lasts exactly one. */
 input_t input_for_tick(gd_t *gd);
+
+/* The click that started the level isn't a jump: ignored until it's up. */
+void input_level_started(gd_t *gd);
 
 /* The static geometry: built once per level, drawn a few calls per frame. */
 void level_build_chunks(level_t *lv, gd_t *gd);

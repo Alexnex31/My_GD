@@ -23,12 +23,29 @@ static float snap(gd_t *gd, double v)
     return roundf((float)v * scale) / scale;
 }
 
+/*
+** Where the player is drawn: between its last two ticks, by the fraction of
+** a tick still in the accumulator, so no frame shows a stepped position
+** (11.3). Only while ticks run: dying or finished, the sim stands still and
+** the accumulator would only make it wobble. Presentation only.
+*/
+static vec2_t drawn_player_pos(const level_t *lv)
+{
+    const player_t *p = &lv->sim.st.player;
+    double alpha = (double)lv->accumulator / 1000000.0;
+
+    if (lv->state != LEVEL_PLAYING)
+        return p->pos;
+
+    return (vec2_t){p->prev_pos.x + (p->pos.x - p->prev_pos.x) * alpha,
+        p->prev_pos.y + (p->pos.y - p->prev_pos.y) * alpha};
+}
+
+/* The camera follows the drawn player on x, so the two never drift (11.3). */
 vec2_t level_camera(gd_t *gd, const level_t *lv)
 {
-    const run_state_t *st = &lv->sim.st;
-
-    return (vec2_t){snap(gd, st->player.pos.x - PLAYER_SCREEN_X),
-        snap(gd, st->cam.pos.y)};
+    return (vec2_t){snap(gd, drawn_player_pos(lv).x - PLAYER_SCREEN_X),
+        snap(gd, lv->sim.st.cam.pos.y)};
 }
 
 /*
@@ -206,13 +223,14 @@ static void setup_player_sprite(gd_t *gd, level_t *lv)
 static void render_player(gd_t *gd, level_t *lv)
 {
     const player_t *p = &lv->sim.st.player;
+    vec2_t pos = drawn_player_pos(lv);
 
     if (lv->state == LEVEL_DYING)
         return render_explosion(gd, lv);     /* it takes the player's place */
     setup_player_sprite(gd, lv);
     sfSprite_setRotation(lv->player_sprite, p->rotation);
     sfSprite_setPosition(lv->player_sprite,
-        (sfVector2f){(float)p->pos.x, (float)p->pos.y});
+        (sfVector2f){(float)pos.x, (float)pos.y});
     draw_sprite(gd, lv->player_sprite, NULL);
 }
 

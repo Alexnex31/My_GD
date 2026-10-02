@@ -17,23 +17,10 @@
     #include <unistd.h>
     #include <math.h>
     #include <dirent.h>
+    #include "sim/alloc.h"
     #include "struct.h"
     #include "level.h"
     #include "view.h"
-
-void my_putchar(char c);
-int my_putstr(char const *str);
-int my_put_nbr(int nb);
-void free_arr(char **ar);
-char *my_strcpy(char *dest, char const *src);
-
-char **my_str_to_word_array(char *str);
-char **my_str_word_array_delim(char *str, char *delim);
-char *int_to_str(int nb);
-char *float_to_str(float nb);
-void *xcalloc(size_t n, size_t size);
-
-sfVector2f create_vector_f(float x, float y);
 
 void close_window(sfRenderWindow *window);
 void destroy_all(sfRenderWindow *window);

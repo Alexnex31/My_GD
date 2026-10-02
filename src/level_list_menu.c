@@ -65,21 +65,6 @@ void print_level_list(level_list_t *level_list, sfRenderWindow *w)
     }
 }
 
-/* A level is levels/<digits>.gd and nothing else (7.2, 7.5). */
-static bool level_file_id(const char *name, char *id, size_t size)
-{
-    size_t n = strlen(name);
-
-    if (n < 4 || strcmp(name + n - 3, ".gd") != 0 || n - 3 >= size)
-        return false;
-    for (size_t i = 0; i < n - 3; i++)
-        if (name[i] < '0' || name[i] > '9')
-            return false;
-    memcpy(id, name, n - 3);
-    id[n - 3] = '\0';
-    return true;
-}
-
 static int cmp_id(const void *a, const void *b)
 {
     long ia = atol(*(char *const *)a);
@@ -99,14 +84,14 @@ char **fill_names_list(void)
 
     if (d == NULL)
         return NULL;
-    ids = xcalloc(257, sizeof(char *));
+    ids = sim_xcalloc(257, sizeof(char *));
     for (dir = readdir(d); dir != NULL && n < 256; dir = readdir(d)) {
-        if (level_file_id(dir->d_name, id, sizeof(id))) {
+        if (level_id_from_path(dir->d_name, id, sizeof(id))) {  /* 7.2, 7.5 */
             ids[n] = strdup(id);
             n += 1;
         } else if (dir->d_name[0] != '.')
-            dprintf(2, "my_gd: levels/%s is not <digits>.gd, skipped\n",
-                dir->d_name);
+            dprintf(2, "my_gd: levels/%s is not <digits>.gd (at most %d"
+                " digits), skipped\n", dir->d_name, LEVEL_ID_MAX);
     }
     closedir(d);
     qsort(ids, n, sizeof(char *), cmp_id);
@@ -144,7 +129,7 @@ static void fill_level_info(level_button_t *lb, gd_t *gd)
 
 level_button_t *create_level_button(char *id, int index, gd_t *gd)
 {
-    level_button_t *lb = xcalloc(1, sizeof(level_button_t));
+    level_button_t *lb = sim_xcalloc(1, sizeof(level_button_t));
     char filepath[256];
     char *attempts_str;
     char *best_str;
@@ -158,7 +143,7 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     fill_level_info(lb, gd);
     lb->play_button = create_button(x + 200, y + 100, 100, gd->res->play_button);
     lb->name_text = sfText_create();
-    text_pos = create_vector_f(x, y);
+    text_pos = (sfVector2f){x, y};
     sfText_setString(lb->name_text, lb->display_name);
     sfText_setFont(lb->name_text, gd->main_font);
     sfText_setCharacterSize(lb->name_text, 35);
@@ -167,16 +152,16 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     lb->attempts_text = sfText_create();
     attempts_str = malloc(50);
     snprintf(attempts_str, 50, "Attempts: %d", lb->attempts);
-    text_pos = create_vector_f(x, y + 50);
+    text_pos = (sfVector2f){x, y + 50};
     sfText_setString(lb->attempts_text, attempts_str);
     sfText_setFont(lb->attempts_text, gd->main_font);
     sfText_setCharacterSize(lb->attempts_text, 25);
     sfText_setPosition(lb->attempts_text, text_pos);
     lb->best_text = sfText_create();
-    best_str = xcalloc(64, 1);
+    best_str = sim_xcalloc(64, 1);
     snprintf(best_str, 64, "Best: %.2f%%%s", progress_printable(lb->best),
         lb->edited ? " (edited)" : "");
-    text_pos = create_vector_f(x, y + 80);
+    text_pos = (sfVector2f){x, y + 80};
     sfText_setString(lb->best_text, best_str);
     sfText_setFont(lb->best_text, gd->main_font);
     sfText_setCharacterSize(lb->best_text, 25);
@@ -188,7 +173,7 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
 
 level_list_t *create_level_list(gd_t *gd)
 {
-    level_list_t *menu = xcalloc(1, sizeof(level_list_t));
+    level_list_t *menu = sim_xcalloc(1, sizeof(level_list_t));
     int i = 0;
 
     sfMusic_stop(gd->musics->main);
@@ -197,7 +182,8 @@ level_list_t *create_level_list(gd_t *gd)
     sfSprite_setTexture(menu->background, gd->res->list_background, sfTrue);
     menu->names = fill_names_list();
     menu->nb_levels = count_names(menu->names);
-    menu->level_buttons = xcalloc(menu->nb_levels + 1, sizeof(level_button_t *));
+    menu->level_buttons = sim_xcalloc(menu->nb_levels + 1,
+        sizeof(level_button_t *));
     while (i < menu->nb_levels) {
         menu->level_buttons[i] = create_level_button(menu->names[i], i, gd);
         i += 1;

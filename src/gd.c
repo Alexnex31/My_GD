@@ -61,7 +61,7 @@ static sfTexture *load_texture(const char *path)
 
 textures_t *load_textures(void)
 {
-    textures_t *res = xcalloc(1, sizeof(textures_t));
+    textures_t *res = sim_xcalloc(1, sizeof(textures_t));
 
     res->main_background = load_texture("res/main_background.png");
     res->edi_background = load_texture("res/cecilya.png");
@@ -112,7 +112,7 @@ void free_musics(music_t *musics)
 
 music_t *load_musics(void)
 {
-    music_t *musics = xcalloc(1, sizeof(music_t));
+    music_t *musics = sim_xcalloc(1, sizeof(music_t));
 
     musics->main = load_music("res/menuLoop.mp3");
     musics->editor = load_music("res/back_mus.ogg");
@@ -138,7 +138,7 @@ void free_gd(gd_t *gd)
 
 gd_t *create_gd(void)
 {
-    gd_t *gd = xcalloc(1, sizeof(gd_t));
+    gd_t *gd = sim_xcalloc(1, sizeof(gd_t));
 
     gd->res = load_textures();
     gd->musics = load_musics();
@@ -153,7 +153,7 @@ gd_t *create_gd(void)
     apply_letterbox(gd, sfRenderWindow_getSize(gd->w).x,
         sfRenderWindow_getSize(gd->w).y);
     gd->cursor = create_cursor();
-    gd->event = xcalloc(1, sizeof(sfEvent));
+    gd->event = sim_xcalloc(1, sizeof(sfEvent));
     gd->menu = 'm';
     snprintf(gd->selected_id, sizeof(gd->selected_id), "1");
     atlas_build(gd);
@@ -253,7 +253,7 @@ static void chdir_to_executable(void)
 
 static void print_usage(int fd)
 {
-    const char *msg = "usage: ./my_gd [-h]\n";
+    const char *msg = "usage: ./my_gd [-h | --check <level.gd>]\n";
 
     write(fd, msg, strlen(msg));
 }
@@ -264,13 +264,12 @@ int main(int argc, char **argv)
         chdir_to_executable();
         return main_loop(create_gd());
     }
-    if (argc == 3 && strcmp(argv[1], "--check") == 0) {
-        chdir_to_executable();
-        return level_check(argv[2]);
-    }
+    if (argc == 3 && strcmp(argv[1], "--check") == 0)
+        return level_check(argv[2]);         /* the user's path: no chdir */
     if (argc == 2 && strcmp(argv[1], "-h") == 0) {
-        my_putstr("GD :)\n");
-        my_putstr("🭀 🭁 🭂 🭃 🭄 🭅 🭆 🭇 🭈 🭉 🭊 🭋 🭌 🭍 🭎 🭏 🭐 🭑 🭒 🭓 🭔 🭕 🭖 🭗 🭘 🭙\n");
+        printf("GD :)\n");
+        printf("🭀 🭁 🭂 🭃 🭄 🭅 🭆 🭇 🭈 🭉 🭊 🭋 🭌 🭍 🭎 🭏 🭐 🭑 🭒 🭓 🭔 🭕 🭖 🭗 🭘 🭙\n");
+        fflush(stdout);                      /* before print_usage's write */
         print_usage(1);
         return 0;
     }

@@ -57,7 +57,7 @@ void level_flush_stats(level_t *lv, gd_t *gd)
 
 level_t *level_start(gd_t *gd, const char *id)
 {
-    level_t *lv = xcalloc(1, sizeof(level_t));
+    level_t *lv = sim_xcalloc(1, sizeof(level_t));
     char path[300];
 
     snprintf(path, sizeof(path), "levels/%s.gd", id);
@@ -67,11 +67,11 @@ level_t *level_start(gd_t *gd, const char *id)
         return NULL;
     }
     snprintf(lv->id, sizeof(lv->id), "%s", id);
-    level_read_header(path, &lv->sim.lvl.hdr, &lv->file_hash);
+    lv->file_hash = lv->sim.lvl.file_hash;   /* the file loaded, read once */
     lv->state = LEVEL_PLAYING;
     lv->clock = sfClock_create();
     level_build_chunks(lv, gd);
-    lv->seen_spent = xcalloc(lv->sim.st.spent_words + 1, sizeof(uint64_t));
+    lv->seen_spent = sim_xcalloc(lv->sim.st.spent_words + 1, sizeof(uint64_t));
     lv->flash_sprite = sfSprite_create();
     sfSprite_setTexture(lv->flash_sprite, gd->atlas, sfTrue);
     lv->player_sprite = sfSprite_create();
@@ -92,6 +92,11 @@ level_t *level_start(gd_t *gd, const char *id)
     sfText_setFont(lv->hud_text, gd->main_font);
     sfText_setCharacterSize(lv->hud_text, 40);
     sfText_setOutlineThickness(lv->hud_text, 3);
+    lv->debug_text = sfText_create();
+    sfText_setFont(lv->debug_text, gd->main_font);
+    sfText_setCharacterSize(lv->debug_text, 26);
+    sfText_setOutlineThickness(lv->debug_text, 3);
+    sfText_setPosition(lv->debug_text, (sfVector2f){40.0f, 120.0f});
     lv->attempt_text = sfText_create();
     sfText_setFont(lv->attempt_text, gd->main_font);
     sfText_setCharacterSize(lv->attempt_text, 60);
@@ -111,6 +116,8 @@ level_t *level_start(gd_t *gd, const char *id)
         (sfVector2f){(VIEW_W - BAR_W) / 2.0f, 30.0f});
     level_count_attempt(lv);
     sfMusic_play(gd->musics->level1);
+    input_level_started(gd);
+    sfClock_restart(lv->clock);              /* the loading isn't play time */
     return lv;
 }
 
@@ -130,6 +137,7 @@ void level_free(level_t *lv, gd_t *gd)
     sfSprite_destroy(lv->strip_sprite);
     sfSprite_destroy(lv->explosion_sprite);
     sfText_destroy(lv->hud_text);
+    sfText_destroy(lv->debug_text);
     sfText_destroy(lv->attempt_text);
     sfRectangleShape_destroy(lv->bar_back);
     sfRectangleShape_destroy(lv->bar_fill);

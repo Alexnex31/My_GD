@@ -67,6 +67,16 @@ static void atlas_place(gd_t *gd, sfImage *atlas, sfImage **parts,
     }
 }
 
+/* The earlier type drawn from the same file, or -1: it is loaded once. */
+static int same_image_as(int t)
+{
+    for (int u = 0; u < t; u++)
+        if (ATLAS_FILES[u] != NULL
+            && strcmp(ATLAS_FILES[u], ATLAS_FILES[t]) == 0)
+            return u;
+    return -1;
+}
+
 /*
 ** One texture for every object type, built once at startup. Types that share
 ** an image (a slope is drawn with the block texture) share its rectangle.
@@ -82,7 +92,7 @@ void atlas_build(gd_t *gd)
     for (int t = 0; t < OBJ_TYPE_COUNT; t++) {
         sfVector2u s;
 
-        if (ATLAS_FILES[t] == NULL)
+        if (ATLAS_FILES[t] == NULL || same_image_as(t) >= 0)
             continue;
         parts[t] = load_image(ATLAS_FILES[t]);
         s = sfImage_getSize(parts[t]);
@@ -92,6 +102,9 @@ void atlas_build(gd_t *gd)
     }
     atlas = sfImage_createFromColor(total, height, sfTransparent);
     atlas_place(gd, atlas, parts, widths);
+    for (int t = 0; t < OBJ_TYPE_COUNT; t++)
+        if (ATLAS_FILES[t] != NULL && same_image_as(t) >= 0)
+            gd->atlas_rect[t] = gd->atlas_rect[same_image_as(t)];
     gd->atlas = sfTexture_createFromImage(atlas, NULL);
     sfTexture_setSmooth(gd->atlas, sfFalse);
     for (int t = 0; t < OBJ_TYPE_COUNT; t++)
