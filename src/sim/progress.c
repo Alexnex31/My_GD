@@ -49,14 +49,28 @@ static progress_entry_t *entry_append(progress_t *p, const char *id)
     return e;
 }
 
-progress_entry_t *progress_get(progress_t *p, const char *id)
+progress_entry_t *progress_find(const progress_t *p, const char *id)
 {
     if (!progress_valid_id(id))
         return NULL;
     for (size_t i = 0; i < p->count; i++)
         if (strcmp(p->entries[i].id, id) == 0)
             return &p->entries[i];
+    return NULL;
+}
+
+progress_entry_t *progress_get(progress_t *p, const char *id)
+{
+    progress_entry_t *e = progress_find(p, id);
+
+    if (e != NULL || !progress_valid_id(id))
+        return e;
     return entry_append(p, id);
+}
+
+float progress_printable(float pct)
+{
+    return pct < 100.0f && pct > 99.99f ? 99.99f : pct;
 }
 
 /* An unknown field is kept verbatim, space separated, for the next save. */
@@ -157,11 +171,22 @@ int progress_load(progress_t *p, const char *path)
     return 0;
 }
 
+/* Nothing but its id: nothing to keep (an older build's lookups made those). */
+static bool entry_empty(const progress_entry_t *e)
+{
+    return e->attempts == 0 && e->best == 0.0f && e->practice_best == 0.0f
+        && e->level_hash == 0 && e->song[0] == '\0' && e->extra == NULL;
+}
+
 static void write_entry(FILE *f, const progress_entry_t *e)
 {
-    fprintf(f, "%s attempts=%d best=%.2f", e->id, e->attempts, e->best);
+    if (entry_empty(e))
+        return;
+    fprintf(f, "%s attempts=%d best=%.2f", e->id, e->attempts,
+        progress_printable(e->best));
     if (e->practice_best > 0.0f)
-        fprintf(f, " practice_best=%.2f", e->practice_best);
+        fprintf(f, " practice_best=%.2f",
+            progress_printable(e->practice_best));
     if (e->level_hash != 0)
         fprintf(f, " hash=%016llx", (unsigned long long)e->level_hash);
     if (e->song[0] != '\0')

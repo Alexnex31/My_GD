@@ -113,16 +113,13 @@ char **fill_names_list(void)
     return ids;
 }
 
-int count_levels(void)
+/* The list's own names, not a second scan: two scans can disagree (7.5). */
+static int count_names(char **names)
 {
-    char **ids = fill_names_list();
     int n = 0;
 
-    if (ids == NULL)
-        return 0;
-    while (ids[n] != NULL)
+    while (names != NULL && names[n] != NULL)
         n += 1;
-    free_arr(ids);
     return n;
 }
 
@@ -130,7 +127,7 @@ int count_levels(void)
 static void fill_level_info(level_button_t *lb, gd_t *gd)
 {
     level_header_t hdr = {0};
-    progress_entry_t *pe = progress_get(&gd->progress, lb->id);
+    const progress_entry_t *pe = progress_find(&gd->progress, lb->id);
     uint64_t hash = 0;
 
     if (level_read_header(lb->filename, &hdr, &hash) == 0)
@@ -177,7 +174,7 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     sfText_setPosition(lb->attempts_text, text_pos);
     lb->best_text = sfText_create();
     best_str = xcalloc(64, 1);
-    snprintf(best_str, 64, "Best: %.2f%%%s", lb->best,
+    snprintf(best_str, 64, "Best: %.2f%%%s", progress_printable(lb->best),
         lb->edited ? " (edited)" : "");
     text_pos = create_vector_f(x, y + 80);
     sfText_setString(lb->best_text, best_str);
@@ -199,9 +196,9 @@ level_list_t *create_level_list(gd_t *gd)
     menu->background = sfSprite_create();
     sfSprite_setTexture(menu->background, gd->res->list_background, sfTrue);
     menu->names = fill_names_list();
-    menu->nb_levels = count_levels();
+    menu->nb_levels = count_names(menu->names);
     menu->level_buttons = xcalloc(menu->nb_levels + 1, sizeof(level_button_t *));
-    while (i < menu->nb_levels && menu->names[i] != NULL) {
+    while (i < menu->nb_levels) {
         menu->level_buttons[i] = create_level_button(menu->names[i], i, gd);
         i += 1;
     }

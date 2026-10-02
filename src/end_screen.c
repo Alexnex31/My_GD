@@ -47,7 +47,7 @@ static sfText *end_text(gd_t *gd, const char *string, unsigned int size,
 end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd)
 {
     end_level_screen_t *es = xcalloc(1, sizeof(end_level_screen_t));
-    const progress_entry_t *pe = progress_get(&gd->progress, level->id);
+    const progress_entry_t *pe = progress_find(&gd->progress, level->id);
     char attempts[100];
 
     es->background = sfSprite_create();

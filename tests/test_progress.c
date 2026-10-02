@@ -60,7 +60,33 @@ static void test_empty_store(void)
     CHECK(e != NULL && e->attempts == 0 && e->best == 0.0f);
     CHECK(progress_get(&p, "7") == e);        /* the same entry, not a second */
     CHECK(p.count == 1);
+    CHECK(progress_find(&p, "7") == e);
+    CHECK(progress_find(&p, "8") == NULL && p.count == 1);   /* never adds */
+    CHECK(progress_find(&p, "nope") == NULL);
     progress_free(&p);
+}
+
+/* Browsing the list leaves no empty lines, and 99.996 isn't saved as 100. */
+static void test_saved_numbers(void)
+{
+    progress_t p;
+
+    remove(TMP_STORE);
+    progress_load(&p, TMP_STORE);
+    progress_get(&p, "1");                    /* looked at, never played */
+    progress_get(&p, "2")->best = 99.996f;
+    progress_get(&p, "3")->best = 100.0f;
+    CHECK(progress_save(&p) == 0);
+    progress_free(&p);
+    progress_load(&p, TMP_STORE);
+    CHECK(p.count == 2 && progress_find(&p, "1") == NULL);
+    CHECK(progress_find(&p, "2")->best < 100.0f);
+    CHECK(progress_find(&p, "3")->best == 100.0f);
+    progress_free(&p);
+    CHECK(progress_printable(99.996f) < 100.0f);
+    CHECK(progress_printable(47.83f) == 47.83f);
+    CHECK(progress_printable(100.0f) == 100.0f);
+    remove(TMP_STORE);
 }
 
 static void test_round_trip(void)
@@ -148,6 +174,7 @@ void test_progress(void)
     test_ids();
     test_empty_store();
     test_round_trip();
+    test_saved_numbers();
     test_unknown_fields_survive();
     test_bad_lines();
     test_save_is_clean();

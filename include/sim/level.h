@@ -19,6 +19,7 @@ int level_parse_mem(const char *buf, size_t len, const char *source,
     object_t **objs, size_t *count, level_header_t *hdr, sim_log_fn log);
 
     #define LEVEL_ID_MAX 18      /* digits in an id: fits any GD-sized number */
+    #define LEVEL_COORD_MAX 1e7  /* px: x, y, w and h, hours of level (7.2)   */
 
 /* "levels/10280.gd" -> "10280"; false when the name isn't <digits>.gd (7.2) */
 bool level_id_from_path(const char *path, char *id, size_t size);

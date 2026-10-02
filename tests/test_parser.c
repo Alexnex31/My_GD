@@ -6,8 +6,11 @@
 */
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "sim/level.h"
 #include "sim/sim.h"
@@ -164,6 +167,20 @@ static void test_rejections(void)
     check_rejected("block 1000 700 2 w=0");
     check_rejected("block 1000 700 2 h=-2");
     check_rejected("block 1000 700 2 rot=abc");
+    check_rejected("block 1e12 700 2");          /* finite, but out of range */
+    check_rejected("block 1000 -2e7 2");
+    check_rejected("block 1000 700 2 w=300000");
+    check_rejected("block 1000 700 300000");
+}
+
+/* The range is wide: two hours of level still load (7.2). */
+static void test_far_object_kept(void)
+{
+    sim_t s;
+
+    load(&s, "block 9000000 700 2\n");
+    CHECK(warnings == 0 && s.lvl.nb_objects == 1);
+    sim_free(&s);
 }
 
 static void test_kept_with_warning(void)
@@ -280,6 +297,26 @@ static void test_level_ids(void)
     sim_free(&s);
 }
 
+/* A directory named like a level is not a file to read, not a huge one. */
+static void test_directory_level(void)
+{
+    char dir[] = "/tmp/my_gd_testXXXXXX";
+    char path[64];
+    level_header_t hdr;
+    sim_t s;
+
+    if (mkdtemp(dir) == NULL)
+        return;
+    snprintf(path, sizeof(path), "%s/5.gd", dir);
+    if (mkdir(path, 0755) == 0) {
+        CHECK(sim_load(&s, path, count_warning) != 0);
+        CHECK(level_read_header(path, &hdr, NULL) != 0);
+        sim_free(&s);
+        rmdir(path);
+    }
+    rmdir(dir);
+}
+
 static void test_real_levels(void)
 {
     sim_t s;
@@ -349,6 +386,7 @@ void test_parser(void)
     test_header_fields();
     test_name_rules();
     test_rejections();
+    test_far_object_kept();
     test_kept_with_warning();
     test_fields();
     test_sort();
@@ -356,6 +394,7 @@ void test_parser(void)
     test_empty_level();
     test_reset_after_load();
     test_level_ids();
+    test_directory_level();
     test_real_levels();
     test_big_level();
 }

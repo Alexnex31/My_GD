@@ -43,6 +43,15 @@ int progress_save(const progress_t *p);
 /* The entry for this id, created empty if the store has none. NULL if invalid. */
 progress_entry_t *progress_get(progress_t *p, const char *id);
 
+/* The entry for this id, or NULL: a lookup that never adds one (6.4). */
+progress_entry_t *progress_find(const progress_t *p, const char *id);
+
+/*
+** A percentage for a "%.2f": below 100 it never prints as "100.00", which
+** reads back as a level beaten (6.4).
+*/
+float progress_printable(float pct);
+
 void progress_free(progress_t *p);
 
 /* Digits only, 1 to LEVEL_ID_MAX of them: the level file's name (7.2). */
