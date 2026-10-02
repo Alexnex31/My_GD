@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "sim/alloc.h"
 #include "sim/level.h"
@@ -136,21 +137,24 @@ bool level_id_from_path(const char *path, char *id, size_t size)
     return true;
 }
 
+/*
+** Regular files only: fopen also opens a directory, and ftell on one can
+** report LLONG_MAX, an allocation that ends the game.
+*/
 static char *read_whole_file(const char *path, size_t *len)
 {
     FILE *f = fopen(path, "rb");
+    struct stat st;
     char *buf = NULL;
-    long size = 0;
 
     if (f == NULL)
         return NULL;
-    if (fseek(f, 0, SEEK_END) != 0 || (size = ftell(f)) < 0) {
+    if (fstat(fileno(f), &st) != 0 || !S_ISREG(st.st_mode)) {
         fclose(f);
         return NULL;
     }
-    rewind(f);
-    buf = sim_xcalloc((size_t)size + 1, 1);
-    *len = fread(buf, 1, (size_t)size, f);
+    buf = sim_xcalloc((size_t)st.st_size + 1, 1);
+    *len = fread(buf, 1, (size_t)st.st_size, f);
     fclose(f);
     return buf;
 }

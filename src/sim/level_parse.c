@@ -188,6 +188,16 @@ static int object_init(object_t *o, const char *word, parse_ctx_t *ctx)
     return 0;
 }
 
+/*
+** Finite isn't enough: the renderer cuts the level into chunks up to its
+** rightmost object, so one object at x = 1e12 asks for a billion (7.2).
+*/
+static bool in_range(const rect_t *r)
+{
+    return fabs(r->x) <= LEVEL_COORD_MAX && fabs(r->y) <= LEVEL_COORD_MAX
+        && r->w <= LEVEL_COORD_MAX && r->h <= LEVEL_COORD_MAX;
+}
+
 /* type x y size [word] [key=value ...]  (7.2) */
 static int parse_object(char *line, object_t *o, parse_ctx_t *ctx)
 {
@@ -223,6 +233,10 @@ static int parse_object(char *line, object_t *o, parse_ctx_t *ctx)
         }
     }
     portal_shape(o, given_w, given_h);
+    if (!in_range(&o->rect)) {
+        warn(ctx, "object out of range (10000000 px), line skipped");
+        return -1;
+    }
     return object_init(o, word, ctx);
 }
 
