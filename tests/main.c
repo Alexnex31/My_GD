@@ -2,7 +2,7 @@
 ** ALEXNEX PROJECT, 2026
 ** tests/main.c
 ** File description:
-** functions to create and manage a window
+** runs every test of the simulation and counts the failed checks (8)
 */
 
 #include "test.h"

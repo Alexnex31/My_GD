@@ -118,6 +118,12 @@ static void test_start_gravity(void)
     CHECK(warnings == 1);
     CHECK(s.st.player.gravity_dir == 1);
     sim_free(&s);
+    load(&s, "start_gravity flipped\nstart_gravity normal\n");  /* last wins */
+    CHECK(warnings == 0 && s.st.player.gravity_dir == 1);
+    sim_free(&s);
+    load(&s, "start_gravity flipped\nstart_gravity sideways\n");
+    CHECK(warnings == 1 && s.st.player.gravity_dir == -1);    /* kept */
+    sim_free(&s);
 }
 
 /* start_speed takes a speed portal's own values (FEATURES 10.3). */
@@ -153,6 +159,9 @@ static void test_start_size(void)
     load(&s, "start_size normal\nblock 5000 700 2\n");
     CHECK(warnings == 0);
     CHECK(!s.lvl.hdr.start.mini);
+    sim_free(&s);
+    load(&s, "start_size mini\nstart_size normal\n");         /* last wins */
+    CHECK(warnings == 0 && !s.lvl.hdr.start.mini);
     sim_free(&s);
 }
 

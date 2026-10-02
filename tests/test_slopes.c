@@ -179,6 +179,53 @@ static void test_step_too_high(void)
     sim_free(&s);
 }
 
+/*
+** Two faces reached at the same time: one step, onto the highest (G.7). The
+** lower one is listed first, so it sorts first and is tried first.
+*/
+static void test_simultaneous_steps(void)
+{
+    sim_t s;
+    int steps = 0;
+
+    load(&s, "block 1000 840 2\nblock 1000 835 2\n");
+    while (s.st.player.alive && s.st.player.pos.x < 1100.0) {
+        sim_tick(&s, NONE);
+        for (int i = 0; i < s.nb_dbg; i++)
+            steps += s.dbg[i].kind == DBG_STEP;
+    }
+    CHECK(s.st.player.alive);
+    CHECK(steps == 1);
+    CHECK(s.st.player.pos.y == 785.0);                   /* 835 - half */
+    sim_free(&s);
+}
+
+/*
+** A staircase of 4 px steps half a pixel apart: a landing and three steps use
+** the whole budget of a tick (MAX_CONTACTS). The last leg tests nothing, yet
+** the tick still covers exactly vx and the next tick climbs on (G.8).
+*/
+static void test_contact_budget(void)
+{
+    sim_t s;
+    double x;
+    int full = 0;
+
+    load(&s, "block 1000 846 2\nblock 1000.5 842 2\nblock 1001 838 2\n"
+        "block 1001.5 834 2\nblock 1002 830 2\nblock 1002.5 826 2\n"
+        "block 1003 822 2\n");
+    while (s.st.player.alive && s.st.player.pos.x < 1090.0) {
+        x = s.st.player.pos.x;
+        sim_tick(&s, NONE);
+        full += s.nb_dbg >= MAX_CONTACTS;
+        CHECK(fabs(s.st.player.pos.x - x - PER_TICK(SCROLL_SPEED)) < 1e-9);
+    }
+    CHECK(full > 0);                                     /* the budget ran out */
+    CHECK(s.st.player.alive);
+    CHECK(s.st.player.pos.y == 772.0);                   /* on the top step */
+    sim_free(&s);
+}
+
 /* A rotated slope's horizontal top is a step like any other (4.2). */
 static void test_step_on_a_rotated_slope(void)
 {
@@ -260,6 +307,8 @@ void test_slopes(void)
     test_head_hit_bounces_the_ship();
     test_step_up();
     test_step_too_high();
+    test_simultaneous_steps();
+    test_contact_budget();
     test_step_on_a_rotated_slope();
     test_step_needs_downward_momentum();
     test_jump_off_a_corner();

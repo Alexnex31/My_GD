@@ -103,6 +103,53 @@ static void test_corridor_bounds(void)
 }
 
 /*
+** A portal taller than the corridor, entered at its edge: the corridor moves
+** to hold the player, which stays where it was and lives (5.2).
+*/
+static void test_tall_portal_holds_the_player(void)
+{
+    sim_t s;
+    double y;
+
+    load(&s, "portal 1000 -200 8 ship\n");   /* 1120 px tall, centered on 0 */
+    cross_at(&s, 1000.0, 590.0);              /* centered alone: -500..500 */
+    y = s.st.player.pos.y;
+    CHECK(s.st.player.mode == MODE_SHIP);
+    CHECK(s.st.bounds.top <= y - PLAYER_HALF);
+    CHECK(s.st.bounds.bottom >= y + PLAYER_HALF);
+    CHECK(s.st.bounds.bottom - s.st.bounds.top == 1000.0);
+    CHECK(fmod(s.st.bounds.top, UNIT) == 0.0);   /* still on the grid */
+    sim_tick(&s, NONE);
+    CHECK(s.st.player.alive && fabs(s.st.player.pos.y - y) < 10.0);
+    sim_free(&s);
+    load(&s, "portal 1000 -200 8 ship\n");   /* rising into it this time */
+    cross_at(&s, 1000.0, 590.0);
+    s.st.player.vy = PER_TICK(CUBE_JUMP_V);
+    for (int i = 0; i < 5; i++)
+        sim_tick(&s, NONE);
+    CHECK(s.st.player.alive);
+    sim_free(&s);
+}
+
+/*
+** Two portals touched in the same tick act in path order, each once (5.1):
+** the cube portal first, then the ship one, so the tick ends in a ship.
+*/
+static void test_two_portals_in_one_tick(void)
+{
+    sim_t s;
+    bool both = false;
+
+    load(&s, "portal 1000 700 2 cube\nportal 1002 700 2 ship\n");
+    while (!is_spent(&s.st, 0) && s.st.player.alive)
+        sim_tick(&s, NONE);
+    both = is_spent(&s.st, 1);                /* spent on the same tick */
+    CHECK(both);
+    CHECK(s.st.player.mode == MODE_SHIP && s.st.bounds.active);
+    sim_free(&s);
+}
+
+/*
 ** The camera settles on the corridor and then stays locked on it (3.5). It
 ** is eased onto it, never cut: a portal that teleported the camera read as a
 ** violent fall on screen.
@@ -202,6 +249,8 @@ void test_portal(void)
     test_portal_acts_once();
     test_portal_never_moves_the_player();
     test_corridor_bounds();
+    test_tall_portal_holds_the_player();
+    test_two_portals_in_one_tick();
     test_camera_locks_on_the_corridor();
     test_corridor_switch_and_exit();
     test_ship_flies_in_the_corridor();

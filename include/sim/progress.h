@@ -10,8 +10,7 @@
 
     #include "sim/sim_types.h"
 
-    #define SAVE_DIR   "save"
-    #define SAVE_PATH  "save/progress.txt"
+    #define SAVE_PATH  "save/progress.txt"   /* its folder is made on save */
 
 /*
 ** One level's records (6.4). "extra" keeps the key=value fields this build

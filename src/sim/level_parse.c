@@ -268,14 +268,17 @@ static bool take_text(const char *line, char *out, size_t size,
 }
 
 /* A two-word field: false for the default word, true for the other one. */
-static bool set_flag(const char *text, const char *off, const char *on,
-    parse_ctx_t *ctx)
+/*
+** One of two words into *on. Both are written, so a later "normal" undoes an
+** earlier "flipped": the last line wins (7.2). Anything else changes nothing.
+*/
+static void set_flag(const char *text, const char *off, const char *on,
+    bool *out, parse_ctx_t *ctx)
 {
-    if (strcmp(text, on) == 0)
-        return true;
-    if (strcmp(text, off) != 0)
+    if (strcmp(text, on) == 0 || strcmp(text, off) == 0)
+        *out = strcmp(text, on) == 0;
+    else
         warn(ctx, "header field takes one of its two words, ignored");
-    return false;
 }
 
 /* The speeds of a speed portal (FEATURES 10.3), written the same way. */
@@ -326,6 +329,7 @@ static bool header_word(const char *key, const char *value,
 {
     char text[64];
     int mode = 0;
+    bool on = false;
 
     if (strcmp(key, "start_gamemode") != 0 && strcmp(key, "start_gravity") != 0
         && strcmp(key, "start_size") != 0)
@@ -337,11 +341,14 @@ static bool header_word(const char *key, const char *value,
         return (warn(ctx, "unknown gamemode, ignored"), true);
     if (strcmp(key, "start_gamemode") == 0)
         return (hdr->start.mode = (gamemode_t)mode, true);
-    if (strcmp(key, "start_gravity") == 0)
-        return set_flag(text, "normal", "flipped", ctx)
-            ? (hdr->start.gravity_dir = -1, true) : true;
-    return set_flag(text, "normal", "mini", ctx)
-        ? (hdr->start.mini = true, true) : true;
+    if (strcmp(key, "start_gravity") == 0) {
+        on = hdr->start.gravity_dir < 0;
+        set_flag(text, "normal", "flipped", &on, ctx);
+        hdr->start.gravity_dir = on ? -1 : 1;
+        return true;
+    }
+    set_flag(text, "normal", "mini", &hdr->start.mini, ctx);
+    return true;
 }
 
 /* The text fields of 7.2, and how much room each one has. */
@@ -427,6 +434,17 @@ static size_t count_lines(const char *buf, size_t len)
     return n;
 }
 
+/* Header only: an object line is recognized by its first word and skipped. */
+static int skip_object(char *line)
+{
+    char *tok[1];
+    obj_type_t type;
+
+    if (split_words(line, tok, 1) < 1 || type_from_name(tok[0], &type) != 0)
+        return 1;
+    return 0;
+}
+
 int level_parse_mem(const char *buf, size_t len, const char *source,
     object_t **objs, size_t *count, level_header_t *hdr, sim_log_fn log)
 {
@@ -435,10 +453,11 @@ int level_parse_mem(const char *buf, size_t len, const char *source,
     char copy[1024];
     size_t pos = 0;
     size_t nb = 0;
+    int skipped = 0;
     int ret = 0;
 
-    *objs = sim_xcalloc(count_lines(buf, len), sizeof(object_t));
-    *count = 0;
+    if (objs != NULL)
+        *objs = sim_xcalloc(count_lines(buf, len), sizeof(object_t));
     while (pos < len) {
         pos = next_line(buf, len, pos, line, sizeof(line));
         ctx.lineno += 1;
@@ -446,11 +465,14 @@ int level_parse_mem(const char *buf, size_t len, const char *source,
         if (is_blank(line))
             continue;
         memcpy(copy, line, sizeof(copy));      /* parse_object splits in place */
-        ret = parse_object(line, *objs + nb, &ctx);
+        ret = objs == NULL ? skip_object(line)
+            : parse_object(line, *objs + nb, &ctx);
         nb += ret == 0;
+        skipped += ret < 0;
         if (ret > 0)
             parse_header_line(copy, hdr, &ctx);
     }
-    *count = nb;
-    return 0;
+    if (count != NULL)
+        *count = nb;
+    return skipped;
 }

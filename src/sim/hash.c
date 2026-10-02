@@ -7,6 +7,7 @@
 
 #include <string.h>
 
+#include "sim/level.h"
 #include "sim/sim.h"
 
 #define FNV_BASIS 14695981039346656037ULL
@@ -20,6 +21,15 @@ static void hash_bytes(uint64_t *h, const void *p, size_t n)
         *h ^= b[i];
         *h *= FNV_PRIME;
     }
+}
+
+/* The one FNV-1a: the run state's hashes and the level file's version. */
+uint64_t fnv1a(const void *data, size_t len)
+{
+    uint64_t h = FNV_BASIS;
+
+    hash_bytes(&h, data, len);
+    return h;
 }
 
 static void hash_double(uint64_t *h, double v)

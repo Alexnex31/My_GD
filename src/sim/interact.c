@@ -61,14 +61,23 @@ static int touch_cmp(const void *a, const void *b)
 ** The corridor a mode opens: as tall as the mode says, centered on the given
 ** y, snapped to the grid, and never below the ground (5.2). A portal centers
 ** it on itself; the start of an attempt centers it on the player (7.2).
+** A portal taller than the corridor can be touched outside it: the corridor
+** then moves along the grid just enough to hold the player, which a portal
+** never moves.
 */
 void corridor_from_center(sim_t *s, double center)
 {
-    double height = MODES[s->st.player.mode].corridor_height;
+    const player_t *p = &s->st.player;
+    double height = MODES[p->mode].corridor_height;
+    double half = MODES[p->mode].half;
     double top = center - height / 2.0;
     ship_bounds_t *b = &s->st.bounds;
 
     top = floor(top / UNIT + 0.5) * UNIT;    /* the nearest grid line, ties down */
+    if (p->pos.y - half < top)
+        top = floor((p->pos.y - half) / UNIT) * UNIT;
+    if (p->pos.y + half > top + height)
+        top = ceil((p->pos.y + half) / UNIT) * UNIT - height;
     if (top + height > GROUND_Y)
         top = GROUND_Y - height;
     b->active = true;

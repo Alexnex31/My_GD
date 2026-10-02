@@ -288,11 +288,12 @@ static void try_steps(sim_t *s, vec2_t d, vec2_t vel, event_t *out)
         for (int i = 0; i < o->hitbox.nverts; i++) {
             if (!up_facing_horizontal_face(&o->hitbox, i, g, &f))
                 continue;
-            if (!step_event(s, d, vel, f, &t) || t >= out->t)
-                continue;                    /* a contact at the same time wins */
-            if (out->kind == EV_STEP && t == out->t
-                && (f.y - out->step.y) * g > 0.0)
-                continue;                    /* among steps, the highest one */
+            if (!step_event(s, d, vel, f, &t) || t > out->t)
+                continue;
+            /* a contact at the same time wins; among steps, the highest one */
+            if (t == out->t && (out->kind != EV_STEP
+                || (f.y - out->step.y) * g >= 0.0))
+                continue;
             out->kind = EV_STEP;
             out->t = t;
             out->step = f;

@@ -9,16 +9,22 @@
 
 #include "sim/internal.h"
 
-/* Where the camera would already have settled for this player (3.5, 7.2). */
+/* The corridor, centered on screen: where the camera locks inside it (3.5). */
+static double corridor_view_y(const ship_bounds_t *b)
+{
+    return b->top - (VIEW_HEIGHT - (b->bottom - b->top)) / 2.0;
+}
+
 /*
-** Where the follow below converges to from the ground view: unchanged while
-** the player is inside the zone or under it (the clamp holds it), pulled up
-** when the player is above it (3.5, 7.2).
+** Where the camera would already have settled for this player, from the
+** ground view: on the corridor inside one; otherwise unchanged while the
+** player is inside the zone or under it (the clamp holds it), pulled up when
+** the player is above it (3.5, 7.2).
 */
 double camera_rest_y(const player_t *p, const ship_bounds_t *b)
 {
     if (b->active)
-        return b->top - (VIEW_HEIGHT - (b->bottom - b->top)) / 2.0;
+        return corridor_view_y(b);
     if (p->pos.y < CAM_ZONE_TOP)
         return p->pos.y - CAM_ZONE_TOP;
     return 0.0;
@@ -55,8 +61,8 @@ void camera_follow(camera_t *c, const player_t *p, const ship_bounds_t *b)
 {
     double target = 0.0;
 
-    if (b->active) {                         /* the corridor, centered on screen */
-        target = b->top - (VIEW_HEIGHT - (b->bottom - b->top)) / 2.0;
+    if (b->active) {
+        target = corridor_view_y(b);
         c->pos.y = at_rest(c->pos.y, target) ? target
             : c->pos.y + (target - c->pos.y) * CAM_LERP;
         return;                              /* eased onto it, never cut (3.5) */

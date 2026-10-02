@@ -25,5 +25,6 @@ typedef struct mode_ops {
 extern const mode_ops_t MODES[MODE_COUNT];
 
 int mode_from_name(const char *name);      /* -1 if unknown (5.5) */
+double modes_tallest_corridor(void);       /* over MODES[]: the kill line (4.7) */
 
 #endif

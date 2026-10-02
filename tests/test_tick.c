@@ -203,6 +203,7 @@ static void test_spikes(void)
 static void test_jump_zone_rules(void)
 {
     sim_t s;
+    double vy = 0.0;
     int jumps = 0;
     bool was_grounded = true;
 
@@ -221,8 +222,9 @@ static void test_jump_zone_rules(void)
     sim_tick(&s, TAP);                         /* jump */
     run(&s, 20, NONE);
     CHECK(!s.st.player.can_jump);              /* no second jump in the air */
+    vy = s.st.player.vy;
     sim_tick(&s, TAP);
-    CHECK(s.st.player.vy < PER_TICK(CUBE_JUMP_V));
+    CHECK(s.st.player.vy == vy - MODES[MODE_CUBE].gravity);   /* gravity only */
     run(&s, 30, TAP);                          /* pressing mid-air changes nothing */
     CHECK(!s.st.player.grounded);
     sim_free(&s);
@@ -252,7 +254,8 @@ static void test_kill_ceiling(void)
     sim_t s;
 
     load(&s, "block 1000 700 2\n");
-    CHECK(s.lvl.kill_y == GROUND_Y - CORRIDOR_MAX_HEIGHT - KILL_CEILING_MARGIN);
+    CHECK(s.lvl.kill_y == GROUND_Y - modes_tallest_corridor()
+        - KILL_CEILING_MARGIN);
     s.st.player.gravity_dir = -1;              /* flipped: it falls upward */
     s.st.player.grounded = false;
     run(&s, 600, NONE);
@@ -315,6 +318,8 @@ static void test_physics_hash_ignores_camera(void)
 static void test_percent_and_completion(void)
 {
     sim_t s;
+    long tick = 0;
+    double x = 0.0;
 
     load(&s, "block 1000 400 2\n");            /* above the player: end_shift 1600 */
     CHECK(sim_percent(&s) == 0.0f);
@@ -323,8 +328,10 @@ static void test_percent_and_completion(void)
     CHECK(s.st.player.alive);
     CHECK(s.st.complete);
     CHECK(sim_percent(&s) <= 100.0f && sim_percent(&s) > 99.0f);
+    tick = s.st.tick;
+    x = s.st.player.pos.x;
     run(&s, 10, NONE);                         /* a complete level stops ticking */
-    CHECK(s.st.tick < 2000);
+    CHECK(s.st.tick == tick && s.st.player.pos.x == x);
     sim_free(&s);
 }
 

@@ -13,6 +13,7 @@
 
 #include "sim/alloc.h"
 #include "sim/level.h"
+#include "sim/modes.h"
 #include "sim/sim.h"
 
 /* By hitbox left edge, then by source line: the same order on every libc. */
@@ -31,7 +32,7 @@ static int cmp_object(const void *a, const void *b)
 void level_finalize(level_data_t *lvl)
 {
     double right = 0.0;
-    double top = GROUND_Y - CORRIDOR_MAX_HEIGHT;
+    double top = GROUND_Y - modes_tallest_corridor();   /* read, never assumed */
 
     qsort(lvl->objects, lvl->nb_objects, sizeof(object_t), cmp_object);
     lvl->reach = 0.0;
@@ -58,8 +59,9 @@ int sim_load_mem(sim_t *s, const char *buf, size_t len, const char *id,
     s->lvl.hdr.start = (level_start_t){   /* what the start_ fields override (7.2) */
         .pos = {PLAYER_SPAWN_X, PLAYER_SPAWN_Y}, .mode = MODE_CUBE,
         .speed_mult = 1.0, .gravity_dir = 1};
-    level_parse_mem(buf, len, id, &s->lvl.objects, &s->lvl.nb_objects,
-        &s->lvl.hdr, log);
+    s->lvl.file_hash = fnv1a(buf, len);  /* the version, from the bytes read */
+    s->lvl.skipped_lines = level_parse_mem(buf, len, id, &s->lvl.objects,
+        &s->lvl.nb_objects, &s->lvl.hdr, log);
     if (s->lvl.hdr.start.mini && log != NULL)
         log("start_size mini has no effect yet: the mini scale is FEATURES 10.4");
     level_finalize(&s->lvl);
@@ -70,18 +72,6 @@ int sim_load_mem(sim_t *s, const char *buf, size_t len, const char *id,
 }
 
 static char *read_whole_file(const char *path, size_t *len);
-
-uint64_t fnv1a(const void *data, size_t len)
-{
-    const unsigned char *p = data;
-    uint64_t h = 0xcbf29ce484222325ULL;
-
-    for (size_t i = 0; i < len; i++) {
-        h ^= p[i];
-        h *= 0x100000001b3ULL;
-    }
-    return h;
-}
 
 /* The defaults sim_load_mem starts from, for a header read on its own. */
 static void header_defaults(level_header_t *hdr, const char *id)
@@ -97,8 +87,6 @@ int level_read_header(const char *path, level_header_t *hdr,
     uint64_t *file_hash)
 {
     char id[LEVEL_ID_MAX + 1] = "";
-    object_t *objs = NULL;
-    size_t count = 0;
     size_t len = 0;
     char *text = read_whole_file(path, &len);
 
@@ -108,8 +96,7 @@ int level_read_header(const char *path, level_header_t *hdr,
     header_defaults(hdr, id);
     if (file_hash != NULL)
         *file_hash = fnv1a(text, len);
-    level_parse_mem(text, len, id, &objs, &count, hdr, NULL);
-    free(objs);                  /* no level_finalize: the hitboxes are the cost */
+    level_parse_mem(text, len, id, NULL, NULL, hdr, NULL);   /* no object */
     free(text);
     return 0;
 }

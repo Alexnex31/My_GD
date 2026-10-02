@@ -87,7 +87,6 @@
     #define CAM_SNAP_EPSILON    (1.0 / 64.0)   /* closer than this: the corridor is reached */
 
     /* Ship corridor (5.2) */
-    #define CORRIDOR_MAX_HEIGHT 1000.0   /* the tallest mode corridor (ship, UFO, wave) */
     #define VIEW_HEIGHT         1080.0   /* logical screen height the camera reasons in (9.1) */
 
     /* Death */

@@ -25,6 +25,16 @@ const mode_ops_t MODES[MODE_COUNT] = {
         .corridor_height = 1000.0, .bot_decision_ticks = 12},
 };
 
+double modes_tallest_corridor(void)
+{
+    double tallest = 0.0;
+
+    for (int i = 0; i < MODE_COUNT; i++)
+        if (MODES[i].corridor_height > tallest)
+            tallest = MODES[i].corridor_height;
+    return tallest;
+}
+
 int mode_from_name(const char *name)
 {
     for (int i = 0; i < MODE_COUNT; i++)

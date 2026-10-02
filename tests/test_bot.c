@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "sim/bot.h"
+#include "sim/level.h"
 #include "sim/sim.h"
 #include "test.h"
 
@@ -103,11 +104,12 @@ static int numeric_name(const struct dirent **a, const struct dirent **b)
     return (x > y) - (x < y);
 }
 
+/* What the level list shows: the loader's own rule (7.2). */
 static int is_level(const struct dirent *e)
 {
-    size_t n = strlen(e->d_name);
+    char id[LEVEL_ID_MAX + 1];
 
-    return n > 3 && strcmp(e->d_name + n - 3, ".gd") == 0;
+    return level_id_from_path(e->d_name, id, sizeof(id));
 }
 
 /*
@@ -123,12 +125,15 @@ static void test_levels(void)
     sim_t s;
     bot_result_t r;
 
+    CHECK(n > 0);                /* levels/ not found: run from the repository */
     printf("bot, information only:\n");
     for (int i = 0; i < n; i++) {
         snprintf(path, sizeof(path), "levels/%s", names[i]->d_name);
         free(names[i]);
-        if (sim_load(&s, path, NULL) != 0)
+        if (sim_load(&s, path, NULL) != 0) {
+            CHECK(!"a level the list shows doesn't load");
             continue;
+        }
         r = bot_solve(&s, BOT_MAX_ATTEMPTS);
         bot_describe(&r, line, sizeof(line));
         printf("  %-16s %s\n", path, line);

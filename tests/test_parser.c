@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include "sim/level.h"
+#include "sim/modes.h"
 #include "sim/sim.h"
 #include "test.h"
 
@@ -147,6 +148,7 @@ static void check_rejected(const char *line)
     load(&s, text);
     CHECK(warnings == 1);
     CHECK(s.lvl.nb_objects == 2);              /* the good lines still load */
+    CHECK(s.lvl.skipped_lines == 1);           /* what --check fails on (7.4) */
     sim_free(&s);
 }
 
@@ -190,10 +192,14 @@ static void test_kept_with_warning(void)
     load(&s, "block 2600 750 2 speed=3\n");
     CHECK(warnings == 1);
     CHECK(s.lvl.nb_objects == 1);
+    CHECK(s.lvl.skipped_lines == 0);           /* a warning, not invalid */
     sim_free(&s);
     load(&s, "block 2600 750 2 group=4,5\nblock 2700 750 2 group=6\n");
     CHECK(warnings == 1);                      /* one warning per level */
     CHECK(s.lvl.nb_objects == 2);
+    sim_free(&s);
+    load(&s, "start_size mini\nfoo bar\nstart_gamemode rocket\n");
+    CHECK(warnings == 3 && s.lvl.skipped_lines == 0);
     sim_free(&s);
 }
 
@@ -242,7 +248,8 @@ static void test_derived_values(void)
     CHECK(s.lvl.reach == 400.0);
     /* the run is measured from the spawn: 500 px past the last object (7.2) */
     CHECK(s.lvl.end_shift == 5400.0 + LEVEL_END_PADDING - PLAYER_SPAWN_X);
-    CHECK(s.lvl.kill_y == GROUND_Y - CORRIDOR_MAX_HEIGHT - KILL_CEILING_MARGIN);
+    CHECK(s.lvl.kill_y == GROUND_Y - modes_tallest_corridor()
+        - KILL_CEILING_MARGIN);
     sim_free(&s);
     load(&s, "block 1000 -400 2\n");           /* higher than any corridor */
     CHECK(s.lvl.kill_y == -400.0 - KILL_CEILING_MARGIN);
@@ -325,8 +332,10 @@ static void test_real_levels(void)
     for (int i = 1; i <= 7; i++) {
         snprintf(path, sizeof(path), "levels/%d.gd", i);
         warnings = 0;
-        if (sim_load(&s, path, count_warning) != 0)
-            continue;                          /* run from another directory */
+        if (sim_load(&s, path, count_warning) != 0) {
+            CHECK(!"levels/ not found: make test runs from the repository");
+            continue;
+        }
         CHECK(warnings == 0);
         CHECK(s.lvl.nb_objects > 0);
         CHECK(s.lvl.end_shift > 1000.0);
@@ -361,11 +370,14 @@ static void test_read_header_only(void)
 {
     level_header_t a = {0};
     level_header_t b = {0};
+    sim_t s;
     uint64_t ha = 0;
     uint64_t hb = 0;
 
-    if (level_read_header("levels/7.gd", &a, &ha) != 0)
-        return;                                /* run from another directory */
+    if (level_read_header("levels/7.gd", &a, &ha) != 0) {
+        CHECK(!"levels/ not found: make test runs from the repository");
+        return;
+    }
     CHECK(strncmp(a.name, "LEVEL", 5) == 0);
     CHECK(ha != 0);
     CHECK(level_read_header("levels/7.gd", &b, &hb) == 0);
@@ -373,6 +385,13 @@ static void test_read_header_only(void)
     CHECK(level_read_header("levels/6.gd", &b, &hb) == 0);
     CHECK(ha != hb);                           /* a different one, another hash */
     CHECK(level_read_header("levels/nope.gd", &b, &hb) == -1);
+    CHECK(sim_load(&s, "levels/7.gd", NULL) == 0);
+    CHECK(s.lvl.file_hash == ha);              /* the loader's own hash, the same */
+    CHECK(strcmp(s.lvl.hdr.name, a.name) == 0);
+    CHECK(s.lvl.hdr.start.pos.x == a.start.pos.x);
+    CHECK(s.lvl.hdr.start.pos.y == a.start.pos.y);
+    CHECK(s.lvl.hdr.start.mode == a.start.mode);
+    sim_free(&s);
     /* FNV-1a, against its published value for "a" */
     CHECK(fnv1a("a", 1) == 0xaf63dc4c8601ec8cULL);
     CHECK(fnv1a("", 0) == 0xcbf29ce484222325ULL);

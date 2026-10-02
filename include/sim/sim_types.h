@@ -101,6 +101,8 @@ typedef struct level_data {   /* immutable after sim_load */
     double reach;              /* max over objects of hitbox.aabb.w: broadphase (4.1) */
     double end_shift;          /* distance at which the level completes (3.4)     */
     double kill_y;             /* kill ceiling, world y (4.7)                     */
+    int skipped_lines;         /* object lines the loader dropped (7.4)           */
+    uint64_t file_hash;        /* fnv1a of the bytes loaded: the version (6.4)    */
     char id[24];               /* the file's digits, e.g. "10280" (7.2)           */
     level_header_t hdr;
 } level_data_t;

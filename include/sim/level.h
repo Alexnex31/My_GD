@@ -13,7 +13,10 @@
 /*
 ** Reads a level file's text (7.2). Bad lines are warnings, never failures:
 ** they are skipped and the rest of the level loads. "source" only names the
-** file in those warnings. Returns 0.
+** file in those warnings. Returns the object lines it skipped: the invalid
+** lines --check fails on (7.4). A field or header value it ignores is a
+** warning, not one of them. With objs NULL it reads the header alone: object
+** lines are recognized by their type and nothing else (7.5).
 */
 int level_parse_mem(const char *buf, size_t len, const char *source,
     object_t **objs, size_t *count, level_header_t *hdr, sim_log_fn log);
