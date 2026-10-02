@@ -82,7 +82,8 @@ portal 2100 750 2 ship
 - `x` and `y` are the object's top-left corner in world pixels, `y` grows downward and the ground's surface is at `y = 850`.
 - `size` is in grid units of 50 px, so `size 2` is the 100 x 100 block that matches the player. `w=` and `h=` override it per axis, `rot=` turns the object by any angle.
 - Sizes must be at least 1: a zero or negative size rejects the line, naming the file and the line.
-- **Your progress is never written into a level file.** Attempts and bests live in `save/progress.txt`, keyed by the level's id, so editing or sharing a level never touches your records.
+- `x`, `y` and the object's width and height must stay within 10 000 000 px (over two hours of level): beyond that the line is rejected the same way.
+- **Your progress is never written into a level file.** Attempts and bests live in `save/progress.txt`, keyed by the level's id, so editing or sharing a level never touches your records. A level gets a line there once you've played it, and a best below 100% is never saved as 100.
 
 The full grammar, including the planned `pad`, `orb`, `saw`, `speed`, `mini` and `gravity` objects, is in `PLAN.md` 7.2 and `FEATURES.md` 12.
 
