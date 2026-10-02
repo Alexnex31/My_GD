@@ -14,6 +14,7 @@
 #include "test.h"
 
 #define TAP ((input_t){true, true})
+#define HELD ((input_t){true, false})
 #define NONE ((input_t){false, false})
 
 static void load(sim_t *s, const char *text)
@@ -87,6 +88,136 @@ static void test_slope_launch(void)
     CHECK(s.st.player.alive);
     CHECK(s.st.player.vy > vx * 0.5);                    /* still going up */
     CHECK(!s.st.player.grounded);
+    sim_free(&s);
+}
+
+/* A 45 degree slope down from (1300, 300) to the ground at (1850, 850). */
+#define DOWN_SLOPE "slope 1300 300 2 rot=90 w=11 h=11\nblock 9000 0 2\n"
+
+/* The circle center's distance to that slope's face, the line y = x - 1000. */
+static double down_face_distance(const sim_t *s)
+{
+    return fabs(s->st.player.pos.x - s->st.player.pos.y - 1000.0) / sqrt(2.0);
+}
+
+/*
+** Already riding the slope down at its own speed, as a run gets there:
+** half a hundredth of a pixel off the face, which a contact leaves anyway.
+*/
+static void ride_down_from(sim_t *s, int speed, gamemode_t mode)
+{
+    double n = sqrt(0.5);
+    char text[256];
+
+    snprintf(text, sizeof(text), "start_speed %d\nstart_x %.6f\nstart_y %.6f\n"
+        DOWN_SLOPE, speed, 1400.0 + 50.01 * n, 400.0 - 50.01 * n);
+    load(s, text);
+    if (mode == MODE_SHIP) {
+        s->st.player.mode = MODE_SHIP;
+        s->st.bounds = (ship_bounds_t){.active = true, .top = -150.0,
+            .bottom = 850.0};
+    }
+    s->st.player.vy = -s->st.player.vx;
+    s->st.player.surface_rise = -s->st.player.vx;
+    s->st.player.grounded = true;
+    s->st.player.support_normal = (vec2_t){n, -n};
+}
+
+/*
+** Down a slope the player stays on it every tick, even when the slope falls
+** faster than the mode's fall cap: the cube at 4x, the ship from 2x (3.4).
+*/
+static void test_ride_down_a_slope(void)
+{
+    sim_t s;
+    int ticks;
+
+    for (int mode = MODE_CUBE; mode <= MODE_SHIP; mode++)
+        for (int speed = 1; speed <= 4; speed++) {
+            ride_down_from(&s, speed, (gamemode_t)mode);
+            ticks = 0;
+            while (s.st.player.alive && s.st.player.pos.x < 1780.0) {
+                sim_tick(&s, NONE);
+                CHECK(s.st.player.grounded);
+                CHECK(fabs(down_face_distance(&s) - 50.0) < CONTACT_SKIN);
+                ticks += 1;
+            }
+            CHECK(s.st.player.alive && ticks >= 20);
+            CHECK(s.st.player.vy == -s.st.player.vx);    /* the slope's own */
+            sim_free(&s);
+        }
+}
+
+/* The jump is the same impulse going down a slope as on flat ground. */
+static void test_jump_off_a_descent(void)
+{
+    sim_t s;
+
+    for (int speed = 1; speed <= 4; speed += 3) {
+        ride_down_from(&s, speed, MODE_CUBE);
+        run(&s, 3, NONE);
+        CHECK(s.st.player.can_jump);
+        sim_tick(&s, TAP);
+        CHECK(s.st.player.vy == PER_TICK(CUBE_JUMP_V) - MODES[MODE_CUBE].gravity);
+        sim_free(&s);
+    }
+}
+
+/*
+** A flat top running into a downhill slope: level until the square leaves
+** the flat face, a fall, then on the slope to the bottom and onto the ground
+** without leaving it again (4.4).
+*/
+static void test_drop_onto_a_descent(void)
+{
+    sim_t s;
+    bool fell = false;
+    bool landed = false;
+
+    load(&s, "start_y 250\nblock 0 300 2 w=26 h=11\n" DOWN_SLOPE);
+    while (s.st.player.alive && s.st.player.pos.x < 2300.0) {
+        sim_tick(&s, NONE);
+        if (s.st.player.pos.x < 1350.0)
+            CHECK(s.st.player.pos.y == 250.0);           /* level, no snap */
+        fell = fell || !s.st.player.grounded;
+        if (fell && s.st.player.grounded)
+            landed = true;
+        if (landed)
+            CHECK(s.st.player.grounded);                 /* never leaves again */
+    }
+    CHECK(s.st.player.alive && fell && landed);
+    CHECK(s.st.player.pos.y == PLAYER_SPAWN_Y);          /* on the ground */
+    sim_free(&s);
+}
+
+/*
+** A held ship under a ceiling that comes down slides along it at exactly
+** the slope's speed, alive: the bounce is capped by `follow` (4.4). Where
+** the ceiling turns flat nothing pushes it any more, and it keeps that
+** downward speed, thrust only slowly taking it back: intended (3.4).
+*/
+static void test_ship_slides_under_a_descending_ceiling(void)
+{
+    sim_t s;
+    int sliding = 0;
+
+    load(&s, "block 0 -150 2 w=20 h=10\nslope 1000 350 2 rot=270 w=4 h=4\n"
+        "block 1200 -150 2 w=20 h=14\nblock 9000 0 2\n");
+    s.st.player.mode = MODE_SHIP;
+    s.st.bounds = (ship_bounds_t){.active = true, .top = -150.0, .bottom = 850.0};
+    s.st.player.pos.y = 410.0;
+    while (s.st.player.alive && s.st.player.pos.x < 1150.0) {
+        sim_tick(&s, HELD);
+        if (s.st.player.pos.x > 1050.0) {
+            CHECK(s.st.player.vy == -s.st.player.vx);    /* along the face */
+            sliding += 1;
+        }
+    }
+    CHECK(s.st.player.alive && sliding > 5);
+    while (s.st.player.alive && s.st.player.pos.x < 1220.0)
+        sim_tick(&s, HELD);
+    CHECK(s.st.player.vy < -0.5 * s.st.player.vx);       /* still going down */
+    CHECK(s.st.player.pos.y > 600.0);                    /* below the flat part */
     sim_free(&s);
 }
 
@@ -302,6 +433,10 @@ void test_slopes(void)
     test_climb_a_slope();
     test_slope_height();
     test_slope_launch();
+    test_ride_down_a_slope();
+    test_jump_off_a_descent();
+    test_drop_onto_a_descent();
+    test_ship_slides_under_a_descending_ceiling();
     test_steep_slope_is_a_wall();
     test_head_hit_kills_the_cube();
     test_head_hit_bounces_the_ship();

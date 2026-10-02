@@ -6,6 +6,7 @@
 */
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "sim/modes.h"
@@ -126,6 +127,56 @@ static void test_start_gravity(void)
     sim_free(&s);
 }
 
+/*
+** Flipped, the ceiling is the floor: seams hold, the jump is the same 213.32
+** px and 102 ticks mirrored, a 25 px step is climbed and 35 px kills (4.4).
+*/
+static void test_flipped_walking(void)
+{
+    char text[1024] = "start_gravity flipped\nstart_y 450\nblock 9000 0 2\n";
+    char line[64];
+    sim_t s;
+    double deepest = 0.0;
+    int airtime = 1;
+
+    for (int i = 0; i < 30; i++) {
+        snprintf(line, sizeof(line), "block %d 300 2\n", 100 * i);
+        strcat(text, line);
+    }
+    load(&s, text);
+    while (s.st.player.alive && s.st.player.pos.x < 2900.0) {
+        sim_tick(&s, (input_t){false, false});
+        CHECK(s.st.player.grounded && s.st.player.pos.y == 450.0);
+    }
+    sim_free(&s);
+    load(&s, "start_gravity flipped\nstart_y 450\nblock 0 300 2 w=60 h=2\n"
+        "block 9000 0 2\n");
+    for (int i = 0; i < 10; i++)              /* it starts in the air (4.3) */
+        sim_tick(&s, (input_t){false, false});
+    CHECK(s.st.player.grounded && s.st.player.can_jump);
+    sim_tick(&s, (input_t){true, true});
+    while (!s.st.player.grounded && s.st.player.alive && airtime < 400) {
+        deepest = fmax(deepest, s.st.player.pos.y - 450.0);
+        sim_tick(&s, (input_t){false, false});
+        airtime += 1;
+    }
+    CHECK(fabs(deepest - 213.32) < 0.05 && airtime == 102);
+    CHECK(s.st.player.pos.y == 450.0);
+    sim_free(&s);
+    load(&s, "start_gravity flipped\nstart_y 450\nblock 0 300 2 w=20 h=2\n"
+        "block 1000 325 2 w=10 h=2\nblock 9000 0 2\n");
+    while (s.st.player.alive && s.st.player.pos.x < 1300.0)
+        sim_tick(&s, (input_t){false, false});
+    CHECK(s.st.player.alive && s.st.player.pos.y == 475.0);
+    sim_free(&s);
+    load(&s, "start_gravity flipped\nstart_y 450\nblock 0 300 2 w=20 h=2\n"
+        "block 1000 335 2 w=10 h=2\nblock 9000 0 2\n");
+    while (s.st.player.alive && s.st.player.pos.x < 1300.0)
+        sim_tick(&s, (input_t){false, false});
+    CHECK(!s.st.player.alive);
+    sim_free(&s);
+}
+
 /* start_speed takes a speed portal's own values (FEATURES 10.3). */
 static void test_start_speed(void)
 {
@@ -188,6 +239,7 @@ void test_start(void)
     test_start_position();
     test_start_gamemode();
     test_start_gravity();
+    test_flipped_walking();
     test_start_speed();
     test_start_size();
     test_reset_returns_to_the_start();
