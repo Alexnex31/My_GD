@@ -218,6 +218,7 @@ void handle_playing(gd_t *gd, level_t **level)
     keyboard_events_playing(level, gd);
     if (*level == NULL || !sfRenderWindow_isOpen(gd->w))
         return;                              /* the scene changed */
+    lv = *level;                             /* Retry replaced the level */
     frame_us = sfClock_restart(lv->clock).microseconds;
     if (frame_us > 250000)
         frame_us = 250000;                   /* no burst of ticks after a hitch */
