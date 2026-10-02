@@ -2038,6 +2038,8 @@ typedef struct progress {
 int progress_load(progress_t *p, const char *path);    /* missing file = empty store */
 int progress_save(const progress_t *p);                 /* 0 on success */
 progress_entry_t *progress_get(progress_t *p, const char *id);   /* creates if missing */
+progress_entry_t *progress_find(const progress_t *p, const char *id);   /* never creates */
+float progress_printable(float pct);                    /* below 100 never prints "100.00" */
 void progress_free(progress_t *p);
 bool progress_valid_id(const char *id);                 /* digits only, 1 to 18 */
 ```
@@ -2052,6 +2054,8 @@ File format, one line per level, `key=value` fields after the id:
 - Load: read a line, take the id (first word), then split the rest on spaces and each field on the first `=`. Numbers with `strtof`/`strtol`, checking the end pointer.
 - **The id is the level file's name without `.gd`**, digits only (7.2), so it's always safe in a path and in this space-separated format. A file in `levels/` that isn't `<digits>.gd` is skipped by the level list with a warning ("rename it to play it").
 - Save: `mkdir(SAVE_DIR, 0755)` (ignore `EEXIST`), write `save/progress.txt.tmp`, `fflush`, `fsync(fileno(f))`, check that `fclose` returns 0 (that's when write errors surface), then `rename()` it over `save/progress.txt`. A crash or power loss mid-save leaves the old file intact (`fsync` makes sure the new content is on disk before the rename makes it visible).
+- **Only playing creates an entry.** The level list and the end screen only read the store (`progress_find`); `progress_get` is for the flush when a level is left. A save skips an entry with nothing in it, so browsing the list never fills the file with `attempts=0 best=0.00` lines.
+- **`best` never rounds up to 100.** A death at 99.996% would print as `100.00` with `%.2f` and read back as a level beaten. `progress_printable` caps anything below 100 at 99.99 for the file and the level list.
 - Load once in `create_gd`, free in `free_gd`.
 - **Written only when a level is left** (6.2): the session's attempts and best live in `level_t` until then. Every path out of a level flushes them, so the file is written once per visit instead of once per attempt.
 
@@ -2181,7 +2185,7 @@ Why width and height: with `size` alone, every object is a square, so a "wide pl
 
 Why `rot=` instead of `up|down|left|right`: an angle covers the four directions (`0`, `90`, `180`, `270`) and everything in between, for every object type, with one field. Hitboxes follow the angle (4.4).
 
-Sizes: `size`, `w` and `h` must be at least 1. Zero or negative rejects the line (a zero-size object would be invisible and touch nothing, so it's always a mistake). There's no maximum.
+Sizes: `size`, `w` and `h` must be at least 1. Zero or negative rejects the line (a zero-size object would be invisible and touch nothing, so it's always a mistake). An object whose `x`, `y`, width or height is beyond 10 000 000 px (`LEVEL_COORD_MAX`, over two hours of level at normal speed) is rejected too: the renderer cuts the level into chunks up to its rightmost object, and one object at `x = 1e12` would ask for a billion of them.
 
 **No migration, ever.** The legacy format (a first line of `id attempts best`, files named `levelN`) is not read at all: the seven levels that existed were converted once by hand, and the old copies are kept outside the repository. A legacy file loads as a level whose first line is an invalid object, with one warning.
 
