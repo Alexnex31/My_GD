@@ -5,16 +5,14 @@
 ** attempts and best per level, saved once per visit (6.2, 6.4)
 */
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
 
 #include "sim/alloc.h"
 #include "sim/level.h"
 #include "sim/progress.h"
+#include "sim/save_file.h"
 
 #define LINE_MAX_LEN 1024
 
@@ -196,44 +194,18 @@ static void write_entry(FILE *f, const progress_entry_t *e)
     fprintf(f, "\n");
 }
 
-/* The store's own folder, whatever its path: "save" for SAVE_PATH. */
-static int make_parent_dir(const char *path)
+static void write_store(FILE *f, const void *data)
 {
-    char dir[sizeof(((progress_t *)0)->path)];
-    char *slash = NULL;
+    const progress_t *p = data;
 
-    snprintf(dir, sizeof(dir), "%s", path);
-    slash = strrchr(dir, '/');
-    if (slash == NULL || slash == dir)
-        return 0;                            /* the working directory, or / */
-    *slash = '\0';
-    return mkdir(dir, 0755) != 0 && errno != EEXIST ? -1 : 0;
-}
-
-/*
-** Atomic: the new content is complete and on disk before the rename makes it
-** visible, so a crash or a power cut leaves the old store intact (6.4).
-*/
-int progress_save(const progress_t *p)
-{
-    char tmp[sizeof(p->path) + 8];
-    FILE *f = NULL;
-
-    if (make_parent_dir(p->path) != 0)
-        return -1;
-    snprintf(tmp, sizeof(tmp), "%s.tmp", p->path);
-    f = fopen(tmp, "w");
-    if (f == NULL)
-        return -1;
     for (size_t i = 0; i < p->count; i++)
         write_entry(f, &p->entries[i]);
-    if (fflush(f) != 0 || fsync(fileno(f)) != 0) {
-        fclose(f);
-        return (void)remove(tmp), -1;
-    }
-    if (fclose(f) != 0)                      /* write errors surface here */
-        return (void)remove(tmp), -1;
-    return rename(tmp, p->path) == 0 ? 0 : (remove(tmp), -1);
+}
+
+/* Atomic: a crash or a power cut leaves the old store intact (6.4). */
+int progress_save(const progress_t *p)
+{
+    return save_atomic(p->path, write_store, p);
 }
 
 void progress_free(progress_t *p)
