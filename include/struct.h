@@ -10,6 +10,9 @@
     #include <SFML/Graphics.h>
     #include <SFML/Audio.h>
 
+    #include <pthread.h>
+
+    #include "sim/input_ticks.h"
     #include "sim/progress.h"
     #include "level.h"
 
@@ -100,6 +103,14 @@ typedef struct music {
     sfMusic *level1;
 } music_t;
 
+/* The polling thread writes the queue; the ticks read it (FEATURES 1). */
+typedef struct input_poll {
+    input_queue_t queue;
+    input_reader_t reader;        /* the ticks' side: what's down, what's latched */
+    pthread_t thread;
+    atomic_bool running;
+} input_poll_t;
+
 typedef struct gd {
     textures_t *res;
     music_t *musics;
@@ -112,8 +123,7 @@ typedef struct gd {
     sfEvent *event;
     char menu;
     char selected_id[24];         /* the level file's digits (7.2)            */
-    bool was_held;                /* last tick's jump input, for the edge     */
-    bool click_latched;           /* the click that started the level is down */
+    input_poll_t input;           /* the jump, polled by its thread (FEATURES 1) */
     bool debug_overlay;           /* F3 (9.6)                                 */
     int draw_calls;               /* this frame's, counted in draw.c (9.0)    */
     sfTexture *atlas;             /* every object image in one texture (9.2)  */

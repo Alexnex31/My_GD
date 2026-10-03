@@ -7,7 +7,7 @@
 
 CC        = gcc
 CFLAGS    = -Wall -Wextra -Iinclude -MMD -MP -ffp-contract=off
-LDLIBS    = -lcsfml-graphics -lcsfml-window -lcsfml-system -lcsfml-audio -lm
+LDLIBS    = -lcsfml-graphics -lcsfml-window -lcsfml-system -lcsfml-audio -lX11 -lm
 
 BUILD     ?= release
 ifeq ($(BUILD),debug)

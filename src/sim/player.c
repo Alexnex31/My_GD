@@ -21,7 +21,7 @@ void player_update_hold(player_t *p, input_t in)
 
 void player_apply_input(player_t *p, input_t in)
 {
-    bool down = in.held || in.pressed;       /* a sub-frame tap still counts */
+    bool down = in.held || in.pressed;       /* a tap inside one tick still counts */
 
     if (p->mode == MODE_CUBE && down && p->can_jump) {
         p->vy = PER_TICK(CUBE_JUMP_V);       /* an impulse: it sets the rise speed */

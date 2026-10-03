@@ -62,5 +62,6 @@ sfRenderWindow *create_window(unsigned int width, unsigned int height)
         sfResize | sfClose, NULL);
     sfRenderWindow_setFramerateLimit(window, 60);
     sfRenderWindow_setMouseCursorVisible(window, sfFalse);
+    sfRenderWindow_setKeyRepeatEnabled(window, sfFalse);   /* FEATURES 1.3 */
     return window;
 }

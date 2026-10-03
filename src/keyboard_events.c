@@ -244,7 +244,7 @@ void handle_end_screen_click(level_t **level, gd_t *gd, int mx, int my)
         go_back_playing_level_list(gd, level);
 }
 
-/* The level scene's events. The jump itself is polled per tick (3.6). */
+/* The level scene's keys. The jump has its own thread (FEATURES 1). */
 static void playing_key(level_t **level, gd_t *gd, sfKeyCode key)
 {
     if (key == sfKeyEscape)
@@ -267,7 +267,7 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
             return;
         }
         if (gd->event->type == sfEvtGainedFocus)
-            sfClock_restart((*level)->clock);   /* no burst after a pause */
+            (*level)->last_frame_us = input_now_us(gd);  /* no burst after a pause */
         if (gd->event->type == sfEvtKeyPressed) {
             playing_key(level, gd, gd->event->key.code);
             if (*level == NULL)

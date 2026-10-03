@@ -69,7 +69,6 @@ level_t *level_start(gd_t *gd, const char *id)
     snprintf(lv->id, sizeof(lv->id), "%s", id);
     lv->file_hash = lv->sim.lvl.file_hash;   /* the file loaded, read once */
     lv->state = LEVEL_PLAYING;
-    lv->clock = sfClock_create();
     level_build_chunks(lv, gd);
     lv->seen_spent = sim_xcalloc(lv->sim.st.spent_words + 1, sizeof(uint64_t));
     lv->flash_sprite = sfSprite_create();
@@ -116,8 +115,8 @@ level_t *level_start(gd_t *gd, const char *id)
         (sfVector2f){(VIEW_W - BAR_W) / 2.0f, 30.0f});
     level_count_attempt(lv);
     sfMusic_play(gd->musics->level1);
-    input_level_started(gd);
-    sfClock_restart(lv->clock);              /* the loading isn't play time */
+    input_start(gd);
+    lv->last_frame_us = input_now_us(gd);    /* the loading isn't play time */
     return lv;
 }
 
@@ -142,7 +141,7 @@ void level_free(level_t *lv, gd_t *gd)
     sfRectangleShape_destroy(lv->bar_back);
     sfRectangleShape_destroy(lv->bar_fill);
     sfRectangleShape_destroy(lv->flash);
-    sfClock_destroy(lv->clock);
+    input_stop(gd);
     sim_free(&lv->sim);
     free(lv);
 }
@@ -167,7 +166,7 @@ void level_respawn(level_t *lv, gd_t *gd)
     for (int i = 0; i < MAX_FLASHES; i++)
         lv->flash_left[i] = 0.0f;
     lv->accumulator = 0;
-    sfClock_restart(lv->clock);
+    lv->last_frame_us = input_now_us(gd);
     level_count_attempt(lv);
     sfMusic_play(gd->musics->level1);        /* play on a stopped music restarts it */
 }
@@ -209,12 +208,15 @@ void level_step(level_t *lv, gd_t *gd, input_t in)
 /*
 ** Events, then whole ticks, then one render (3.6). The accumulator is an
 ** integer number of microseconds x TICK_RATE, so a tick costs exactly
-** 1000000 of it and nothing ever rounds.
+** 1000000 of it and nothing ever rounds. What's left in it is how far `now`
+** is past the last tick's end: each tick knows its own 1/240 s, and gets the
+** input of that time only (FEATURES 1).
 */
 void handle_playing(gd_t *gd, level_t **level)
 {
     level_t *lv = NULL;
-    sfInt64 frame_us = 0;
+    int64_t now = 0;
+    int64_t frame_us = 0;
 
     if (*level == NULL)
         *level = level_start(gd, gd->selected_id);
@@ -227,14 +229,18 @@ void handle_playing(gd_t *gd, level_t **level)
     if (*level == NULL || !sfRenderWindow_isOpen(gd->w))
         return;                              /* the scene changed */
     lv = *level;                             /* Retry replaced the level */
-    frame_us = sfClock_restart(lv->clock).microseconds;
+    now = input_now_us(gd);
+    frame_us = now - lv->last_frame_us;
+    lv->last_frame_us = now;
     if (frame_us > 250000)
         frame_us = 250000;                   /* no burst of ticks after a hitch */
     lv->frame_us = frame_us;                 /* the renderer's own timers (5.3) */
     lv->accumulator += frame_us * TICK_RATE;
     while (lv->accumulator >= 1000000) {
-        level_step(lv, gd, input_for_tick(gd));
-        lv->accumulator -= 1000000;
+        int64_t end = now * TICK_RATE - lv->accumulator + 1000000;
+
+        lv->accumulator -= 1000000;          /* first: a respawn zeroes it */
+        level_step(lv, gd, input_for_tick(gd, end - 1000000, end));
     }
     level_render(gd, lv);
 }

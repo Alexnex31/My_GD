@@ -261,6 +261,7 @@ static void print_usage(int fd)
 int main(int argc, char **argv)
 {
     if (argc == 1) {
+        input_init_threads();                /* before any X call */
         chdir_to_executable();
         return main_loop(create_gd());
     }

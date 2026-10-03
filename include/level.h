@@ -47,7 +47,7 @@ typedef struct level {
     int death_ticks;              /* counts down through LEVEL_DYING          */
     vec2_t death_pos;             /* where to draw the explosion              */
     sfInt64 accumulator;          /* microseconds x TICK_RATE (3.6)           */
-    sfClock *clock;
+    int64_t last_frame_us;        /* input_now_us at the last frame's ticks   */
     level_stats_t stats;
     render_chunk_t *chunks;       /* the level's static geometry (9.2)        */
     size_t nb_chunks;
@@ -91,11 +91,19 @@ void level_count_attempt(level_t *lv);
 void level_record_best(level_t *lv);
 void level_flush_stats(level_t *lv, gd_t *gd);
 
-/* One tick's input (3.6). Polled per tick, so `pressed` lasts exactly one. */
-input_t input_for_tick(gd_t *gd);
+/*
+** The jump (3.6, FEATURES 1): a thread polls the buttons every millisecond and
+** stamps each change; a tick gets the presses that happened inside its own
+** 1/240 s. Ticks run up to input_now_us, the time the input is known until.
+*/
+void input_init_threads(void);               /* first thing in main */
+int64_t input_clock_us(void);
+int64_t input_now_us(gd_t *gd);
+input_t input_for_tick(gd_t *gd, int64_t start, int64_t end);
 
-/* The click that started the level isn't a jump: ignored until it's up. */
-void input_level_started(gd_t *gd);
+/* Per level. The click that started it isn't a jump: ignored until it's up. */
+void input_start(gd_t *gd);
+void input_stop(gd_t *gd);
 
 /* The static geometry: built once per level, drawn a few calls per frame. */
 void level_build_chunks(level_t *lv, gd_t *gd);
