@@ -497,7 +497,7 @@ uint64_t sim_physics_hash(const sim_t *s);     /* the same without the camera (b
 
 `sim_log_fn` is a function pointer (`void (*)(const char *msg)`) for loader warnings, so the sim never prints directly. `sim_load` reads the file into memory and calls `sim_load_mem`, so tests and the fuzzer (8.1) can parse strings without temp files.
 
-`input_t` is `{bool held; bool pressed;}` from the start. The cube and ship use `held` (the cube also jumps on `pressed`, so a tap shorter than a frame still jumps); `pressed` (one tick per physical press) is needed by the UFO, ball and orbs (FEATURES 1). Using the final signature now avoids changing every call site later.
+`input_t` is `{bool held; bool pressed;}` from the start. The cube and ship use `held` (the cube also jumps on `pressed`, so a tap inside one tick still jumps); `pressed` (one tick per physical press) is needed by the UFO, ball and orbs (FEATURES 1). Using the final signature now avoids changing every call site later.
 
 `sim_tick` returns nothing; the caller checks `s->st.player.alive` and `s->st.complete` afterwards. Death handling (delay, explosion, attempts, save) belongs to the game layer, because it involves time, sound and files.
 
@@ -963,7 +963,7 @@ void player_apply_input(player_t *p, input_t in)
 
 `hold` is part of the run state (snapshots, hash). In this plan's scope only the cube's jump uses it; orbs, the ball and the UFO are in FEATURES.
 
-`down` is `held || pressed` for every mode that reads the button's state (cube, ship, and FEATURES' ball and wave): a tap shorter than a frame is never seen as `held`, but its `pressed` tick still gives one tick of jump, thrust or rise.
+`down` is `held || pressed` for every mode that reads the button's state (cube, ship, and FEATURES' ball and wave): a tap inside one tick isn't `held` at the tick's end, but its `pressed` still gives one tick of jump, thrust or rise.
 
 ```c
 void player_apply_gravity(player_t *p)
@@ -1118,20 +1118,25 @@ Horizontal camera: `cam.x = player.x - PLAYER_SCREEN_X`, always (the game layer 
 void handle_playing(gd_t *gd, level_t **level)
 {
     level_t *lv;
-    sfInt64 frame_us;
+    int64_t now;
+    int64_t frame_us;
 
     if (*level == NULL)
         *level = level_start(gd, gd->selected_level_id);
     if (*level == NULL || level_poll_events(level, gd) != 0)
         return;                                   /* scene changed */
     lv = *level;                                  /* after the events: Retry replaces it */
-    frame_us = sfClock_restart(lv->clock).microseconds;
+    now = input_now_us(gd);                       /* the input is known until then */
+    frame_us = now - lv->last_frame_us;
+    lv->last_frame_us = now;
     if (frame_us > 250000)
         frame_us = 250000;                        /* no spiral of death after a hitch */
     lv->accumulator += frame_us * TICK_RATE;      /* units: microseconds x TICK_RATE */
     while (lv->accumulator >= 1000000) {
-        level_step(lv, gd, input_for_tick(gd));   /* one sim tick + death/complete handling */
-        lv->accumulator -= 1000000;
+        int64_t end = now * TICK_RATE - lv->accumulator + 1000000;   /* this tick's time */
+
+        lv->accumulator -= 1000000;               /* first: a respawn zeroes it */
+        level_step(lv, gd, input_for_tick(gd, end - 1000000, end));
     }
     level_render(gd, lv);
 }
@@ -1144,11 +1149,11 @@ Why:
 - **Integer accumulator.** `sfTime` is already an integer number of microseconds. Accumulating `frame_us * TICK_RATE` and subtracting exactly `1000000` per tick is exact: no rounding, ever, whatever the tick rate (1/60 s isn't a whole number of microseconds, but `1000000 / TICK_RATE` never has to be computed). A float accumulator loses a little on every subtraction. `lv->accumulator` is an `sfInt64`.
 - The simulation itself only sees integer ticks, so it stays deterministic.
 
-`input_for_tick(gd)` returns the `input_t` for the next tick. In Phase 10 it's simply `{input_held(gd), false}`; FEATURES 1 adds exact `pressed` edges without changing this loop.
+**Each tick has its own time.** What's left in the accumulator is how far `now` is past the last tick's end, so the tick about to run covers `[end - 1000000, end)` in microseconds x `TICK_RATE`. `input_for_tick` gives it the input of exactly that time: a thread polls the jump inputs every millisecond and stamps each change, and a tick is `pressed` only if an input went down inside its own 1/240 s (FEATURES 1). `now` is `input_now_us`, the time up to which the thread has published every change, not the clock: a tick never runs before its input is known.
 
-Restart `lv->clock` at the very end of `level_start` (after the chunks are built: loading isn't play time), after respawn, and on `sfEvtGainedFocus`, so a pause doesn't dump a burst of ticks.
+Set `lv->last_frame_us = input_now_us(gd)` at the very end of `level_start` (after the chunks are built: loading isn't play time), after respawn, and on `sfEvtGainedFocus`, so a pause doesn't dump a burst of ticks. Presses stamped before it fall in no tick's time and press nothing, so a click before `R` or during a pause is never replayed into the new attempt.
 
-**The click that starts a level isn't a jump.** Play and Retry are left clicks, and the button is usually still down on the level's first tick; a hold carried into an attempt is fresh (3.4), so the cube would jump at tick 0. `level_start` calls `input_level_started`, which ignores the mouse until that click is released (the keyboard is never ignored) and clears `was_held`, left over from the previous level.
+**The click that starts a level isn't a jump.** Play and Retry are left clicks, and the button is usually still down on the level's first tick; a hold carried into an attempt is fresh (3.4), so the cube would jump at tick 0. `level_start` calls `input_start`, which starts the polling thread with the mouse inputs latched: they count for nothing, neither held nor pressed, until they're seen up (the keyboard is never ignored).
 
 `level_step` wraps the sim with the game rules:
 
@@ -1905,7 +1910,7 @@ void level_respawn(level_t *lv, gd_t *gd)
     sim_reset(&lv->sim);
     lv->state = LEVEL_PLAYING;
     lv->accumulator = 0;
-    sfClock_restart(lv->clock);
+    lv->last_frame_us = input_now_us(gd);    /* presses before it press nothing (3.6) */
     level_count_attempt(lv);
     sfMusic_play(gd->musics.level);          /* sfMusic_play on a stopped music restarts it */
 }
@@ -2928,14 +2933,14 @@ Files marked *(planned)* don't exist yet; everything else is in the repository.
 include/
     sim/constants.h  sim/sim_types.h  sim/sim.h  sim/level.h  sim/progress.h
     sim/hitbox.h  sim/sweep.h  sim/geom.h  sim/modes.h  sim/alloc.h  sim/internal.h
-    sim/bot.h
+    sim/bot.h  sim/input_ticks.h
     view.h           (VIEW_W, VIEW_H, render layers)
     level.h          (the level scene: level_t, chunks, death, respawn, progress)
-    input.h          (bindings, input_t sampling; planned, FEATURES 1)
+    input.h          (bindings; planned, FEATURES 2.2)
     mygd.h  struct.h (game-side includes, structs and prototypes)
 src/sim/             level_parse.c  level_build.c  hitbox.c  sweep.c  move.c  zone.c
                      interact.c  player.c  camera.c  modes.c  sim.c  hash.c  alloc.c
-                     progress.c  bot.c
+                     progress.c  bot.c  input_ticks.c
 src/                 gd.c  window.c  input.c  keyboard_events.c  draw.c  check.c
                      level.c  level_render.c  level_chunks.c  atlas.c  debug_overlay.c
                      end_screen.c  main_menu.c  option_menu.c  editor_menu.c

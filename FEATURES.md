@@ -98,95 +98,90 @@ Why the modes come before the editor: the editor's palette, properties and playt
 
 ### 1.1 The problem, precisely
 
-The cube only cares whether the button is **down** ("held"). The UFO, ball, orbs and editor shortcuts care about **presses**: the moment the button goes from up to down. With a fixed timestep, three situations break naive press detection:
+The cube only cares whether the button is **down** ("held"). The UFO, ball, orbs and editor shortcuts care about **presses**: the moment the button goes from up to down. The game only lives in 240 Hz ticks; frames are a rendering detail. But the loop runs ticks in bursts: it reads the window once per frame, then runs the 4 ticks that frame owes (at 60 FPS) one after the other, in a fraction of a millisecond. Anything read during the burst is the same for all 4 ticks, so a click can't be placed in the tick it happened in:
 
-1. **Several ticks per frame.** At 240 Hz and 60 FPS, each frame runs 4 ticks. If "pressed" is computed per frame and passed to all 4 ticks, a UFO jumps 4 times from one click.
-2. **Zero ticks in a frame.** On a fast monitor (e.g. 500 FPS), some frames run no tick. A press detected in such a frame must not be lost.
-3. **Taps shorter than a frame.** A quick tap (down and up between two polls) is never seen as "held" by polling. The events queue still contains it.
+1. **Several ticks per frame.** If "pressed" is read per frame and given to all 4 ticks, a UFO jumps 4 times from one click; given to the first only, a click at the end of the frame is moved up to 3 ticks early.
+2. **Zero ticks in a frame.** On a fast monitor (e.g. 500 FPS), some frames run no tick: what a frame sees isn't any tick's.
+3. **Events have no time.** SFML's events say what happened, not when: everything is "this frame".
 
 ### 1.2 Specification
 
-- `held` for a tick = the button state sampled at the start of the frame that runs this tick.
-- `pressed` for a tick = true for **exactly one tick** per physical press: the first tick that runs after the press happened.
-- A press and release within one frame still produces one `pressed` tick. `held` is false on that tick.
+- Every tick covers its own 1/240 s of real time: tick *k* of an attempt is `[start + k/240 s, start + (k+1)/240 s)`.
+- `pressed` for a tick = a jump input went **down inside that tick's 1/240 s**. Several presses inside one tick are one `pressed`, and nothing is carried over to the next tick. A press that falls in no tick's time (a pause, a hitch the loop skipped, before the attempt) presses nothing.
+- `held` for a tick = a jump input is down at the end of that tick's time. A press and release inside one tick gives `pressed` without `held`.
+- Frames don't matter: the same presses at the same times give the same ticks at 30, 60 or 500 FPS.
 - OS key repeat must not create extra presses.
 
 ### 1.3 Implementation
 
-```c
-typedef struct input {
-    bool held;
-    bool pressed;
-} input_t;
+A thread polls the jump inputs every millisecond and stamps each **change** with the monotonic clock; the loop gives each tick the changes stamped inside its own time.
 
-typedef struct input_state {       /* game layer, in gd_t */
-    bool held;                     /* sampled at frame start */
-    bool was_held;                 /* held at the previous frame */
-    int pending_presses;           /* presses not yet delivered to a tick */
-} input_state_t;
+```c
+typedef struct input_change {
+    int64_t at_us;                 /* when the poll saw it */
+    unsigned int down;             /* bit i: jump input i is down */
+} input_change_t;
 ```
 
-Event side (inside the frame's event loop):
+The queue between them is a single-writer, single-reader ring (`src/sim/input_ticks.c`, pure C, so the tests drive it with made-up stamps): no lock, 256 changes. The thread also publishes `polled_us`, the time up to which every change is already in the queue:
 
 ```c
-void input_on_event(input_state_t *st, const sfEvent *ev, const settings_t *set)
-{
-    if (event_matches_binding(ev, set->jump_bindings, set->nb_jump_bindings))
-        st->pending_presses += 1;
-}
+for (;;) {                                  /* the polling thread, in src/input.c */
+    int64_t now = input_clock_us();         /* the stamp, taken before the poll */
+    unsigned int down = buttons_down();     /* sfKeyboard / sfMouse, every jump input */
 
-bool event_matches_binding(const sfEvent *ev, const binding_t *b, size_t n)
+    if (down != queued && input_queue_push(&q, (input_change_t){now, down}))
+        queued = down;                      /* full: pushed again next poll */
+    input_queue_publish(&q, now);
+    sleep_until_next_ms();
+}
+```
+
+The loop (PLAN 3.6) runs ticks up to `polled_us` rather than to the clock, so a change can never arrive after its tick has run. What's left in the accumulator says how far `now` is past the last tick's end, so each tick knows its own window, in microseconds x `TICK_RATE`:
+
+```c
+while (lv->accumulator >= 1000000) {
+    int64_t end = now * TICK_RATE - lv->accumulator + 1000000;
+
+    lv->accumulator -= 1000000;
+    level_step(lv, gd, input_for_tick(gd, end - 1000000, end));
+}
+```
+
+The reader takes every change stamped before `end`: one stamped inside the window that puts a new input down is the press; one stamped before the window only updates what's down.
+
+```c
+input_t input_read_tick(input_reader_t *r, input_queue_t *q, int64_t start, int64_t end)
 {
-    for (size_t i = 0; i < n; i++) {
-        if (b[i].kind == BIND_KEY && ev->type == sfEvtKeyPressed && ev->key.code == b[i].code)
-            return true;
-        if (b[i].kind == BIND_MOUSE && ev->type == sfEvtMouseButtonPressed
-            && (int)ev->mouseButton.button == b[i].code)
-            return true;
-        if (b[i].kind == BIND_JOY && ev->type == sfEvtJoystickButtonPressed
-            && (int)ev->joystickButton.button == b[i].code)
-            return true;
+    input_change_t c;
+    bool pressed = false;
+
+    while (next_change(q, end, &c)) {       /* stamped before `end` */
+        if (c.at_us * TICK_RATE >= start && (c.down & ~r->down & ~r->latched))
+            pressed = true;
+        r->down = c.down;
+        r->latched &= c.down;
     }
-    return false;
+    return (input_t){(r->down & ~r->latched) != 0, pressed};
 }
 ```
 
-`binding_t` is PLAN 10.2's (key, mouse button or gamepad button). The same bindings drive `held` (polling, PLAN 10.2) and `pressed` (events, here), so they can never disagree about which inputs jump.
+- **Key repeat** doesn't exist for polling: a key held for 2 s is one change. `sfRenderWindow_setKeyRepeatEnabled(w, sfFalse)` is still set once after creating the window, for the UI (5).
+- **Another input** going down while one is held is a new press; a release never is.
+- **The click that starts a level** (`latched`): Play and Retry are left clicks, usually still down on tick 0. The mouse inputs start latched and count for nothing until they're seen up; the keyboard never is (PLAN 3.6).
+- **Threads and X.** SFML 2.6 polls through the X display its window uses and never makes Xlib thread safe, so `main` calls `XInitThreads()` before anything else (as SDL does). Measured: a poll of Space, Up and the left button takes about 0.28 ms, and the thread holds 1 kHz, so a stamp is at most about 1.3 ms off, against a 4.17 ms tick.
+- The thread runs while a level is open (`input_start` in `level_start`, `input_stop` in `level_free`); menus read events as before.
 
-```c
-```
-
-Call `sfRenderWindow_setKeyRepeatEnabled(w, sfFalse)` once after creating the window. Otherwise holding Space generates a `sfEvtKeyPressed` every ~30 ms and the UFO would flap by itself.
-
-Frame side:
-
-```c
-void input_sample(input_state_t *st, gd_t *gd)
-{
-    st->was_held = st->held;
-    st->held = input_held(gd);     /* PLAN 10.2: focus-aware polling */
-}
-
-input_t input_for_tick(input_state_t *st)
-{
-    input_t in = {st->held, st->pending_presses > 0};
-
-    if (st->pending_presses > 0)
-        st->pending_presses -= 1;  /* one press per tick; two fast clicks = two ticks */
-    return in;
-}
-```
-
-Why a counter and not a boolean: two clicks within one frame (possible with a fast double-click on a slow frame) should give two UFO hops on two consecutive ticks, not one. Cap it (e.g. 4) so a long freeze doesn't replay a burst of clicks.
+The same table of jump inputs is polled for every bit, so `held` and `pressed` can never disagree about which inputs jump. PLAN 10.2's bindings (FEATURES 2.2) replace the table.
 
 ### 1.4 How each mode reads input
 
 | Mode | Uses | Rule |
 |---|---|---|
-| Cube | `held` or `pressed` | Jump if `(held || pressed) && can_jump`. Including `pressed` makes a sub-frame tap on the ground still jump. Uses the hold |
-| Ship | `held` or `pressed` | Thrust while down; a tap shorter than a frame still gives one tick of thrust. Never uses the hold (always fresh) |
+| Cube | `held` or `pressed` | Jump if `(held || pressed) && can_jump`. Including `pressed` makes a tap inside one tick on the ground still jump. Uses the hold |
+| Ship | `held` or `pressed` | Thrust while down; a tap inside one tick still gives one tick of thrust. Never uses the hold (always fresh) |
 | UFO | `pressed` | One hop per press, anywhere. Uses the hold |
-| Wave | `held` or `pressed` | Up while down; a tap shorter than a frame still gives one tick up. Never uses the hold (always fresh) |
+| Wave | `held` or `pressed` | Up while down; a tap inside one tick still gives one tick up. Never uses the hold (always fresh) |
 | Ball | `held` or `pressed` | Exactly like the cube, but it flips its gravity instead of jumping (9). Uses the hold |
 | Orbs | a **fresh** hold | Activate when touched with a fresh hold, even one started before the contact; takes priority over the surface jump (10.2). Uses the hold |
 
@@ -194,14 +189,22 @@ Why a counter and not a boolean: two clicks within one frame (possible with a fa
 
 ### 1.5 Clicks that belong to the UI
 
-A left click on the pause button or the end screen must not also count as a jump. Rule: the UI handles the event first; if it consumed it (the click was inside a widget), `input_on_event` isn't called for it. The UI is always clicked with the left mouse button, whatever the jump bindings are. After the end screen's Retry, also ignore `held` until the button has been released once, or the new attempt starts with a jump (PLAN 10.2).
+A left click on the pause button or the end screen must not also count as a jump. Polling can't tell a UI click from a jump, but it doesn't have to: the UI reads the frame's events **before** the ticks that cover the click run, and every UI click in a level stops those ticks. Pausing stops ticking, and resuming restarts the tick windows at the resume time, so a press stamped before it presses nothing (1.2). The end screen only exists once the sim has stopped. Retry and Play start a new level, whose mouse inputs start latched until released (1.3). A future widget that's clicked while ticks keep running would need the same treatment: drop the presses stamped before its click was handled. The UI is always clicked with the left mouse button, whatever the jump bindings are.
 
 ### 1.6 Tests
 
-- 4 ticks in a frame, one press → `pressed` true on tick 1 only.
-- 0 ticks in frame 1, press in frame 1, 4 ticks in frame 2 → `pressed` on frame 2's first tick.
-- Press + release inside one frame → one tick with `pressed = true, held = false`.
-- Held for 2 s with key repeat enabled at the OS level → exactly one press.
+In `tests/test_input.c`, on the queue and the reader alone, with made-up stamps:
+
+- A press inside tick 1 → `pressed` on tick 1 only, `held` from tick 1 on.
+- Two clicks inside one tick → one `pressed`, nothing on the next tick. Clicks in two ticks in a row → two.
+- Press + release inside one tick → that tick has `pressed = true, held = false`; the next has neither.
+- Held for 2 s → exactly one press, 480 ticks held.
+- The same changes queued all up front or just in time → the same ticks (frames don't matter).
+- A change exactly on a tick's end → the next tick's.
+- A press stamped before the tick's window → held, not pressed.
+- The latched click: neither held nor pressed until released; a key meanwhile still is.
+- Another input going down while one is held → a press; one going up → not.
+- A full queue refuses a change until the reader frees a slot.
 
 ---
 
@@ -324,7 +327,7 @@ For each event, in order:
 2. If a widget has **mouse capture** (a slider being dragged), it gets mouse moves and the release, even outside its bounds; stop.
 3. Keyboard navigation: Up/Down move focus (skipping disabled widgets, wrapping around); Left/Right go to the focused widget (sliders and cyclers change value); Enter/Space activate; Escape goes to the screen's "back" action.
 4. Mouse: find the widget under the mouse; hover moves focus to it; press starts capture or pressed state.
-5. If nothing consumed the event and the scene is a level, give it to `input_on_event` (1.5).
+5. The jump never goes through events: its own thread polls it (1.3). A UI click in a level stops the ticks that would cover it (1.5).
 
 ### 3.5 The widgets
 
@@ -1049,7 +1052,7 @@ Expected: completable by the bot; impossible for a cube (the wall is 300 px, abo
 
 ### 8.1 Behavior
 
-- Moves at exactly 45°: toward the ceiling while held, toward the floor while released. A tap shorter than a frame gives one tick up (`held || pressed`, PLAN 3.4).
+- Moves at exactly 45°: toward the ceiling while held, toward the floor while released. A tap inside one tick gives one tick up (`held || pressed`, PLAN 3.4).
 - That 45° motion is a **real velocity** in the engine (`vy = ±vx`), not a position rule: while in wave mode it's overwritten every tick by the input (the wave goes sharply, directly up or down, so it never feels inertia), but when the player leaves wave mode through a portal, the new mode inherits it (6.6 step 3): leaving a wave on the way up gives the next mode a small upward push, on the way down a downward one.
 - No gravity, no inertia: direction changes on the tick the input changes.
 - Hitbox 30×30.
@@ -1736,10 +1739,10 @@ All in `tests/`, linking only `src/sim/` (PLAN 8). "Measured" values come from t
 
 | Area | Test | Expected |
 |---|---|---|
-| Input | 4 ticks, one press | `pressed` on tick 1 only |
-| Input | 0 ticks then 4 ticks, press in the first frame | `pressed` on the second frame's first tick |
-| Input | press+release in one frame | one tick `pressed=1, held=0` |
-| Input | two presses in one frame | `pressed` on two consecutive ticks |
+| Input | held for 2 s | one `pressed`, held on every tick |
+| Input | a press inside tick k | `pressed` on tick k only |
+| Input | press+release inside one tick | that tick `pressed=1, held=0` |
+| Input | two presses inside one tick | one `pressed`, nothing on the next tick |
 | Settings | round trip | identical struct |
 | Settings | `fps_limit=75`, `music_volume=300`, garbage line | defaults for those, warnings, others kept |
 | Settings | unknown key | preserved on save |
@@ -1776,8 +1779,8 @@ All in `tests/`, linking only `src/sim/` (PLAN 8). "Measured" values come from t
 | Contacts | wave sliding on the ground enters a cube portal | the cube ends up standing on the ground, alive |
 | Portals | ship pressed against its corridor ceiling takes a cube portal | never touches the old ceiling again; its strips fade out over 0.25 s |
 | Contacts | UFO at 2× speed, ship and ball at 3×, cube at 4×, riding down a 45° slope | `grounded` every tick, following the slope (faster than the fall cap) |
-| Input | ship: press and release inside one frame | exactly one tick of thrust |
-| Input | wave: press and release inside one frame | exactly one tick up, then down again |
+| Input | ship: press and release inside one tick | exactly one tick of thrust |
+| Input | wave: press and release inside one tick | exactly one tick up, then down again |
 | Contacts | flipped cube runs along a block's underside, then off its end | stays grounded along it, then falls upward |
 | Saws | box passing 1 px outside the circle, near the rounded corner of the inflated shape | survives; 1 px inside: dies; a 20 px saw at 4× speed is still hit |
 | Pads | yellow pad in UFO and ship mode | the launch is 2876.9 px/s in both, above the ship's 2326.5 px/s thrust limit; holding the ship doesn't add to it, gravity slows it |

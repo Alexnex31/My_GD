@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). The features of `FEATURES.md` are next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -17,12 +17,12 @@ The physics is a *semi*-physics engine: one body moves, it has a velocity, force
 
 ## Build
 
-Requires a C compiler, `make` and **CSFML 2.6** (graphics, window, audio, system).
+Requires a C compiler, `make`, **CSFML 2.6** (graphics, window, audio, system) and the Xlib headers (`libx11`, which SFML itself needs on Linux: the input thread calls `XInitThreads`).
 
 | System | Install |
 |---|---|
 | Arch | `pacman -S csfml` |
-| Debian / Ubuntu | `apt install libcsfml-dev` |
+| Debian / Ubuntu | `apt install libcsfml-dev libx11-dev` |
 | From source | build SFML 2.6, then CSFML 2.6 against it (`/usr/local` works: the Makefile finds it) |
 
 ```sh
@@ -102,7 +102,7 @@ FEATURES.md     gamemodes, objects, editor, music, options, tests
 
 ## Tests
 
-`make test` builds a test binary that links **only** the simulation, so it needs no window and no CSFML. It covers the collision cases engines usually get wrong (seams between blocks, exact gaps, containment, tunneling at high speed, slopes, step-ups, the jump zone), pins the physics constants, and checks that the same inputs give the same state hash twice. A bot walks each level with the real engine and reports whether it found a way through: information, never a build failure. `--check` prints the same line. `make fuzz_parser` builds a libFuzzer target that feeds random bytes to the level loader and plays them; CI runs it for 60 s. Details in `PLAN.md` 8.
+`make test` builds a test binary that links **only** the simulation, so it needs no window and no CSFML. It covers the collision cases engines usually get wrong (seams between blocks, exact gaps, containment, tunneling at high speed, slopes, step-ups, the jump zone), pins the physics constants, checks that the same inputs give the same state hash twice, and that every press lands in the tick it happened in, however frames group the ticks. A bot walks each level with the real engine and reports whether it found a way through: information, never a build failure. `--check` prints the same line. `make fuzz_parser` builds a libFuzzer target that feeds random bytes to the level loader and plays them; CI runs it for 60 s. Details in `PLAN.md` 8.
 
 ## Physics numbers
 
