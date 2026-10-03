@@ -123,6 +123,7 @@ music_t *load_musics(void)
 
 void free_gd(gd_t *gd)
 {
+    settings_free(&gd->settings);
     progress_free(&gd->progress);
     sfTexture_destroy(gd->atlas);
     sfView_destroy(gd->ui_view);
@@ -136,18 +137,34 @@ void free_gd(gd_t *gd)
     free(gd);
 }
 
+static void log_settings(const char *msg)
+{
+    dprintf(2, "my_gd: %s\n", msg);
+}
+
+/* Every music at the settings' volume (FEATURES 2.2). */
+static void set_music_volume(music_t *m, int volume)
+{
+    sfMusic *all[] = {m->main, m->param, m->editor, m->level1};
+
+    for (size_t i = 0; i < sizeof(all) / sizeof(all[0]); i++)
+        sfMusic_setVolume(all[i], (float)volume);
+}
+
 gd_t *create_gd(void)
 {
     gd_t *gd = sim_xcalloc(1, sizeof(gd_t));
 
+    settings_load(&gd->settings, SETTINGS_PATH, log_settings);  /* before the window */
     gd->res = load_textures();
     gd->musics = load_musics();
+    set_music_volume(gd->musics, gd->settings.music_volume);
     gd->main_font = sfFont_createFromFile("res/GDfont.ttf");
     if (gd->main_font == NULL) {
         dprintf(2, "my_gd: missing asset res/GDfont.ttf\n");
         exit(84);
     }
-    gd->w = create_window(1280, 720);
+    gd->w = create_window(&gd->settings);
     gd->ui_view = sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H});
     gd->level_view = sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H});
     apply_letterbox(gd, sfRenderWindow_getSize(gd->w).x,
@@ -230,6 +247,8 @@ int main_loop(gd_t *gd)
         free_level_list_menu(level_list);
     if (level != NULL)
         level_free(level, gd);
+    if (settings_save(&gd->settings) != 0 && !gd->settings.unreadable)
+        dprintf(2, "my_gd: cannot save %s\n", gd->settings.path);   /* 2.4 */
     free_gd(gd);
     return 0;
 }

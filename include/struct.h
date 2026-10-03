@@ -14,6 +14,7 @@
 
     #include "sim/input_ticks.h"
     #include "sim/progress.h"
+    #include "sim/settings.h"
     #include "level.h"
 
 typedef struct cursor {
@@ -107,6 +108,7 @@ typedef struct music {
 typedef struct input_poll {
     input_queue_t queue;
     input_reader_t reader;        /* the ticks' side: what's down, what's latched */
+    bindings_t jump;              /* the settings' jump inputs, for the thread */
     pthread_t thread;
     atomic_bool running;
 } input_poll_t;
@@ -129,6 +131,7 @@ typedef struct gd {
     sfTexture *atlas;             /* every object image in one texture (9.2)  */
     sfFloatRect atlas_rect[OBJ_TYPE_COUNT];
     progress_t progress;          /* attempts and best, loaded once (6.4)     */
+    settings_t settings;          /* save/settings.txt (FEATURES 2)           */
 } gd_t;
 
 #endif

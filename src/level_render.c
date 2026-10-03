@@ -234,7 +234,7 @@ static void render_player(gd_t *gd, level_t *lv)
     draw_sprite(gd, lv->player_sprite, NULL);
 }
 
-/* The percentage and its bar. The string is only rebuilt when it changes. */
+/* The percentage and its bar, each if the settings show it (FEATURES 2.2). */
 static void render_hud(gd_t *gd, level_t *lv)
 {
     float pct = sim_percent(&lv->sim);
@@ -247,11 +247,14 @@ static void render_hud(gd_t *gd, level_t *lv)
     }
     sfRectangleShape_setSize(lv->bar_fill,
         (sfVector2f){BAR_W * pct / 100.0f, BAR_H});
-    draw_rect(gd, lv->bar_back);
-    draw_rect(gd, lv->bar_fill);
+    if (gd->settings.show_progress_bar) {
+        draw_rect(gd, lv->bar_back);
+        draw_rect(gd, lv->bar_fill);
+    }
     sfText_setPosition(lv->hud_text,
         (sfVector2f){(VIEW_W + BAR_W) / 2.0f + 20.0f, 28.0f});
-    draw_text(gd, lv->hud_text);
+    if (gd->settings.show_percent)
+        draw_text(gd, lv->hud_text);
 }
 
 /*
@@ -260,6 +263,8 @@ static void render_hud(gd_t *gd, level_t *lv)
 */
 static void render_attempt(gd_t *gd, level_t *lv)
 {
+    if (!gd->settings.show_attempts)
+        return;
     sfText_setPosition(lv->attempt_text,
         (sfVector2f){(float)lv->sim.lvl.hdr.start.pos.x + 400.0f, 400.0f});
     draw_text(gd, lv->attempt_text);

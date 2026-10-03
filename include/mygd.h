@@ -24,8 +24,7 @@
 
 void close_window(sfRenderWindow *window);
 void destroy_all(sfRenderWindow *window);
-sfRenderWindow *create_window(unsigned int width,
-    unsigned int height);
+sfRenderWindow *create_window(const settings_t *set);
 
 
 cursor_t *create_cursor(void);

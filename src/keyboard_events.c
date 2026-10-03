@@ -251,8 +251,6 @@ static void playing_key(level_t **level, gd_t *gd, sfKeyCode key)
         return go_back_playing_level_list(gd, level);
     if (key == sfKeyF3)
         gd->debug_overlay = !gd->debug_overlay;
-    if (key == sfKeyR && (*level)->state != LEVEL_COMPLETE)
-        level_restart(*level, gd);
 }
 
 void keyboard_events_playing(level_t **level, gd_t *gd)
@@ -273,6 +271,9 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
             if (*level == NULL)
                 return;
         }
+        if (input_event_is(gd->event, gd->settings.restart_key)
+            && (*level)->state != LEVEL_COMPLETE)
+            level_restart(*level, gd);       /* 6.5, any key or button */
         if (gd->event->type == sfEvtMouseButtonPressed
             && (*level)->state == LEVEL_COMPLETE
             && (*level)->end_time >= level_end_flight(*level) + END_FLASH) {

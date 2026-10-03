@@ -100,6 +100,7 @@ void input_init_threads(void);               /* first thing in main */
 int64_t input_clock_us(void);
 int64_t input_now_us(gd_t *gd);
 input_t input_for_tick(gd_t *gd, int64_t start, int64_t end);
+bool input_event_is(const sfEvent *ev, binding_t b);
 
 /* Per level. The click that started it isn't a jump: ignored until it's up. */
 void input_start(gd_t *gd);
