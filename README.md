@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) and the settings store (2: `save/settings.txt`) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -51,13 +51,35 @@ Exit code `84` means a missing asset, an unreadable level or a bad argument, wit
 
 | Action | Key |
 |---|---|
-| Jump / hold | `Space`, `Up`, or left click |
+| Jump / hold | `Space`, `Up`, or left click (`jump_bindings`) |
 | Back to the level list | `Escape` |
-| Restart the attempt | `R` |
+| Restart the attempt | `R` (`restart_key`) |
 | Debug overlay (hitboxes, contacts, tick, speeds) | `F3` |
 | Pause | *(planned)* |
 
-Rebindable keys, a gamepad and the options screen are planned (`FEATURES.md` 2 and 5).
+The keys are rebindable in `save/settings.txt`, written with the defaults the first time the game quits. Every key is `key=value`, one per line:
+
+```text
+music_volume=80
+fullscreen=0
+window_width=1280
+window_height=720
+vsync=1
+fps_limit=0              # 0, 60, 120, 144 or 240; ignored while vsync is on
+show_percent=1
+show_progress_bar=1
+show_attempts=1
+jump_bindings=Space,Up,MouseLeft,Joy0
+restart_key=R
+```
+
+- **Key names** are SFML's: `A`–`Z`, `Num0`–`Num9`, `Space`, `Up`, `LShift`, `F1`–`F15`, `Numpad0`–`Numpad9` and the rest of `sfKeyCode`; `MouseLeft`, `MouseRight`, `MouseMiddle`; `Joy0`–`Joy15`. Case doesn't matter. Up to 6 jump inputs.
+- An empty `restart_key=` unbinds it. `Escape` can't be bound, and a key can't both jump and restart.
+- An invalid value keeps its default, with a warning naming the line. Unknown keys are kept and written back; comments aren't.
+- If the file exists but can't be read, the game uses the defaults and never overwrites it.
+- `sfx_volume`, `menu_song`, `checkpoint_key`, `remove_checkpoint_key` and `audio_offset_ms` are read and kept for the features that will use them. Gamepad buttons are read but not polled yet.
+
+The full list is in `FEATURES.md` 2.2. The options screen that edits them is planned (`FEATURES.md` 5).
 
 ## Levels
 

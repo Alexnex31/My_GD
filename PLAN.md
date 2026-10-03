@@ -2705,6 +2705,8 @@ bool input_held(gd_t *gd)
 }
 ```
 
+**As built** (FEATURES 1 and 2): `binding_t` is in `include/sim/binding.h`, with `BIND_NONE` for an unbound action key; the names are SFML's, checked key by key against `sfKeyCode` when `input.c` compiles. The jump bindings come from `save/settings.txt` and are polled by the input thread, not per tick. The focus check and gamepad polling below are still to do.
+
 Call `sfJoystick_update()` once per frame before polling if the window doesn't process events that frame (SFML updates joysticks while polling events).
 
 - **Focus matters:** `sfKeyboard_isKeyPressed` reads the global keyboard state, ignoring focus. Today, pressing Space in another window makes the cube jump. Track `sfEvtLostFocus` / `sfEvtGainedFocus`, and pause the level while unfocused.
@@ -2933,14 +2935,13 @@ Files marked *(planned)* don't exist yet; everything else is in the repository.
 include/
     sim/constants.h  sim/sim_types.h  sim/sim.h  sim/level.h  sim/progress.h
     sim/hitbox.h  sim/sweep.h  sim/geom.h  sim/modes.h  sim/alloc.h  sim/internal.h
-    sim/bot.h  sim/input_ticks.h
+    sim/bot.h  sim/input_ticks.h  sim/binding.h  sim/settings.h  sim/save_file.h
     view.h           (VIEW_W, VIEW_H, render layers)
     level.h          (the level scene: level_t, chunks, death, respawn, progress)
-    input.h          (bindings; planned, FEATURES 2.2)
     mygd.h  struct.h (game-side includes, structs and prototypes)
 src/sim/             level_parse.c  level_build.c  hitbox.c  sweep.c  move.c  zone.c
                      interact.c  player.c  camera.c  modes.c  sim.c  hash.c  alloc.c
-                     progress.c  bot.c  input_ticks.c
+                     progress.c  bot.c  input_ticks.c  binding.c  settings.c  save_file.c
 src/                 gd.c  window.c  input.c  keyboard_events.c  draw.c  check.c
                      level.c  level_render.c  level_chunks.c  atlas.c  debug_overlay.c
                      end_screen.c  main_menu.c  option_menu.c  editor_menu.c

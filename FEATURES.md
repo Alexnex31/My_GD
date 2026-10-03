@@ -229,32 +229,35 @@ value   = any chars up to end of line
 |---|---|---|---|---|
 | `music_volume` | int | 0–100 | 80 | music manager |
 | `sfx_volume` | int | 0–100 | 100 | sound bank |
-| `menu_song` | file name in `music/` | must exist | `menu_loop.ogg` (4.2) | menus |
+| `menu_song` | file name in `music/` | a plain name (no folder, not hidden); whether it exists is checked when it's played (4) | `menu_loop.ogg` (4.2) | menus |
 | `fullscreen` | bool (0/1) | | 0 | window |
-| `window_width` | int | 640–desktop width | 1280 | window |
-| `window_height` | int | 360–desktop height | 720 | window |
+| `window_width` | int | 640–7680; the window is then capped to the desktop | 1280 | window |
+| `window_height` | int | 360–4320; capped to the desktop | 720 | window |
 | `vsync` | bool | | 1 | window |
 | `fps_limit` | int | 0, 60, 120, 144, 240 | 0 | window (ignored while vsync is on) |
 | `show_percent` | bool | | 1 | HUD |
 | `show_progress_bar` | bool | | 1 | HUD |
 | `show_attempts` | bool | | 1 | HUD |
-| `jump_bindings` | comma list of binding names (keys, `MouseLeft`/`MouseRight`/`MouseMiddle`, `Joy0`..`Joy15`) | 1–6 bindings | `Space,Up,MouseLeft,Joy0` | input |
-| `restart_key` | binding name | not a jump binding, not Escape | `R` | level (PLAN 6.5) |
-| `checkpoint_key` | binding name | not a jump binding | `Z` | practice (PLAN 13.1) |
-| `remove_checkpoint_key` | binding name | not a jump binding | `X` | practice |
+| `jump_bindings` | comma list of binding names (keys, `MouseLeft`/`MouseRight`/`MouseMiddle`, `Joy0`..`Joy15`) | 1–6 bindings, each once, never `Escape` | `Space,Up,MouseLeft,Joy0` | input (1.3) |
+| `restart_key` | binding name, or empty for unbound | not a jump binding, not Escape | `R` | level (PLAN 6.5) |
+| `checkpoint_key` | binding name, or empty | not a jump binding, not Escape, not `restart_key` | `Z` | practice (PLAN 13.1) |
+| `remove_checkpoint_key` | binding name, or empty | not a jump binding, not Escape, not an earlier action key | `X` | practice |
 | `audio_offset_ms` | int | −300–300 | 0 | music sync (4.8) |
 
 ### 2.3 Loading rules
 
 1. Start from defaults (`settings_defaults`).
-2. Read line by line. For each `pair`, find the key in a table; parse; validate against the range; if invalid, keep the default and log `settings.txt:7: fps_limit=75 invalid, using 0`.
+2. Read line by line; spaces around the key and the value are trimmed, `#` lines and blank lines skipped. For each `pair`, find the key in a table; parse; validate against the range; if invalid, keep the default and log `save/settings.txt:7: fps_limit=75 invalid, using 0`. A key given twice: the last one wins. A line that isn't `key=value` with a `[a-z_]+` key is logged and dropped.
 3. Unknown keys: **keep them** in a list of raw lines and write them back unchanged on save. A newer version's settings survive being opened by an older build.
-4. Missing file: defaults, no warning. Unreadable file: defaults, one warning.
+4. Missing file: defaults, no warning. Unreadable file (no read permission, a read error, not a regular file): defaults, one warning, and the file is **never overwritten** (`unreadable`), so a permission problem can't turn into lost settings.
+5. Then the action keys, in table order (`restart_key`, `checkpoint_key`, `remove_checkpoint_key`): one that is also a jump binding, or the same as an earlier action key, falls back to its default, or is left unbound if the default is taken too; logged. This runs after the whole file, so the order of the lines doesn't matter.
 
-A table keeps parsing and saving in one place, so a new setting is one line:
+Binding names are SFML's, any case: `A`–`Z`, `Num0`–`Num9`, `Space`, `Up`, `F1`–`F15`, `Numpad0`–`Numpad9` and every other `sfKeyCode` name; `MouseLeft`, `MouseRight`, `MouseMiddle`; `Joy0`–`Joy15`. They live in `include/sim/binding.h` as an X-macro list in `sfKeyCode`'s order, and `input.c` checks each one against `sfKey<name>` with a `_Static_assert`, so the stored codes are SFML's without a translation table. Gamepad buttons are read and saved, but not polled yet: SFML refreshes joysticks while the main thread reads its events, which the input thread (1.3) can't share.
+
+A table keeps parsing and saving in one place, so a new setting is one line (`src/sim/settings.c`):
 
 ```c
-typedef enum setting_type { ST_INT, ST_BOOL, ST_STRING, ST_KEYS } setting_type_t;
+typedef enum setting_type { ST_INT, ST_BOOL, ST_FILE, ST_BINDING, ST_BINDINGS } setting_type_t;
 
 typedef struct setting_def {
     const char *key;
@@ -262,23 +265,27 @@ typedef struct setting_def {
     size_t offset;              /* offsetof(settings_t, field) */
     int min;
     int max;
+    const int *choices;         /* ST_INT: the only values allowed (fps_limit), or NULL */
 } setting_def_t;
 
 static const setting_def_t DEFS[] = {
-    {"music_volume", ST_INT, offsetof(settings_t, music_volume), 0, 100},
-    {"sfx_volume", ST_INT, offsetof(settings_t, sfx_volume), 0, 100},
-    {"fullscreen", ST_BOOL, offsetof(settings_t, fullscreen), 0, 1},
+    {"music_volume", ST_INT, offsetof(settings_t, music_volume), 0, 100, NULL},
+    {"sfx_volume", ST_INT, offsetof(settings_t, sfx_volume), 0, 100, NULL},
+    {"fullscreen", ST_BOOL, offsetof(settings_t, fullscreen), 0, 1, NULL},
     /* ... */
 };
 ```
 
-`offsetof` gives the field's position inside the struct, so one generic function reads and writes every setting.
+`offsetof` gives the field's position inside the struct, so one generic function reads and writes every setting. A value is only stored once it's valid: a rejected one never touches the field.
+
+What uses them today: the window (size, fullscreen, vsync, frame limit) at startup, the music volume, the three HUD toggles, the jump bindings (read by the input thread when a level starts) and the restart key. The others wait for their features: `sfx_volume` (there are no sounds yet), `menu_song` (4), the checkpoint keys (practice) and `audio_offset_ms` (4.8).
 
 ### 2.4 Saving rules
 
 - Save when leaving the options screen (not on every slider step: dragging a slider would write the file 100 times).
-- Save on quit.
-- Atomic: write `settings.txt.tmp`, `fclose` returns 0, `rename`.
+- Save on quit. Until the options screen exists, that's what writes the file with its defaults the first time, so the player has something to edit.
+- Atomic: write `settings.txt.tmp`, `fsync`, `fclose` returns 0, `rename`, the folder made if needed. `src/sim/save_file.c` does it for both stores, the progress and the settings.
+- Written in the table's order, then the unknown keys; comments aren't kept.
 
 ### 2.5 What never goes in settings
 
