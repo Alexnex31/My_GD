@@ -265,29 +265,46 @@ static void render_attempt(gd_t *gd, level_t *lv)
     draw_text(gd, lv->attempt_text);
 }
 
-/* The wall the player flies into at the end, 4 blocks past the finish (9.8). */
-static void draw_end_wall(gd_t *gd, level_t *lv, float cam_y)
-{
-    float x = (float)(lv->sim.lvl.hdr.start.pos.x + lv->sim.lvl.end_shift
-        + 400.0);
+/*
+** The camera freezes with the player PLAYER_SCREEN_X from the left, and the
+** wall stands at the right edge of that frozen view: this is how far the
+** player's front has to fly to touch it, whatever the level (9.8).
+*/
+#define END_DISTANCE (VIEW_W - END_WALL_W - PLAYER_SCREEN_X - PLAYER_HALF)
 
+/* The run's own speed, so a level finished at 4x doesn't crawl at the end. */
+static double end_speed(const level_t *lv)
+{
+    return lv->sim.st.player.vx * TICK_RATE;
+}
+
+float level_end_flight(const level_t *lv)
+{
+    return (float)(END_DISTANCE / end_speed(lv));
+}
+
+/* The wall the player flies into at the end: the frozen view's edge (9.8). */
+static void draw_end_wall(gd_t *gd, level_t *lv, vec2_t cam)
+{
     sfSprite_setTextureRect(lv->strip_sprite,
-        (sfIntRect){0, 0, 100, (int)VIEW_H});
+        (sfIntRect){0, 0, (int)END_WALL_W, (int)VIEW_H});
     sfSprite_setColor(lv->strip_sprite, sfWhite);
-    sfSprite_setPosition(lv->strip_sprite, (sfVector2f){x, cam_y});
+    sfSprite_setPosition(lv->strip_sprite,
+        (sfVector2f){(float)cam.x + VIEW_W - END_WALL_W, (float)cam.y});
     draw_sprite(gd, lv->strip_sprite, NULL);
 }
 
 /*
 ** The finish is a moment, not a cut (9.8): the camera stops, the player flies
-** on into an end wall, then a white flash, then the end screen.
+** on at its own speed until it touches the end wall, then a white flash, then
+** the end screen.
 */
 static void render_end_sequence(gd_t *gd, level_t *lv, vec2_t cam)
 {
     const player_t *p = &lv->sim.st.player;
     float t = lv->end_time;
-    double x = p->pos.x + (double)t * SCROLL_SPEED;
-
+    float flight = level_end_flight(lv);
+    double x = p->pos.x + (double)fminf(t, flight) * end_speed(lv);
 
     sfView_setCenter(gd->level_view, (sfVector2f){(float)cam.x + VIEW_W / 2.0f,
         (float)cam.y + VIEW_H / 2.0f});
@@ -296,19 +313,19 @@ static void render_end_sequence(gd_t *gd, level_t *lv, vec2_t cam)
     sfRenderWindow_setView(gd->w, gd->level_view);
     render_ground(gd, lv, (float)cam.x);
     render_objects(gd, lv, (float)cam.x);
-    draw_end_wall(gd, lv, (float)cam.y);
+    draw_end_wall(gd, lv, cam);
     setup_player_sprite(gd, lv);
     sfSprite_setPosition(lv->player_sprite,
         (sfVector2f){(float)x, (float)p->pos.y});
     sfSprite_setRotation(lv->player_sprite,
-        p->rotation + t * (float)CUBE_SPIN);
+        p->rotation + fminf(t, flight) * (float)CUBE_SPIN);
     draw_sprite(gd, lv->player_sprite, NULL);
     sfRenderWindow_setView(gd->w, gd->ui_view);
-    if (t < END_FLIGHT)
+    if (t < flight)
         return;
     sfRectangleShape_setFillColor(lv->flash, (sfColor){255, 255, 255,
         (sfUint8)(255.0f * fmaxf(0.0f,
-            1.0f - (t - END_FLIGHT) / END_FLASH))});
+            1.0f - (t - flight) / END_FLASH))});
     draw_rect(gd, lv->flash);
 }
 
@@ -320,7 +337,7 @@ void level_render(gd_t *gd, level_t *lv)
 
     if (lv->state == LEVEL_COMPLETE) {
         lv->end_time += (float)lv->frame_us / 1000000.0f;
-        if (lv->end_time < END_FLIGHT + END_FLASH)
+        if (lv->end_time < level_end_flight(lv) + END_FLASH)
             return render_end_sequence(gd, lv, cam);
         sfRenderWindow_setView(gd->w, gd->ui_view);
         print_end_level_screen(gd, lv->end_screen);

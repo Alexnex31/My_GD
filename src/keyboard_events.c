@@ -275,7 +275,7 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
         }
         if (gd->event->type == sfEvtMouseButtonPressed
             && (*level)->state == LEVEL_COMPLETE
-            && (*level)->end_time >= END_FLIGHT + END_FLASH) {
+            && (*level)->end_time >= level_end_flight(*level) + END_FLASH) {
             pos = click_pos(gd);
             handle_end_screen_click(level, gd, pos.x, pos.y);
             return;

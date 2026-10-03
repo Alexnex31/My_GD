@@ -2637,10 +2637,10 @@ Mouse positions (clicks, custom cursor) then go through `sfRenderWindow_mapPixel
 
 Today the end screen replaces the level instantly on the completion tick. GD makes the finish a moment: the camera stops, the player flies on into the end, a flash, then the results.
 
-When `complete` becomes true, the game layer (not the sim) plays a 1-second sequence in `LEVEL_COMPLETE` before showing the end screen:
+When `complete` becomes true, the game layer (not the sim) plays a short sequence in `LEVEL_COMPLETE` before showing the end screen:
 
 1. The camera x freezes at its value on the completion tick.
-2. The player sprite keeps moving right at `SCROLL_SPEED` (a presentation-only position, `end_x + t * SCROLL_SPEED`), spinning, toward an end wall drawn at `PLAYER_SPAWN_X + end_shift + 400`.
+2. The player sprite keeps moving right at the run's own speed (`vx * TICK_RATE`, so a level finished at 4× doesn't crawl; a presentation-only position, `end_x + t * speed`), spinning, toward an end wall drawn at the **right edge of the frozen view** (`END_WALL_W` = 100 px wide). The player sits `PLAYER_SCREEN_X` from the left, so its front always has `VIEW_W - END_WALL_W - PLAYER_SCREEN_X - PLAYER_HALF` = 1270 px to fly: about 1.2 s at 1×, 0.3 s at 4× (`level_end_flight`). It stops against the wall. (A wall at a fixed 400 px past the finish stood in the middle of the screen, and a fixed 1 s flight went through it.)
 3. When it reaches the wall: a white flash (a full-screen rectangle fading out over 0.3 s), the completion sound, and "Level Complete!".
 4. Then the end screen, with the cursor. The music keeps playing (FEATURES 4.8).
 

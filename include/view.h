@@ -20,8 +20,8 @@
 
     #define BAR_W   700.0f        /* the progress bar at the top (9.5)          */
     #define BAR_H   36.0f
-    #define END_FLIGHT 1.0f       /* seconds the player flies on at the end (9.8) */
-    #define END_FLASH  0.3f      /* and the white flash after it */
+    #define END_WALL_W 100.0f    /* the end wall, at the frozen view's right edge (9.8) */
+    #define END_FLASH  0.3f      /* the white flash once the player reaches it */
     #define MAX_FLASHES 4        /* objects flashing as they are spent (9.2) */
     #define FLASH_TIME  0.2f
 

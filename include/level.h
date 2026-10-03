@@ -105,4 +105,7 @@ void render_objects(gd_t *gd, level_t *lv, float cam_x);
 /* The camera the renderer uses: the player's x, the sim's y, pixel snapped. */
 vec2_t level_camera(gd_t *gd, const level_t *lv);
 
+/* Seconds from the completion until the player reaches the end wall (9.8). */
+float level_end_flight(const level_t *lv);
+
 #endif
