@@ -88,7 +88,7 @@ typedef struct level_start {  /* where and how an attempt starts (7.2) */
 typedef struct level_header { /* the level file's header fields (7.2) */
     char name[128];           /* the prose name; the id when the file has none  */
     char author[64];
-    char music[64];           /* a file in res/songs (FEATURES 4.5), "" = none  */
+    char music[64];           /* a file in music/ (FEATURES 4.5), "" = none     */
     double music_offset;      /* seconds of song skipped at the start           */
     double bpm;               /* the editor's beat grid (FEATURES 11.11)        */
     double first_beat;        /* song time of beat 0, with bpm (FEATURES 11.11) */
