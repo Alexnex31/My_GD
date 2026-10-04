@@ -21,17 +21,19 @@ endif
 OUT       = build/$(BUILD)
 
 SIM_SRC   = $(wildcard src/sim/*.c)
+UI_SRC    = $(wildcard src/ui/*.c)
 GAME_SRC  = $(wildcard src/*.c)
 SIM_OBJ   = $(SIM_SRC:%.c=$(OUT)/%.o)
+UI_OBJ    = $(UI_SRC:%.c=$(OUT)/%.o)
 GAME_OBJ  = $(GAME_SRC:%.c=$(OUT)/%.o)
-DEP       = $(SIM_OBJ:.o=.d) $(GAME_OBJ:.o=.d)
+DEP       = $(SIM_OBJ:.o=.d) $(UI_OBJ:.o=.d) $(GAME_OBJ:.o=.d)
 TEST_SRC  = $(wildcard tests/*.c)
-HDR       = $(wildcard include/sim/*.h) $(wildcard tests/*.h)
+HDR       = $(wildcard include/sim/*.h) $(wildcard include/ui/*.h) $(wildcard tests/*.h)
 TEST_FLAGS = -Wall -Wextra -Iinclude -ffp-contract=off -g -fsanitize=address,undefined
 
 all: $(NAME)
 
-$(NAME): $(GAME_OBJ) $(SIM_OBJ)
+$(NAME): $(GAME_OBJ) $(UI_OBJ) $(SIM_OBJ)
 	$(CC) $^ -o $@ $(LDFLAGS) $(LDLIBS)
 
 $(OUT)/%.o: %.c
@@ -41,8 +43,8 @@ $(OUT)/%.o: %.c
 debug:
 	$(MAKE) BUILD=debug
 
-# Tests link ONLY the simulation: no CSFML, no window, no audio.
-unit_tests: $(TEST_SRC) $(SIM_SRC) $(HDR)
+# Tests link ONLY the simulation and the toolkit's core: no CSFML, no window.
+unit_tests: $(TEST_SRC) $(SIM_SRC) $(UI_SRC) $(HDR)
 	$(CC) $(TEST_FLAGS) $(filter %.c,$^) -o $@ -lm
 
 test: unit_tests
