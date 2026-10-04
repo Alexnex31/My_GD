@@ -51,6 +51,9 @@ progress_entry_t *progress_find(const progress_t *p, const char *id);
 */
 float progress_printable(float pct);
 
+/* Empties the store and saves it, the old file copied to <path>.bak first. */
+int progress_reset(progress_t *p);
+
 void progress_free(progress_t *p);
 
 /* Digits only, 1 to LEVEL_ID_MAX of them: the level file's name (7.2). */

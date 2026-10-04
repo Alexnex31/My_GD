@@ -208,6 +208,60 @@ int progress_save(const progress_t *p)
     return save_atomic(p->path, write_store, p);
 }
 
+typedef struct bytes {
+    const char *data;
+    size_t len;
+} bytes_t;
+
+static void write_bytes(FILE *f, const void *data)
+{
+    const bytes_t *b = data;
+
+    fwrite(b->data, 1, b->len, f);
+}
+
+/* The store's file as it is now, to path.bak; nothing to copy is fine. */
+static int backup(const progress_t *p)
+{
+    char bak[sizeof(p->path) + 8];
+    bytes_t b = {NULL, 0};
+    char *text = NULL;
+    FILE *f = fopen(p->path, "r");
+    long size = 0;
+    int ok = 0;
+
+    if (f == NULL)
+        return 0;
+    if (fseek(f, 0, SEEK_END) != 0 || (size = ftell(f)) < 0
+        || fseek(f, 0, SEEK_SET) != 0)
+        return fclose(f), -1;
+    text = sim_xcalloc((size_t)size + 1, 1);
+    b = (bytes_t){text, fread(text, 1, (size_t)size, f)};
+    ok = ferror(f) ? -1 : 0;
+    fclose(f);
+    snprintf(bak, sizeof(bak), "%s.bak", p->path);
+    if (ok == 0)
+        ok = save_atomic(bak, write_bytes, &b);
+    free(text);
+    return ok;
+}
+
+/*
+** Every attempt, best and song choice gone, the old file kept as .bak
+** (FEATURES 5.6). Nothing is cleared if the backup can't be written.
+*/
+int progress_reset(progress_t *p)
+{
+    char path[sizeof(p->path)];
+
+    if (backup(p) != 0)
+        return -1;
+    snprintf(path, sizeof(path), "%s", p->path);
+    progress_free(p);
+    snprintf(p->path, sizeof(p->path), "%s", path);
+    return progress_save(p);
+}
+
 void progress_free(progress_t *p)
 {
     for (size_t i = 0; i < p->count; i++)

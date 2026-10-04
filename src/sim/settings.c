@@ -421,11 +421,14 @@ static void write_settings(FILE *f, const void *data)
         fprintf(f, "%s\n", s->extra[i]);
 }
 
-int settings_save(const settings_t *s)
+int settings_save(settings_t *s)
 {
     if (s->unreadable)
         return -1;
-    return save_atomic(s->path, write_settings, s);
+    if (save_atomic(s->path, write_settings, s) != 0)
+        return -1;
+    s->dirty = false;
+    return 0;
 }
 
 void settings_free(settings_t *s)

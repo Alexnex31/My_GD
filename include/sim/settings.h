@@ -42,6 +42,7 @@ typedef struct settings {
     int audio_offset_ms;          /* -300-300 (4.8)                          */
     char **extra;                 /* unknown "key=value" lines, kept as is   */
     size_t nb_extra;
+    bool dirty;                   /* changed since loaded or saved (5.7)     */
     bool unreadable;              /* the file exists but couldn't be read:
                                      never overwritten                       */
     char path[256];
@@ -57,7 +58,7 @@ void settings_defaults(settings_t *s);
 int settings_load(settings_t *s, const char *path, sim_log_fn log);
 
 /* Through a .tmp and a rename, unknown keys written back (2.4). */
-int settings_save(const settings_t *s);
+int settings_save(settings_t *s);
 
 void settings_free(settings_t *s);
 
