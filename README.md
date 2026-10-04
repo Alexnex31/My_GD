@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`) and the widget toolkit (3, used by the options screen next) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3) and music selection (4: a library in `music/`, per-level songs and overrides, sync) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -43,7 +43,7 @@ Objects and dependency files go to `build/release` or `build/debug`, so the two 
 ./my_gd --check levels/1.gd   # load a level without a window and report on it
 ```
 
-The game finds its `res/` and `levels/` folders next to the executable, so it can be started from anywhere.
+The game finds its `res/`, `levels/` and `music/` folders next to the executable, so it can be started from anywhere.
 
 Exit code `84` means a missing asset, an unreadable level or a bad argument, with a message saying which. `--check` exits `1` when the level can't be read or has invalid lines (object lines it had to skip), `0` otherwise: ignored fields and unknown header keys are only warnings. Its path is relative to where you run it.
 
@@ -81,6 +81,23 @@ restart_key=R
 
 The full list is in `FEATURES.md` 2.2. The options screen that edits them is planned (`FEATURES.md` 5).
 
+## Music
+
+Songs live in `music/` (`.ogg` recommended; `.wav`, `.flac` and `.mp3` work too), described in `music/songs.txt`:
+
+```text
+# file | title | artist | license | default_offset_seconds
+stereo_sunrise.ogg | Stereo Sunrise | Some Artist | CC BY 4.0 | 0.00
+```
+
+- A level picks its song with `music <file>` and `music_offset <seconds>` in its header; without one, it plays `back_mus.ogg`.
+- In the level list, click a level's "Song:" line to choose your own song for it (saved with your progress). Moving through the list plays 10 s of each song.
+- The menus play `menu_song` (`settings.txt`, default `menu_loop.ogg`), or the library's first song if it's missing, and pick up where they left it after a level.
+- Song file names can't contain spaces or any of `#|=`. A file that doesn't decode is skipped with a message.
+- Keep the license of every song you ship in `songs.txt`: the end screen credits title, artist and license.
+
+`./my_gd --check` prints which song a level plays and warns when the level is longer than it (the song then loops). Details in `FEATURES.md` 4.
+
 ## Levels
 
 A level is a text file in `levels/`, named after its **id**: digits only, with a `.gd` extension (`levels/10280.gd`). Adding a level is dropping such a file there.
@@ -117,6 +134,7 @@ src/            game layer (window, scenes, menus, rendering)
 src/sim/        the simulation: no SFML, no globals, deterministic
 src/ui/         the widget toolkit's core: no SFML either, tested the same way
 levels/         level files
+music/          songs and songs.txt
 res/            textures, fonts, sounds
 tests/          unit tests, engine tests, the bot
 PLAN.md         the rewrite: architecture, engine, phases

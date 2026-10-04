@@ -654,6 +654,18 @@ The end-of-level screen shows `♪ Title — Artist (License)`. A Credits screen
 - A song file deleted while the game is closed: the level plays the fallback song and shows the notice; no crash.
 - Override set from the level list survives a restart; "Default" clears it.
 
+### 4.13 As built
+
+- **Where:** the pure part is `src/music/library.c` (`include/music/library.h`): the scan, `songs.txt`, the choice of song and offset, the sync rule, the volume curve, the level's duration. The scan takes the decoder as a function, so `tests/test_music.c` feeds it a fake one; the game passes `music_probe` (`sfMusic`). The one `sfMusic` lives in `src/music_manager.c`, the level list's song line and picker in `src/song_picker.c`.
+- **File names:** a song's name can't have spaces or any of `#|=`, and needs one of the four extensions: the level header, `songs.txt` and the space-separated progress file all have to hold it. Others are skipped with a log line. At most 63 characters (the header's `music` field).
+- **Offsets:** a `music_offset` of 0 counts as unset, so the song's `default_offset` applies.
+- **What plays today:** `res/back_mus.ogg` moved to `music/back_mus.ogg` (`music/songs.txt` describes it, license still `?`). There's no `music/menu_loop.ogg`, so the menus play the library's first song with one warning; `res/menuLoop.mp3` isn't played any more (PLAN 12.2).
+- **Sync (4.8):** level start, death, respawn and completion follow the table; the drift check runs once a second while playing. Pause, focus loss and checkpoint respawns wait for pause (PLAN 10.4) and practice mode.
+- **Level vs song (4.9):** `--check` prints the song, its offset and both lengths, and warns when the level is longer; in game, the song loops then.
+- **Picker (4.6):** the level list shows "Song: Title — Artist" under each level ("(yours)" for an override); clicking it opens the picker over the dimmed list. Moving the selection plays 10 s; Enter saves `song=` (the "Default" row removes it); Escape cancels; both resume the menu song where it was.
+- **Credits (4.11):** the end screen shows "Song: Title — Artist (License)". The Credits screen isn't there yet: it needs a main menu entry and `res/CREDITS.md`.
+- **Text:** SFML reads `char *` in the locale's encoding, so song titles and the em dash go through `utf8_to_utf32`. The game's font has no ♪, so the lines start with "Song:".
+
 ---
 
 ## 5. Options screen
