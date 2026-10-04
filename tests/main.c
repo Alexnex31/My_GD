@@ -25,6 +25,7 @@ int main(void)
     test_settings();
     test_ui();
     test_music();
+    test_options();
     test_bot();
     if (failures == 0)
         printf("all tests passed\n");
