@@ -21,13 +21,16 @@ bool music_probe(const char *path, float *duration)
     return true;
 }
 
-/* Where the menu song was, so coming back resumes it (4.10). */
+/*
+** Where the menu song was, so coming back resumes it (4.10). By who plays,
+** not by file: a level may well play the menu's song.
+*/
 static void remember_menu(music_manager_t *m)
 {
-    if (m->current != NULL && strcmp(m->current_file, m->menu_file) == 0
-        && m->preview_until_ms == 0)
+    if (m->current != NULL && m->menu_playing)
         m->menu_position = sfTime_asSeconds(
             sfMusic_getPlayingOffset(m->current));
+    m->menu_playing = false;
 }
 
 /*
@@ -39,8 +42,11 @@ int music_load(music_manager_t *m, const char *file)
     char path[256];
     sfMusic *next = NULL;
 
-    if (m->current != NULL && strcmp(m->current_file, file) == 0)
+    if (m->current != NULL && strcmp(m->current_file, file) == 0) {
+        remember_menu(m);                    /* the same file, a new owner */
+        m->preview_until_ms = 0;
         return 0;
+    }
     snprintf(path, sizeof(path), "%s/%s", MUSIC_DIR, file);
     next = sfMusic_createFromFile(path);
     if (next == NULL)
@@ -120,15 +126,13 @@ void music_menu(gd_t *gd)
 
     if (m->menu_file[0] == '\0')
         return;                              /* an empty library: silence */
-    if (m->current != NULL && strcmp(m->current_file, m->menu_file) == 0
-        && m->preview_until_ms == 0
-        && sfMusic_getStatus(m->current) == sfPlaying)
-        return;
+    if (m->menu_playing && sfMusic_getStatus(m->current) == sfPlaying)
+        return;                              /* already the menu's */
     if (music_load(m, m->menu_file) != 0)
         return;
-    m->preview_until_ms = 0;                 /* even if it was the preview's */
     sfMusic_setLoop(m->current, sfTrue);
     music_play_from(m, m->menu_position);
+    m->menu_playing = true;
 }
 
 /* The song picker's 10 s from the song's own start (4.6). */
