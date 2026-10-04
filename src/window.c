@@ -64,11 +64,37 @@ sfRenderWindow *create_window(const settings_t *set)
         video_mode.height = desktop.height;
     window = sfRenderWindow_create(video_mode, "my_gd",
         set->fullscreen ? sfFullscreen : sfResize | sfClose, NULL);
-    sfRenderWindow_setVerticalSyncEnabled(window, set->vsync);
-    if (!set->vsync)
-        sfRenderWindow_setFramerateLimit(window,
-            (unsigned int)set->fps_limit);   /* 0: as fast as it goes */
+    if (window == NULL)
+        return NULL;                         /* the caller keeps the old one */
+    window_apply_sync(window, set);
     sfRenderWindow_setMouseCursorVisible(window, sfFalse);
     sfRenderWindow_setKeyRepeatEnabled(window, sfFalse);   /* FEATURES 1.3 */
     return window;
+}
+
+/* VSync or a frame limit, never both: they fight (FEATURES 5.3). */
+void window_apply_sync(sfRenderWindow *w, const settings_t *set)
+{
+    sfRenderWindow_setVerticalSyncEnabled(w, set->vsync);
+    sfRenderWindow_setFramerateLimit(w, set->vsync ? 0
+        : (unsigned int)set->fps_limit);
+}
+
+/*
+** A new window for new display settings (FEATURES 5.4), made before the old
+** one goes: an unsupported mode leaves the old window as it was, and -1.
+** Every window setting comes with create_window; textures and fonts survive.
+*/
+int window_apply(gd_t *gd)
+{
+    sfRenderWindow *w = create_window(&gd->settings);
+    sfVector2u size;
+
+    if (w == NULL)
+        return -1;
+    sfRenderWindow_destroy(gd->w);
+    gd->w = w;
+    size = sfRenderWindow_getSize(w);
+    apply_letterbox(gd, size.x, size.y);
+    return 0;
 }

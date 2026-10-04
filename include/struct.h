@@ -77,10 +77,6 @@ typedef struct editor_menu {
     sfSprite *background;
 } editor_m_t;
 
-typedef struct option_menu {
-    sfSprite *background;
-} option_m_t;
-
 typedef struct main_menu {
     sfSprite *background;
     button_t *play;
@@ -121,6 +117,7 @@ typedef struct music_manager {
     int64_t last_check_ms;        /* drift checks once a second               */
     char menu_file[SONG_FILE_MAX]; /* "" when the library is empty            */
     float menu_position;          /* where the menu song was left (4.10)      */
+    bool menu_playing;            /* the playback is the menu's, whatever file */
     int64_t preview_until_ms;     /* the picker's preview: 0 none, -1 over    */
 } music_manager_t;
 

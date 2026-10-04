@@ -22,10 +22,16 @@
     #include "level.h"
     #include "view.h"
     #include "ui/ui.h"
+    #include "options.h"
 
 void close_window(sfRenderWindow *window);
 void destroy_all(sfRenderWindow *window);
+/* Every scene's events go through it: a resize letterboxes (9.7). */
+bool poll_event(gd_t *gd);
+
 sfRenderWindow *create_window(const settings_t *set);
+void window_apply_sync(sfRenderWindow *w, const settings_t *set);
+int window_apply(gd_t *gd);
 
 
 cursor_t *create_cursor(void);
@@ -41,9 +47,6 @@ void free_main_menu(main_m_t *m);
 void print_main_menu(main_m_t *m, sfRenderWindow *w);
 main_m_t *create_main_menu(gd_t *gd);
 
-void free_option_menu(option_m_t *om);
-void print_option_menu(option_m_t *om, sfRenderWindow *w);
-option_m_t *create_option_menu(gd_t *gd);
 
 void free_editor_menu(editor_m_t *om);
 void print_editor_menu(editor_m_t *om, sfRenderWindow *w);
@@ -61,7 +64,6 @@ void free_end_level_screen(end_level_screen_t *end_screen);
 
 
 void keyboard_events_main_menu(main_m_t **menu, gd_t *gd);
-void keyboard_events_option_menu(option_m_t **om, gd_t *gd);
 void keyboard_events_editor_menu(editor_m_t **editor_m, gd_t *gd);
 void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd);
 void keyboard_events_playing(level_t **level, gd_t *gd);

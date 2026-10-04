@@ -11,7 +11,7 @@
 ** Every scene polls through here, so a resize letterboxes the views (9.7)
 ** whatever scene is showing.
 */
-static bool poll_event(gd_t *gd)
+bool poll_event(gd_t *gd)
 {
     if (!sfRenderWindow_pollEvent(gd->w, gd->event))
         return false;
@@ -93,27 +93,6 @@ void keyboard_events_main_menu(main_m_t **menu, gd_t *gd)
         if (gd->event->type == sfEvtMouseButtonPressed && gd->event->mouseButton.button == sfMouseLeft) {
             pos = click_pos(gd);
             buttons_menu(menu, gd, pos.x, pos.y);
-            return;
-        }
-    }
-}
-
-void go_back_option_main(option_m_t **om, gd_t *gd)
-{
-    free_option_menu(*om);
-    *om = NULL;
-    gd->menu = 'm';
-}
-
-void keyboard_events_option_menu(option_m_t **om, gd_t *gd)
-{
-    while (poll_event(gd)) {
-        if (gd->event->type == sfEvtClosed) {
-            close_window(gd->w);
-            return;
-        }
-        if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeyEscape) {
-            go_back_option_main(om, gd);
             return;
         }
     }

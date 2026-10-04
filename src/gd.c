@@ -140,6 +140,10 @@ gd_t *create_gd(void)
         exit(84);
     }
     gd->w = create_window(&gd->settings);
+    if (gd->w == NULL) {
+        dprintf(2, "my_gd: cannot open a window\n");
+        exit(84);
+    }
     ui_gfx_create(gd);
     gd->ui_view = sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H});
     gd->level_view = sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H});
@@ -177,7 +181,7 @@ void handle_option_menu(gd_t *gd, option_m_t **option_menu)
 {
     if (*option_menu == NULL)
         *option_menu = create_option_menu(gd);
-    print_option_menu(*option_menu, gd->w);
+    print_option_menu(*option_menu, gd);
     print_cursor(gd->cursor, gd->w);
     keyboard_events_option_menu(option_menu, gd);
 }
@@ -224,8 +228,9 @@ int main_loop(gd_t *gd)
         free_level_list_menu(level_list);
     if (level != NULL)
         level_free(level, gd);
-    if (settings_save(&gd->settings) != 0 && !gd->settings.unreadable)
-        dprintf(2, "my_gd: cannot save %s\n", gd->settings.path);   /* 2.4 */
+    if ((gd->settings.dirty || access(gd->settings.path, F_OK) != 0)
+        && !gd->settings.unreadable && settings_save(&gd->settings) != 0)
+        dprintf(2, "my_gd: cannot save %s\n", gd->settings.path);   /* 5.7 */
     free_gd(gd);
     return 0;
 }
