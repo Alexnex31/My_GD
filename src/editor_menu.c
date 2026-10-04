@@ -22,7 +22,7 @@ editor_m_t *create_editor_menu(gd_t *gd)
 {
     editor_m_t *menu = sim_xcalloc(1, sizeof(editor_m_t));
 
-    sfMusic_stop(gd->musics->main);
+    music_menu(gd);                          /* it plays on (FEATURES 4.10) */
     menu->background = sfSprite_create();
     sfSprite_setTexture(menu->background, gd->res->edi_background, sfTrue);
     gd->menu = 'e';

@@ -55,6 +55,56 @@ void level_flush_stats(level_t *lv, gd_t *gd)
     progress_save(&gd->progress);
 }
 
+/* Whether the song the player or the level asked for is the one playing. */
+static bool song_went_missing(const level_t *lv, const char *override)
+{
+    if (override != NULL && override[0] != '\0')
+        return lv->song.source != SONG_OVERRIDE;
+    return lv->sim.lvl.hdr.music[0] != '\0' && lv->song.source != SONG_LEVEL;
+}
+
+static void show_song_notice(level_t *lv, const char *override)
+{
+    char text[300];
+
+    snprintf(text, sizeof(text), "Song missing: %s, playing %s",
+        override != NULL && override[0] != '\0' ? override
+        : lv->sim.lvl.hdr.music, lv->song.song != NULL
+        ? lv->song.song->title : "nothing");
+    sfText_setUnicodeString(lv->notice_text, utf8_to_utf32(text));
+    lv->notice_left = 4.0f;
+}
+
+/*
+** The override, the level's song, the default (FEATURES 4.4): a file that
+** won't open falls to the next rule. Started at tick 0's position, right
+** before the level clock starts (4.8).
+*/
+static void level_music_start(level_t *lv, gd_t *gd)
+{
+    const progress_entry_t *pe = progress_find(&gd->progress, lv->id);
+    const char *override = pe == NULL ? NULL : pe->song;
+    song_source_t from = SONG_OVERRIDE;
+
+    for (;;) {
+        lv->song = music_choose(&gd->library, override, &lv->sim.lvl.hdr,
+            from);
+        if (lv->song.song == NULL
+            || music_load(&gd->music, lv->song.song->file) == 0)
+            break;
+        from = lv->song.source + 1;
+    }
+    if (song_went_missing(lv, override))
+        show_song_notice(lv, override);
+    if (lv->song.song == NULL)
+        return music_stop(&gd->music);
+    gd->music.level_offset = lv->song.offset;
+    music_set_loop(&gd->music, lv->song.offset + level_duration(&lv->sim.lvl)
+        > lv->song.song->duration);          /* better a loop than silence (4.9) */
+    music_play_from(&gd->music, music_expected(lv->song.offset, 0,
+        gd->music.audio_offset));
+}
+
 level_t *level_start(gd_t *gd, const char *id)
 {
     level_t *lv = sim_xcalloc(1, sizeof(level_t));
@@ -100,6 +150,11 @@ level_t *level_start(gd_t *gd, const char *id)
     sfText_setFont(lv->attempt_text, gd->main_font);
     sfText_setCharacterSize(lv->attempt_text, 60);
     sfText_setOutlineThickness(lv->attempt_text, 4);
+    lv->notice_text = sfText_create();
+    sfText_setFont(lv->notice_text, gd->main_font);
+    sfText_setCharacterSize(lv->notice_text, 30);
+    sfText_setOutlineThickness(lv->notice_text, 3);
+    sfText_setPosition(lv->notice_text, (sfVector2f){40.0f, VIEW_H - 80.0f});
     lv->bar_back = sfRectangleShape_create();
     sfRectangleShape_setSize(lv->bar_back, (sfVector2f){BAR_W, BAR_H});
     sfRectangleShape_setFillColor(lv->bar_back, (sfColor){0, 0, 0, 120});
@@ -114,8 +169,8 @@ level_t *level_start(gd_t *gd, const char *id)
     sfRectangleShape_setPosition(lv->bar_fill,
         (sfVector2f){(VIEW_W - BAR_W) / 2.0f, 30.0f});
     level_count_attempt(lv);
-    sfMusic_play(gd->musics->level1);
     input_start(gd);
+    level_music_start(lv, gd);
     lv->last_frame_us = input_now_us(gd);    /* the loading isn't play time */
     return lv;
 }
@@ -138,6 +193,7 @@ void level_free(level_t *lv, gd_t *gd)
     sfText_destroy(lv->hud_text);
     sfText_destroy(lv->debug_text);
     sfText_destroy(lv->attempt_text);
+    sfText_destroy(lv->notice_text);
     sfRectangleShape_destroy(lv->bar_back);
     sfRectangleShape_destroy(lv->bar_fill);
     sfRectangleShape_destroy(lv->flash);
@@ -153,7 +209,7 @@ void level_on_death(level_t *lv, gd_t *gd)
     lv->death_ticks = DEATH_DELAY_TICKS;
     lv->death_pos = lv->sim.st.player.pos;
     lv->fade_left = 0.0f;                    /* a death clears the old strips */
-    sfMusic_stop(gd->musics->level1);
+    music_stop(&gd->music);                  /* GD stops it on death (4.8) */
 }
 
 void level_respawn(level_t *lv, gd_t *gd)
@@ -168,7 +224,9 @@ void level_respawn(level_t *lv, gd_t *gd)
     lv->accumulator = 0;
     lv->last_frame_us = input_now_us(gd);
     level_count_attempt(lv);
-    sfMusic_play(gd->musics->level1);        /* play on a stopped music restarts it */
+    if (lv->song.song != NULL)               /* from tick 0's position (4.8) */
+        music_play_from(&gd->music, music_expected(lv->song.offset, 0,
+            gd->music.audio_offset));
 }
 
 /* A voluntary death: the percentage counts, but no delay and no explosion. */
@@ -236,11 +294,15 @@ void handle_playing(gd_t *gd, level_t **level)
         frame_us = 250000;                   /* no burst of ticks after a hitch */
     lv->frame_us = frame_us;                 /* the renderer's own timers (5.3) */
     lv->accumulator += frame_us * TICK_RATE;
+    if (lv->notice_left > 0.0f)
+        lv->notice_left -= (float)frame_us / 1000000.0f;
     while (lv->accumulator >= 1000000) {
         int64_t end = now * TICK_RATE - lv->accumulator + 1000000;
 
         lv->accumulator -= 1000000;          /* first: a respawn zeroes it */
         level_step(lv, gd, input_for_tick(gd, end - 1000000, end));
     }
+    if (lv->state == LEVEL_PLAYING && lv->song.song != NULL)
+        music_check_sync(&gd->music, lv->sim.st.tick);  /* after a freeze (4.8) */
     level_render(gd, lv);
 }

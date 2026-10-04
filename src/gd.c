@@ -84,43 +84,6 @@ textures_t *load_textures(void)
     return res;
 }
 
-static sfMusic *load_music(const char *path)
-{
-    sfMusic *music = sfMusic_createFromFile(path);
-
-    if (music == NULL) {
-        dprintf(2, "my_gd: missing asset %s\n", path);
-        exit(84);
-    }
-    return music;
-}
-
-void free_musics(music_t *musics)
-{
-    if (musics == NULL)
-        return;
-    if (musics->editor != NULL)
-        sfMusic_destroy(musics->editor);
-    if (musics->main != NULL)
-        sfMusic_destroy(musics->main);
-    if (musics->param != NULL)
-        sfMusic_destroy(musics->param);
-    if (musics->level1 != NULL)
-        sfMusic_destroy(musics->level1);
-    free(musics);
-}
-
-music_t *load_musics(void)
-{
-    music_t *musics = sim_xcalloc(1, sizeof(music_t));
-
-    musics->main = load_music("res/menuLoop.mp3");
-    musics->editor = load_music("res/back_mus.ogg");
-    musics->param = load_music("res/back_mus.ogg");
-    musics->level1 = load_music("res/back_mus.ogg");
-    return musics;
-}
-
 void free_gd(gd_t *gd)
 {
     settings_free(&gd->settings);
@@ -130,7 +93,8 @@ void free_gd(gd_t *gd)
     sfView_destroy(gd->ui_view);
     sfView_destroy(gd->level_view);
     free_textures(gd->res);
-    free_musics(gd->musics);
+    music_free(&gd->music);
+    library_free(&gd->library);
     sfFont_destroy(gd->main_font);
     free_cursor(gd->cursor);
     free(gd->event);
@@ -138,28 +102,38 @@ void free_gd(gd_t *gd)
     free(gd);
 }
 
-static void log_settings(const char *msg)
+static void log_warning(const char *msg)
 {
     dprintf(2, "my_gd: %s\n", msg);
 }
 
-/* Every music at the settings' volume (FEATURES 2.2). */
-static void set_music_volume(music_t *m, int volume)
+/*
+** The library, then the menu's song: the setting's, else the library's
+** first with one warning, else silence (FEATURES 4.2).
+*/
+static void music_init(gd_t *gd)
 {
-    sfMusic *all[] = {m->main, m->param, m->editor, m->level1};
+    const song_t *menu = NULL;
 
-    for (size_t i = 0; i < sizeof(all) / sizeof(all[0]); i++)
-        sfMusic_setVolume(all[i], (float)volume);
+    library_scan(&gd->library, MUSIC_DIR, music_probe, log_warning);
+    gd->music.volume = gd->settings.music_volume;
+    gd->music.audio_offset = gd->settings.audio_offset_ms / 1000.0;
+    menu = music_menu_song(&gd->library, gd->settings.menu_song);
+    if (menu != NULL && strcmp(menu->file, gd->settings.menu_song) != 0)
+        dprintf(2, "my_gd: menu song %s isn't in %s/, playing %s\n",
+            gd->settings.menu_song, MUSIC_DIR, menu->file);
+    if (menu != NULL)
+        snprintf(gd->music.menu_file, sizeof(gd->music.menu_file), "%s",
+            menu->file);
 }
 
 gd_t *create_gd(void)
 {
     gd_t *gd = sim_xcalloc(1, sizeof(gd_t));
 
-    settings_load(&gd->settings, SETTINGS_PATH, log_settings);  /* before the window */
+    settings_load(&gd->settings, SETTINGS_PATH, log_warning);  /* before the window */
     gd->res = load_textures();
-    gd->musics = load_musics();
-    set_music_volume(gd->musics, gd->settings.music_volume);
+    music_init(gd);
     gd->main_font = sfFont_createFromFile("res/GDfont.ttf");
     if (gd->main_font == NULL) {
         dprintf(2, "my_gd: missing asset res/GDfont.ttf\n");
@@ -185,6 +159,7 @@ void handle_level_list(gd_t *gd, level_list_t **level_list)
     if (*level_list == NULL)
         *level_list = create_level_list(gd);
     print_level_list(*level_list, gd->w);
+    song_picker_draw(*level_list, gd);
     print_cursor(gd->cursor, gd->w);
     keyboard_events_level_list(level_list, gd);
 }
@@ -255,20 +230,26 @@ int main_loop(gd_t *gd)
     return 0;
 }
 
+int exe_dir(char *buf, size_t size)
+{
+    ssize_t n = readlink("/proc/self/exe", buf, size - 1);
+    char *slash = NULL;
+
+    if (n <= 0)
+        return -1;
+    buf[n] = '\0';
+    slash = strrchr(buf, '/');
+    if (slash == NULL)
+        return -1;
+    *slash = '\0';
+    return 0;
+}
+
 static void chdir_to_executable(void)
 {
     char path[4096];
-    ssize_t n = readlink("/proc/self/exe", path, sizeof(path) - 1);
-    char *slash;
 
-    if (n <= 0)
-        return;
-    path[n] = '\0';
-    slash = strrchr(path, '/');
-    if (slash == NULL)
-        return;
-    *slash = '\0';
-    if (chdir(path) != 0)
+    if (exe_dir(path, sizeof(path)) == 0 && chdir(path) != 0)
         dprintf(2, "my_gd: cannot enter %s\n", path);
 }
 

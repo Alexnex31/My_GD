@@ -32,6 +32,28 @@ void ui_gfx_free(gd_t *gd)
     sfText_destroy(gd->ui_text);
 }
 
+/*
+** SFML reads a char * in the locale's encoding, not UTF-8: song titles and
+** the em dash go through this. A static buffer: sfText copies it at once.
+*/
+const sfUint32 *utf8_to_utf32(const char *s)
+{
+    static sfUint32 out[512];
+    const unsigned char *p = (const unsigned char *)s;
+    size_t n = 0;
+
+    while (*p != '\0' && n < 511) {
+        int extra = *p >= 0xF0 ? 3 : (*p >= 0xE0 ? 2 : (*p >= 0xC0 ? 1 : 0));
+        sfUint32 c = *p++ & (0x7Fu >> extra);
+
+        for (int i = 0; i < extra && (*p & 0xC0) == 0x80; i++)
+            c = (c << 6) | (*p++ & 0x3Fu);
+        out[n++] = c;
+    }
+    out[n] = 0;
+    return out;
+}
+
 int64_t ui_now_ms(void)
 {
     return input_clock_us() / 1000;
@@ -117,7 +139,7 @@ static void text(gd_t *gd, const char *s, sfVector2f at, int align,
 {
     sfFloatRect b;
 
-    sfText_setString(gd->ui_text, s);
+    sfText_setUnicodeString(gd->ui_text, utf8_to_utf32(s));
     b = sfText_getLocalBounds(gd->ui_text);
     sfText_setOrigin(gd->ui_text, (sfVector2f){b.left + b.width * align
         / 2.0f, b.top + b.height / 2.0f});

@@ -42,8 +42,7 @@ main_m_t *create_main_menu(gd_t *gd)
 
     if (menu == NULL)
         return NULL;
-    sfMusic_setLoop(gd->musics->main, sfTrue);
-    sfMusic_play(gd->musics->main);
+    music_menu(gd);                          /* FEATURES 4.10 */
     menu->background = sfSprite_create();
     menu->title = sfText_create();
     menu->title_string = strdup("My_GD");

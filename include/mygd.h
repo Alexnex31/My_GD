@@ -85,12 +85,38 @@ void atlas_build(gd_t *gd);
 /* The letterbox of 9.7, applied to both views on every resize. */
 void apply_letterbox(gd_t *gd, unsigned int w, unsigned int h);
 
+/* The music manager (FEATURES 4.7): one sfMusic for everything. */
+bool music_probe(const char *path, float *duration);
+int music_load(music_manager_t *m, const char *file);
+void music_play_from(music_manager_t *m, double seconds);
+void music_stop(music_manager_t *m);
+void music_set_loop(music_manager_t *m, bool loop);
+void music_set_volume(music_manager_t *m, int volume);
+void music_free(music_manager_t *m);
+void music_check_sync(music_manager_t *m, long tick);
+void music_menu(gd_t *gd);
+void music_preview(gd_t *gd, const song_t *s);
+void music_update(gd_t *gd);
+
+/* The level list's song line and its picker (FEATURES 4.6). */
+void song_line_refresh(gd_t *gd, level_button_t *lb);
+void song_picker_open(level_list_t *list, gd_t *gd, int index);
+void song_picker_event(level_list_t *list, gd_t *gd);
+void song_picker_update(level_list_t *list, gd_t *gd);
+void song_picker_finish(level_list_t *list, gd_t *gd);
+void song_picker_draw(level_list_t *list, gd_t *gd);
+void song_picker_discard(level_list_t *list);
+
+/* The folder of the executable: res/, levels/ and music/ live there. */
+int exe_dir(char *buf, size_t size);
+
 /* The widget toolkit's window side (FEATURES 3): events in, widgets drawn. */
 void ui_gfx_create(gd_t *gd);
 void ui_gfx_free(gd_t *gd);
 bool ui_from_sf(gd_t *gd, const sfEvent *ev, ui_event_t *out);
 void ui_draw(gd_t *gd, const ui_screen_t *ui);
 int64_t ui_now_ms(void);
+const sfUint32 *utf8_to_utf32(const char *s);
 
 /* The F3 overlay (9.6): shapes, hitboxes, the tick's events, the numbers. */
 void render_debug_overlay(gd_t *gd, level_t *lv, vec2_t cam);

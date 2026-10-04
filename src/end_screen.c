@@ -19,6 +19,8 @@ void free_end_level_screen(end_level_screen_t *end_screen)
         sfText_destroy(end_screen->attempts_text);
     if (end_screen->percent_text != NULL)
         sfText_destroy(end_screen->percent_text);
+    if (end_screen->song_text != NULL)
+        sfText_destroy(end_screen->song_text);
     if (end_screen->retry_button != NULL)
         free_button(end_screen->retry_button);
     if (end_screen->quit_button != NULL)
@@ -48,7 +50,9 @@ end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd)
 {
     end_level_screen_t *es = sim_xcalloc(1, sizeof(end_level_screen_t));
     const progress_entry_t *pe = progress_find(&gd->progress, level->id);
+    const song_t *song = level->song.song;
     char attempts[100];
+    char credit[200];
 
     es->background = sfSprite_create();
     if (gd->res->end_level_background != NULL)
@@ -62,6 +66,13 @@ end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd)
         (sfVector2f){700.0f, 400.0f});
     es->percent_text = end_text(gd, "Completion: 100%", 50,
         (sfVector2f){680.0f, 500.0f});
+    if (song != NULL)                        /* CC BY wants the credit (4.11) */
+        snprintf(credit, sizeof(credit), "Song: %s \xe2\x80\x94 %s (%s)",
+            song->title, song->artist, song->license);
+    else
+        snprintf(credit, sizeof(credit), "%s", "No song");
+    es->song_text = end_text(gd, "", 30, (sfVector2f){600.0f, 600.0f});
+    sfText_setUnicodeString(es->song_text, utf8_to_utf32(credit));
     es->retry_button = create_button(600, 700, 250, gd->res->retry_button);
     es->quit_button = create_button(1000, 700, 250, gd->res->quit_button);
     return es;
@@ -74,6 +85,7 @@ void print_end_level_screen(gd_t *gd, end_level_screen_t *end_screen)
     sfRenderWindow_drawText(gd->w, end_screen->title_text, NULL);
     sfRenderWindow_drawText(gd->w, end_screen->attempts_text, NULL);
     sfRenderWindow_drawText(gd->w, end_screen->percent_text, NULL);
+    sfRenderWindow_drawText(gd->w, end_screen->song_text, NULL);
     print_button(end_screen->retry_button, gd->w);
     print_button(end_screen->quit_button, gd->w);
 }

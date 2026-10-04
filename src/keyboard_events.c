@@ -176,6 +176,21 @@ void handle_level_buttons_click(level_list_t **lvl_list, gd_t *gd, int mx, int m
     }
 }
 
+/* A click on a level's song line opens its picker (FEATURES 4.6). */
+static bool song_line_click(level_list_t *list, gd_t *gd, int mx, int my)
+{
+    for (int i = 0; i < list->nb_levels; i++) {
+        sfFloatRect b = sfText_getGlobalBounds(
+            list->level_buttons[i]->song_text);
+
+        if (sfFloatRect_contains(&b, (float)mx, (float)my)) {
+            song_picker_open(list, gd, i);
+            return true;
+        }
+    }
+    return false;
+}
+
 void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
 {
     sfVector2i pos;
@@ -185,6 +200,15 @@ void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
             close_window(gd->w);
             return;
         }
+        if ((*lvl_list)->picker_for >= 0) {
+            song_picker_event(*lvl_list, gd);    /* it has every event */
+            continue;
+        }
+        if (gd->event->type == sfEvtMouseButtonPressed
+            && gd->event->mouseButton.button == sfMouseLeft
+            && song_line_click(*lvl_list, gd, click_pos(gd).x,
+            click_pos(gd).y))
+            continue;
         if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeyEscape) {
             go_back_list_main(lvl_list, gd);
             return;
@@ -195,6 +219,8 @@ void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
             return;
         }
     }
+    song_picker_finish(*lvl_list, gd);       /* what a callback closed */
+    song_picker_update(*lvl_list, gd);
 }
 
 void go_back_playing_level_list(gd_t *gd, level_t **level)

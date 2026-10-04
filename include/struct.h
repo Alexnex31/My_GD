@@ -15,6 +15,8 @@
     #include "sim/input_ticks.h"
     #include "sim/progress.h"
     #include "sim/settings.h"
+    #include "music/library.h"
+    #include "ui/ui.h"
     #include "level.h"
 
 typedef struct cursor {
@@ -34,6 +36,7 @@ typedef struct end_level_screen {
     sfText *title_text;
     sfText *attempts_text;
     sfText *percent_text;
+    sfText *song_text;            /* "Song: Title — Artist (License)" (4.11) */
     button_t *retry_button;
     button_t *quit_button;
 } end_level_screen_t;
@@ -50,6 +53,8 @@ typedef struct level_button {
     sfText *name_text;
     sfText *attempts_text;
     sfText *best_text;
+    level_header_t hdr;           /* its song and offset (4.4)              */
+    sfText *song_text;            /* "Song: Title — Artist": opens the picker */
 } level_button_t;
 
 typedef struct level_list {
@@ -57,6 +62,15 @@ typedef struct level_list {
     char **names;
     level_button_t **level_buttons;
     int nb_levels;
+    struct gd *gd;                /* for the picker's callbacks             */
+    int picker_for;               /* the level whose song is chosen, -1 (4.6) */
+    bool picker_closing;          /* closed by a callback: freed after events */
+    ui_screen_t picker_root;      /* nothing of its own: dims, holds the modal */
+    ui_screen_t picker;
+    widget_t picker_list;
+    int picker_row;               /* 0: the level's own song                */
+    char **picker_rows;
+    sfText *picker_title;
 } level_list_t;
 
 typedef struct editor_menu {
@@ -97,12 +111,18 @@ typedef struct textures {
     sfTexture *quit_button;
 } textures_t;
 
-typedef struct music {
-    sfMusic *main;
-    sfMusic *param;
-    sfMusic *editor;
-    sfMusic *level1;
-} music_t;
+/* The one playing song (FEATURES 4.7): levels, menus and previews share it. */
+typedef struct music_manager {
+    sfMusic *current;
+    char current_file[SONG_FILE_MAX];
+    int volume;                   /* the setting's 0-100, curved when applied */
+    double level_offset;          /* where the level's song starts            */
+    double audio_offset;          /* seconds, the setting's (4.8)             */
+    int64_t last_check_ms;        /* drift checks once a second               */
+    char menu_file[SONG_FILE_MAX]; /* "" when the library is empty            */
+    float menu_position;          /* where the menu song was left (4.10)      */
+    int64_t preview_until_ms;     /* the picker's preview: 0 none, -1 over    */
+} music_manager_t;
 
 /* The polling thread writes the queue; the ticks read it (FEATURES 1). */
 typedef struct input_poll {
@@ -115,7 +135,8 @@ typedef struct input_poll {
 
 typedef struct gd {
     textures_t *res;
-    music_t *musics;
+    music_manager_t music;
+    library_t library;            /* the songs in music/ (FEATURES 4.2)       */
     sfFont *main_font;
     sfRenderWindow *w;
     sfView *ui_view;              /* menus and the HUD, fixed 1920x1080 (9.1) */

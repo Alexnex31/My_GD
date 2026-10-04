@@ -364,4 +364,6 @@ void level_render(gd_t *gd, level_t *lv)
         render_debug_overlay(gd, lv, cam);
     sfRenderWindow_setView(gd->w, gd->ui_view);
     render_hud(gd, lv);
+    if (lv->notice_left > 0.0f)
+        draw_text(gd, lv->notice_text);      /* "Song missing" (FEATURES 4.4) */
 }

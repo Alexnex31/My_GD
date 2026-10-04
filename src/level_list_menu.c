@@ -23,6 +23,8 @@ void free_level_button(level_button_t *lb)
         sfText_destroy(lb->attempts_text);
     if (lb->best_text != NULL)
         sfText_destroy(lb->best_text);
+    if (lb->song_text != NULL)
+        sfText_destroy(lb->song_text);
     free(lb);
 }
 
@@ -30,6 +32,7 @@ void free_level_list_menu(level_list_t *level_list)
 {
     int i = 0;
 
+    song_picker_discard(level_list);
     if (level_list->names != NULL) {
         while (level_list->names[i] != NULL) {
             free(level_list->names[i]);
@@ -60,6 +63,7 @@ void print_level_list(level_list_t *level_list, sfRenderWindow *w)
             sfRenderWindow_drawText(w, level_list->level_buttons[i]->name_text, NULL);
             sfRenderWindow_drawText(w, level_list->level_buttons[i]->attempts_text, NULL);
             sfRenderWindow_drawText(w, level_list->level_buttons[i]->best_text, NULL);
+            sfRenderWindow_drawText(w, level_list->level_buttons[i]->song_text, NULL);
         }
         i += 1;
     }
@@ -111,12 +115,11 @@ static int count_names(char **names)
 /* The prose name from the file's header, the numbers from the store (6.4). */
 static void fill_level_info(level_button_t *lb, gd_t *gd)
 {
-    level_header_t hdr = {0};
     const progress_entry_t *pe = progress_find(&gd->progress, lb->id);
     uint64_t hash = 0;
 
-    if (level_read_header(lb->filename, &hdr, &hash) == 0)
-        lb->display_name = strdup(hdr.name);
+    if (level_read_header(lb->filename, &lb->hdr, &hash) == 0)
+        lb->display_name = strdup(lb->hdr.name);
     else
         lb->display_name = strdup(lb->id);
     lb->file_hash = hash;
@@ -166,6 +169,12 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     sfText_setFont(lb->best_text, gd->main_font);
     sfText_setCharacterSize(lb->best_text, 25);
     sfText_setPosition(lb->best_text, text_pos);
+    lb->song_text = sfText_create();
+    sfText_setFont(lb->song_text, gd->main_font);
+    sfText_setCharacterSize(lb->song_text, 22);
+    sfText_setPosition(lb->song_text, (sfVector2f){x, y + 115});
+    sfText_setFillColor(lb->song_text, (sfColor){180, 230, 255, 255});
+    song_line_refresh(gd, lb);
     free(attempts_str);
     free(best_str);
     return lb;
@@ -176,8 +185,9 @@ level_list_t *create_level_list(gd_t *gd)
     level_list_t *menu = sim_xcalloc(1, sizeof(level_list_t));
     int i = 0;
 
-    sfMusic_stop(gd->musics->main);
-    sfMusic_stop(gd->musics->level1);
+    music_menu(gd);                          /* back from a level: resumes (4.10) */
+    menu->gd = gd;
+    menu->picker_for = -1;
     menu->background = sfSprite_create();
     sfSprite_setTexture(menu->background, gd->res->list_background, sfTrue);
     menu->names = fill_names_list();

@@ -14,6 +14,7 @@
     #include "sim/level.h"
     #include "sim/sim.h"
     #include "view.h"
+    #include "music/library.h"
 
 typedef struct gd gd_t;
 
@@ -73,6 +74,9 @@ typedef struct level {
     size_t flash_index[MAX_FLASHES];
     float flash_left[MAX_FLASHES];
     struct end_level_screen *end_screen;
+    song_choice_t song;           /* what plays, from where (FEATURES 4.4)    */
+    sfText *notice_text;          /* "Song missing", for a few seconds        */
+    float notice_left;
 } level_t;
 
 /* The scene (3.6): events, then whole ticks, then one render. */

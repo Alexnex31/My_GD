@@ -128,6 +128,48 @@ static int check_behind_spawn(const level_data_t *lvl)
     return found;
 }
 
+static void library_warning(const char *msg)
+{
+    dprintf(2, "  %s\n", msg);
+}
+
+/*
+** The song that will play (FEATURES 4.4), from the music/ next to the
+** executable, and whether the level outlasts it (4.9): it would loop.
+*/
+static int check_song(const level_data_t *lvl)
+{
+    char dir[4096];
+    library_t lib = {0};
+    song_choice_t c;
+    double over = 0.0;
+    int found = 0;
+
+    if (exe_dir(dir, sizeof(dir) - 8) != 0)
+        return 0;
+    strcat(dir, "/" MUSIC_DIR);
+    library_scan(&lib, dir, music_probe, library_warning);
+    c = music_choose(&lib, NULL, &lvl->hdr, SONG_OVERRIDE);
+    if (lvl->hdr.music[0] != '\0' && c.source != SONG_LEVEL)
+        found += (dprintf(2, "  music %s isn't in music/: the default song"
+            " plays\n", lvl->hdr.music), 1);
+    if (c.song == NULL) {
+        dprintf(2, "  song: none, the level plays in silence\n");
+        return library_free(&lib), found;
+    }
+    dprintf(2, "  song: %s (%s), from %.2f s; level %.1f s, song %.1f s\n",
+        c.song->title, c.song->file, c.offset, level_duration(lvl),
+        c.song->duration);
+    over = c.offset + level_duration(lvl) - c.song->duration;
+    if (over > 0.0) {
+        dprintf(2, "  the level is %.1f s longer than its song: it loops\n",
+            over);
+        found += 1;
+    }
+    library_free(&lib);
+    return found;
+}
+
 /* Whether the bot finds a way through: information, never a failure. */
 static void report_bot(sim_t *s)
 {
@@ -163,6 +205,7 @@ int level_check(const char *path)
     issues += check_steep_faces(&s.lvl);
     issues += check_crowding(&s.lvl);
     issues += check_behind_spawn(&s.lvl);
+    issues += check_song(&s.lvl);
     issues += g_loader_messages - s.lvl.skipped_lines;
     bad = s.lvl.skipped_lines;
     dprintf(2, "  %d invalid line(s), %d warning(s)\n", bad, issues);
