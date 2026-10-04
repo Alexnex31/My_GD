@@ -2720,7 +2720,7 @@ Call `sfJoystick_update()` once per frame before polling if the window doesn't p
 - Load sound buffers once (`sfx_t` in `gd_t`: death, level start, level quit), one `sfSound` each.
 - `back_mus.ogg` is opened three times as three `sfMusic` (editor, options, level). Open it once. *Done (FEATURES 4.7): one `sfMusic` for everything, `back_mus.ogg` moved to `music/`.*
 - Menu music: the main menu restarts it every time it's created, and the level list stops it. GD keeps the menu loop playing across all menus and only stops it for a level. Start it once; stop it on entering a level; resume on leaving. *Done (FEATURES 4.10).*
-- Add volume settings to the options screen (it's an empty screen today), saved in the settings file (FEATURES 2), not with progress.
+- Add volume settings to the options screen (it's an empty screen today), saved in the settings file (FEATURES 2), not with progress. *Done (FEATURES 5).*
 
 ### 10.4 Pause
 
@@ -2937,6 +2937,8 @@ include/
     sim/hitbox.h  sim/sweep.h  sim/geom.h  sim/modes.h  sim/alloc.h  sim/internal.h
     sim/bot.h  sim/input_ticks.h  sim/binding.h  sim/settings.h  sim/save_file.h
     ui/ui.h          (the widget toolkit's core, FEATURES 3)
+    ui/options_rules.h (rebinding, window sizes, FEATURES 5)
+    options.h        (the options scene, FEATURES 5)
     music/library.h  (the song library and the sync rule, FEATURES 4)
     view.h           (VIEW_W, VIEW_H, render layers)
     level.h          (the level scene: level_t, chunks, death, respawn, progress)
@@ -2944,13 +2946,13 @@ include/
 src/sim/             level_parse.c  level_build.c  hitbox.c  sweep.c  move.c  zone.c
                      interact.c  player.c  camera.c  modes.c  sim.c  hash.c  alloc.c
                      progress.c  bot.c  input_ticks.c  binding.c  settings.c  save_file.c
-src/ui/              ui.c (pure C, tested like the sim)
+src/ui/              ui.c  options_rules.c (pure C, tested like the sim)
 src/music/           library.c (pure C too)
 src/                 gd.c  window.c  input.c  keyboard_events.c  draw.c  check.c
                      level.c  level_render.c  level_chunks.c  atlas.c  debug_overlay.c
                      end_screen.c  main_menu.c  option_menu.c  editor_menu.c
                      level_list_menu.c  button.c  cursor.c  ui_sfml.c
-                     music_manager.c  song_picker.c
+                     music_manager.c  song_picker.c  options_rows.c  options_dialogs.c
                      scene.c  audio.c (planned, 10.1 and 10.3)
 tests/               main.c  test.h  test_constants.c  test_hitbox.c  test_sweep.c
                      test_circle.c  test_parser.c  test_start.c  test_tick.c

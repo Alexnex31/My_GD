@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3) and music selection (4: a library in `music/`, per-level songs and overrides, sync) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) and the options screen (5) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -79,7 +79,12 @@ restart_key=R
 - If the file exists but can't be read, the game uses the defaults and never overwrites it.
 - `sfx_volume`, `menu_song`, `checkpoint_key`, `remove_checkpoint_key` and `audio_offset_ms` are read and kept for the features that will use them. Gamepad buttons are read but not polled yet.
 
-The full list is in `FEATURES.md` 2.2. The options screen that edits them is planned (`FEATURES.md` 5).
+The full list is in `FEATURES.md` 2.2. The **options screen** (the main menu's options button) edits them, with the keyboard or the mouse:
+
+- **Sections:** Audio, Gameplay, Controls, Display and Data, switched with `Tab` / `Shift+Tab` or a click. `Up`/`Down` move through the rows, `Left`/`Right` change a value, `Enter` activates, `Escape` goes back and saves what changed.
+- **Controls:** activate a row, then press any key, mouse button or gamepad button. `Escape` cancels, `Backspace` clears. An input another row has swaps the two rows, and the last jump input can't be removed.
+- **Display:** a new fullscreen setting or window size asks to be kept, and reverts by itself after 10 s, so an unsupported mode fixes itself.
+- **Data:** Reset progress asks first, and keeps the old file as `save/progress.txt.bak`. Open save folder opens `save/` and prints its path.
 
 ## Music
 

@@ -662,6 +662,7 @@ The end-of-level screen shows `♪ Title — Artist (License)`. A Credits screen
 - **What plays today:** `res/back_mus.ogg` moved to `music/back_mus.ogg` (`music/songs.txt` describes it, license still `?`). There's no `music/menu_loop.ogg`, so the menus play the library's first song with one warning; `res/menuLoop.mp3` isn't played any more (PLAN 12.2).
 - **Sync (4.8):** level start, death, respawn and completion follow the table; the drift check runs once a second while playing. Pause, focus loss and checkpoint respawns wait for pause (PLAN 10.4) and practice mode.
 - **Level vs song (4.9):** `--check` prints the song, its offset and both lengths, and warns when the level is longer; in game, the song loops then.
+- **Menu vs level (4.10):** the manager tracks whether the menu owns the playback (`menu_playing`), not which file is loaded: a level that plays the menu's own song (`back_mus.ogg` today) still saves the menu's position on the way in and gives it back on the way out.
 - **Picker (4.6):** the level list shows "Song: Title — Artist" under each level ("(yours)" for an override); clicking it opens the picker over the dimmed list. Moving the selection plays 10 s; Enter saves `song=` (the "Default" row removes it); Escape cancels; both resume the menu song where it was.
 - **Credits (4.11):** the end screen shows "Song: Title — Artist (License)". The Credits screen isn't there yet: it needs a main menu entry and `res/CREDITS.md`.
 - **Text:** SFML reads `char *` in the locale's encoding, so song titles and the em dash go through `utf8_to_utf32`. The game's font has no ♪, so the lines start with "Song:".
@@ -783,6 +784,17 @@ Mark settings dirty on every change. On leaving the options screen: save if dirt
 - Switching to an unsupported window size and waiting 10 s restores the previous size.
 - After rebinding Jump to W and removing Space, Space no longer jumps and W does, in cube, ship and UFO.
 - After removing `MouseLeft` from the jump bindings, clicking in a level doesn't jump, and menus still work with the mouse.
+
+### 5.9 As built
+
+- **Files:** the scene is `src/option_menu.c` (sections, routing, leaving), `src/options_rows.c` (each section's rows and what they apply) and `src/options_dialogs.c` (the revert and reset dialogs, the save folder), with `include/options.h`. The decisions that need no window are pure and tested (`src/ui/options_rules.c`, `tests/test_options.c`): rebinding (5.5) and the window sizes (5.2). `progress_reset` (5.6) is in `src/sim/progress.c`.
+- **Routing:** the section tabs and Back are their own toolkit screen and only get the mouse; the rows get every event, so the keyboard never lands on a tab. Every callback only sets a `pending_*` field: switching sections, opening a dialog, recreating the window and leaving all happen after the frame's events (3.5).
+- **Applied at once:** music volume, the menu song (it plays from its start), the audio offset, the three HUD toggles, VSync and the frame limit (never both, 5.3), the bindings. Effects volume is stored for the sounds to come.
+- **Rebinding (5.5):** `rebind` assigns, clears on Backspace, swaps with the row that had the input (a notice "R moved: Jump 1 <-> Restart" for 2 s; the font has no ↔), and refuses any change that would leave no jump input, a swap included. The jump rows are packed back into `jump_bindings` in their order. A level started afterwards polls the new bindings (1.3).
+- **Display (5.4):** `window_apply` makes the new window before destroying the old one; on failure the settings go back and "Display mode not supported" shows. Otherwise the dialog counts down from 10 with Revert focused; Escape and the timeout revert.
+- **Reset (5.6):** the dialog says it deletes song choices too (they live in the same file), with Cancel focused. Nothing is cleared if the backup can't be written.
+- **Saving (5.7):** every change marks the settings dirty; leaving the screen saves if dirty; quitting saves if dirty, or if `settings.txt` doesn't exist yet (so a first run still writes one to edit).
+- **Not yet:** the audio offset's Calibrate button (it needs a click sound and a flashing square) and joystick polling for jumps (1.3).
 
 ---
 
