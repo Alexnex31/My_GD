@@ -21,6 +21,7 @@ void test_progress(void);
 void test_input(void);
 void test_settings(void);
 void test_ui(void);
+void test_music(void);
 void test_bot(void);
 
 #endif
