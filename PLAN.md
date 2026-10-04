@@ -2936,16 +2936,18 @@ include/
     sim/constants.h  sim/sim_types.h  sim/sim.h  sim/level.h  sim/progress.h
     sim/hitbox.h  sim/sweep.h  sim/geom.h  sim/modes.h  sim/alloc.h  sim/internal.h
     sim/bot.h  sim/input_ticks.h  sim/binding.h  sim/settings.h  sim/save_file.h
+    ui/ui.h          (the widget toolkit's core, FEATURES 3)
     view.h           (VIEW_W, VIEW_H, render layers)
     level.h          (the level scene: level_t, chunks, death, respawn, progress)
     mygd.h  struct.h (game-side includes, structs and prototypes)
 src/sim/             level_parse.c  level_build.c  hitbox.c  sweep.c  move.c  zone.c
                      interact.c  player.c  camera.c  modes.c  sim.c  hash.c  alloc.c
                      progress.c  bot.c  input_ticks.c  binding.c  settings.c  save_file.c
+src/ui/              ui.c (pure C, tested like the sim)
 src/                 gd.c  window.c  input.c  keyboard_events.c  draw.c  check.c
                      level.c  level_render.c  level_chunks.c  atlas.c  debug_overlay.c
                      end_screen.c  main_menu.c  option_menu.c  editor_menu.c
-                     level_list_menu.c  button.c  cursor.c
+                     level_list_menu.c  button.c  cursor.c  ui_sfml.c
                      scene.c  audio.c (planned, 10.1 and 10.3)
 tests/               main.c  test.h  test_constants.c  test_hitbox.c  test_sweep.c
                      test_circle.c  test_parser.c  test_start.c  test_tick.c

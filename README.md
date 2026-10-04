@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) and the settings store (2: `save/settings.txt`) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`) and the widget toolkit (3, used by the options screen next) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -28,7 +28,7 @@ Requires a C compiler, `make`, **CSFML 2.6** (graphics, window, audio, system) a
 ```sh
 make              # release build -> ./my_gd
 make debug        # -g3 -O0 with ASan and UBSan -> ./my_gd_debug
-make test         # build and run the unit tests (sim only: no CSFML needed)
+make test         # build and run the unit tests (sim and toolkit core: no CSFML needed)
 make fuzz_parser  # level-parser fuzzer, needs clang
 make re           # rebuild from scratch
 ```
@@ -115,6 +115,7 @@ The full grammar, including the planned `pad`, `orb`, `saw`, `speed`, `mini` and
 include/        headers (include/sim/ for the simulation)
 src/            game layer (window, scenes, menus, rendering)
 src/sim/        the simulation: no SFML, no globals, deterministic
+src/ui/         the widget toolkit's core: no SFML either, tested the same way
 levels/         level files
 res/            textures, fonts, sounds
 tests/          unit tests, engine tests, the bot

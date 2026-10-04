@@ -338,68 +338,102 @@ For each event, in order:
 
 ### 3.5 The widgets
 
+The toolkit has two halves, like the input (1.3) and the settings (2):
+
+- **The core** (`include/ui/ui.h`, `src/ui/ui.c`): pure C, no SFML. Focus, hover, presses, capture, activation, the slider's grid, the cycler, the list, key repeat and the key capture modal. The tests drive it with made-up events (`tests/test_ui.c`).
+- **The window side** (`src/ui_sfml.c`): `ui_from_sf` turns an `sfEvent` into a `ui_event_t`, with the mouse already in the UI view's pixels (3.1); `ui_draw` draws a screen with one shape and one text, created once (`ui_gfx_create`).
+
+The core's events are bindings (FEATURES 2), so a key capture gets keys, mouse buttons and gamepad buttons the same way:
+
 ```c
+typedef enum ui_event_kind { UI_MOVE, UI_PRESS, UI_RELEASE, UI_WHEEL } ui_event_kind_t;
+
+typedef struct ui_event {
+    ui_event_kind_t kind;
+    binding_t input;               /* a key, mouse button or gamepad button */
+    float x;                       /* the mouse, UI pixels */
+    float y;
+    int wheel;                     /* notches, up positive */
+    bool shift;
+} ui_event_t;
+
 typedef enum widget_kind { W_BUTTON, W_TOGGLE, W_SLIDER, W_CYCLER, W_KEYBIND, W_LIST } widget_kind_t;
 
-typedef struct widget {
+struct widget {
     widget_kind_t kind;
     const char *label;
-    sfFloatRect bounds;            /* UI coordinates */
+    ui_rect_t bounds;              /* UI coordinates */
     bool enabled;
-    int *value;                    /* toggle 0/1, slider min..max, cycler index, keybind sfKeyCode */
+    int *value;                    /* toggle 0/1, slider min..max, cycler and list index */
+    binding_t *binding;            /* keybind */
     int min;
     int max;
     int step;
-    const char *const *choices;    /* cycler labels, `max + 1` entries */
-    void (*on_change)(gd_t *gd, struct widget *w);    /* value changed */
-    void (*on_activate)(gd_t *gd, struct widget *w);  /* button pressed */
-} widget_t;
+    const char *const *choices;    /* cycler labels and list rows, `max + 1` entries */
+    int scroll;                    /* list: the first row shown */
+    widget_fn on_change;           /* value changed: (ctx, widget) */
+    widget_fn on_activate;         /* a button, or a list's chosen row */
+    capture_fn on_capture;         /* a keybind's result; NULL: assigned as is */
+};
 ```
 
-Slider: the value follows the mouse while captured; Left/Right change it by `step`; holding Left/Right repeats every 80 ms after a 300 ms delay (your own timer, since OS key repeat is off, 1.3).
+Callbacks get the screen's `ctx`, not `gd_t`, and **must never free the screen they're called from**: a scene that changes sets a flag and switches after its events (PLAN 10.1).
+
+Slider: pressing it captures the mouse, and the value follows it anywhere until the release, on the step grid and capped at `max` (a step that doesn't divide the range still reaches `max`). Left/Right change it by `step`.
 
 ```c
-static void slider_follow_mouse(widget_t *w, float mouse_x, gd_t *gd)
+static void slider_follow(ui_screen_t *ui, widget_t *w, float x)
 {
-    float t = (mouse_x - w->bounds.left) / w->bounds.width;
+    float t = (x - w->bounds.x) / w->bounds.w;
+    int step = w->step > 0 ? w->step : 1;
     int v;
 
     t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
-    v = w->min + (int)roundf(t * (float)(w->max - w->min) / (float)w->step) * w->step;
-    if (v != *w->value) {
-        *w->value = v;
-        if (w->on_change != NULL)
-            w->on_change(gd, w);
-    }
+    v = w->min + (int)roundf(t * (float)(w->max - w->min) / (float)step) * step;
+    set_value(ui, w, v > w->max ? w->max : v);    /* calls on_change only if it changed */
 }
 ```
 
 `on_change` is only called when the value actually changes, so dragging doesn't spam volume updates with the same value.
 
-Cycler: `< label >`, Left/Right or clicking the arrows move through `choices`, wrapping around.
+**Held arrows repeat** every 80 ms after a 300 ms delay, on `ui_update`'s clock, since OS key repeat is off (1.3): Up/Down move the focus (or a list's selection), Left/Right change a slider or a cycler. A hitch replays at most 4 repeats.
 
-Key capture: activating it shows "Press a key… (Esc to cancel)" as a modal; the next `sfEvtKeyPressed` is the result. Rules in 5.5.
+Cycler: `< label >`. Left/Right move through `choices`, wrapping around; a click on its left third goes back, anywhere else forward, and Enter goes forward.
 
-List: rows of fixed height, a scroll offset, mouse wheel scrolls 3 rows, Up/Down move the selection and scroll to keep it visible, Enter activates. Used by the song picker and, later, the level list and editor file dialog.
+Key capture: activating it starts the modal ("Press a key, mouse button or gamepad button for Jump 2", "Esc to cancel, Backspace to clear"), drawn over a dimmed screen. Only the next **press** counts, so the click or Enter that opened it doesn't. Escape cancels, Backspace gives `BIND_NONE` (clear), anything else is the result. With `on_capture` set, the screen decides (5.5: swaps, the last jump binding); without it, the binding is assigned.
+
+List: rows of `UI_ROW_H` (60 px), as many as fit in its bounds, from `scroll`. The mouse wheel scrolls 3 rows, clamped so the last row stays at the bottom. Up/Down move the selection and scroll to keep it visible; past either end, the focus moves on to the next widget. A click selects a row; a click on the selected row, or Enter, activates it (`on_activate`). Used by the song picker and, later, the level list and editor file dialog.
+
+Disabled widgets are skipped by Up/Down, ignore the mouse, and never take the focus.
 
 ### 3.6 Screen structure
 
 ```c
-typedef struct ui_screen {
+struct ui_screen {
     widget_t *widgets;
-    size_t count;
-    size_t focused;
-    int captured;                  /* index of the widget with mouse capture, -1 if none */
-    int pressed;                   /* index where the current press started, -1 if none */
-    void (*on_back)(gd_t *gd);     /* Escape */
-} ui_screen_t;
+    int count;
+    int focused;                   /* -1 when nothing can be focused */
+    int hovered;
+    int pressed;                   /* where the current left press started, -1 if none */
+    int captured;                  /* the slider being dragged, -1 if none */
+    int capturing;                 /* the keybind waiting for an input, -1 if none */
+    /* the mouse, the held arrow and its next repeat */
+    ui_screen_t *modal;            /* a dialog on top: it gets every event, it's drawn last */
+    void *ctx;
+    float label_x;                 /* rows' labels start here (5.1); 0: right-aligned against the widget */
+    void (*on_back)(void *ctx);                             /* Escape */
+    void (*on_key)(void *ctx, binding_t key, bool shift);   /* other keys: Tab for the sections (5.1) */
+};
 
-void ui_event(ui_screen_t *ui, gd_t *gd, const sfEvent *ev);   /* returns nothing; sets flags */
-void ui_update(ui_screen_t *ui, gd_t *gd);                      /* hover, key repeat timers */
-void ui_draw(const ui_screen_t *ui, gd_t *gd);
+void ui_init(ui_screen_t *ui, widget_t *widgets, int count, void *ctx);   /* focus on the first enabled */
+void ui_event(ui_screen_t *ui, const ui_event_t *ev, int64_t now_ms);
+void ui_update(ui_screen_t *ui, int64_t now_ms);                          /* key repeat */
+ui_look_t ui_look(const ui_screen_t *ui, int i);                          /* 3.2, for the renderer */
 ```
 
-Widgets are laid out once when the screen is created; nothing is allocated per frame.
+`ui_look` gives the state of 3.2 with what to draw: scale 1.05 hovered (under the mouse with no button down), 0.92 pressed (the left press started here and the mouse is still on it, or it's the slider being dragged), 50% alpha disabled, an outline when focused.
+
+Widgets are laid out once when the screen is created; nothing is allocated per frame. No scene uses the toolkit yet: the options screen (5) is the first.
 
 ---
 
