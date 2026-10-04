@@ -1,0 +1,7 @@
+# The songs of music/ (FEATURES 4.3). One line per song, fields separated
+# by |, each optional after the file:
+# file | title | artist | license | default_offset_seconds
+#
+# Keep the license of every song you ship here, and its proof somewhere:
+# CC BY wants the title and the artist credited, which the end screen does.
+back_mus.ogg | Back Music | Unknown | ? | 0.00
