@@ -124,6 +124,7 @@ music_t *load_musics(void)
 void free_gd(gd_t *gd)
 {
     settings_free(&gd->settings);
+    ui_gfx_free(gd);
     progress_free(&gd->progress);
     sfTexture_destroy(gd->atlas);
     sfView_destroy(gd->ui_view);
@@ -165,6 +166,7 @@ gd_t *create_gd(void)
         exit(84);
     }
     gd->w = create_window(&gd->settings);
+    ui_gfx_create(gd);
     gd->ui_view = sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H});
     gd->level_view = sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H});
     apply_letterbox(gd, sfRenderWindow_getSize(gd->w).x,

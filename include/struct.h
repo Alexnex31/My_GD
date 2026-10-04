@@ -132,6 +132,8 @@ typedef struct gd {
     sfFloatRect atlas_rect[OBJ_TYPE_COUNT];
     progress_t progress;          /* attempts and best, loaded once (6.4)     */
     settings_t settings;          /* save/settings.txt (FEATURES 2)           */
+    sfRectangleShape *ui_shape;   /* the widgets', reused (FEATURES 3)        */
+    sfText *ui_text;
 } gd_t;
 
 #endif

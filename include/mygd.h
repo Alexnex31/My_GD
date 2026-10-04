@@ -21,6 +21,7 @@
     #include "struct.h"
     #include "level.h"
     #include "view.h"
+    #include "ui/ui.h"
 
 void close_window(sfRenderWindow *window);
 void destroy_all(sfRenderWindow *window);
@@ -83,6 +84,13 @@ void atlas_build(gd_t *gd);
 
 /* The letterbox of 9.7, applied to both views on every resize. */
 void apply_letterbox(gd_t *gd, unsigned int w, unsigned int h);
+
+/* The widget toolkit's window side (FEATURES 3): events in, widgets drawn. */
+void ui_gfx_create(gd_t *gd);
+void ui_gfx_free(gd_t *gd);
+bool ui_from_sf(gd_t *gd, const sfEvent *ev, ui_event_t *out);
+void ui_draw(gd_t *gd, const ui_screen_t *ui);
+int64_t ui_now_ms(void);
 
 /* The F3 overlay (9.6): shapes, hitboxes, the tick's events, the numbers. */
 void render_debug_overlay(gd_t *gd, level_t *lv, vec2_t cam);
