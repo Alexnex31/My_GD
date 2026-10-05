@@ -172,7 +172,7 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     lb->song_text = sfText_create();
     sfText_setFont(lb->song_text, gd->main_font);
     sfText_setCharacterSize(lb->song_text, 22);
-    sfText_setPosition(lb->song_text, (sfVector2f){x, y + 115});
+    sfText_setPosition(lb->song_text, (sfVector2f){x, y + 205});  /* under Play */
     sfText_setFillColor(lb->song_text, (sfColor){180, 230, 255, 255});
     song_line_refresh(gd, lb);
     free(attempts_str);

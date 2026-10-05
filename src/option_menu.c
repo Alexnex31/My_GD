@@ -91,9 +91,11 @@ void print_option_menu(option_m_t *om, gd_t *gd)
 {
     sfRenderWindow_drawSprite(gd->w, om->background, NULL);
     ui_draw(gd, &om->tabs);
-    if (om->section == SEC_DISPLAY)          /* 5.3: worth saying */
+    if (om->section == SEC_DISPLAY) {        /* 5.3: worth saying */
         draw_line(om, "VSync and the frame limit change smoothness and power"
-            " use, never the game's speed.", OPT_LABEL_X, 640.0f);
+            " use,", OPT_LABEL_X, 640.0f);
+        draw_line(om, "never the game's speed.", OPT_LABEL_X, 690.0f);
+    }
     ui_draw(gd, &om->rows);
     options_draw_dialog(om);
     if (ui_now_ms() < om->notice_until_ms)
