@@ -677,7 +677,8 @@ typedef enum obj_type {
     OBJ_SLOPE,                /* neutral: right triangle (7.2)               */
     OBJ_SPIKE,                /* harm                                        */
     OBJ_PORTAL,               /* interactive: acts once, then untouchable    */
-    /* later: OBJ_SAW (harm), OBJ_PAD, OBJ_ORB, OBJ_GRAVITY, OBJ_SPEED (FEATURES 10) */
+    OBJ_GRAVITY,              /* interactive: a gravity portal (FEATURES 9.4) */
+    /* later: OBJ_SAW (harm), OBJ_PAD, OBJ_ORB, OBJ_SPEED (FEATURES 10) */
     OBJ_TYPE_COUNT
 } obj_type_t;
 

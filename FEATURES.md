@@ -1040,6 +1040,15 @@ A negative value is a speed **toward the floor the player is falling to**: for t
 
 **Other rules from the same page**, already in this plan: the wave moves at a 45° diagonal up while held and down while released (8), and a **mini wave's vertical speed is double its horizontal speed** (a 2:1 diagonal, not 45°: add it with the mini portal, 10.4); the ball inverts gravity on contact with a surface (9); the spider teleports to the nearest overhead surface and inverts gravity (10.5); the swing inverts gravity gradually (10.5).
 
+### 6.10 As built
+
+- **The table:** `MODES` (`src/sim/modes.c`, `include/sim/modes.h`) has every field of 6.1, with a row for the cube and the ship; the UFO, wave and ball add theirs (7–9). A mode's own code is one file, `src/sim/mode_cube.c` and `src/sim/mode_ship.c`: its input and its icon's rotation. `src/sim/player.c` keeps what every mode shares: the hold rule, gravity up to the mode's fall cap (`player_apply_gravity`, the `apply_forces` of both rows) and `player_flip_gravity`.
+- **The tick (6.3)** calls `MODES[p->mode]` at each step and no longer names a mode. Moving the code was checked to change nothing: every tick's state hash over 20000 ticks, on every level and three input patterns, is the same before and after.
+- **`neutral_kills` (6.4):** the square that dies on a neutral object is `mode_neutral_kill_half`: the inner box, or the whole rigid square for a mode nothing may touch. No row sets it until the wave (8).
+- **Gravity portals (9.4)** are in, ahead of the ball, because they are what flips gravity in a level: `gravity x y size up|down`, an interactive object with a mode portal's shape. Yellow sends the player up, blue brings it back down.
+- **The game layer** reads per-mode arrays for the icon and the portal colour, and draws the icon upside down when gravity is flipped.
+- **Tests:** `tests/test_gravity.c` (the table's rows, the parser, a flip keeps position and on-screen speed, a portal acts once, landing exactly 50 px under a block, there and back, the kill ceiling, gravity and gamemode independent) and a gravity level in `tests/test_bot.c`.
+
 ---
 
 ## 7. UFO
@@ -1262,6 +1271,8 @@ gravity x y size up|down
 ```
 
 First touch (interactive rule, PLAN 5.1: acts once, then `spent`): if the player's gravity isn't already the portal's direction (`up` = −1, `down` = +1), `player_flip_gravity` (PLAN 3.4); otherwise nothing. It only flips the gravity: the player keeps its motion, and the flipped gravity takes it from there. The mode doesn't change, and no corridor is created: a gravity portal outside a corridor gives a flipped player nothing above it, so the level must provide something to land on, or the kill ceiling (6.4) kills it. Gravity portals and mode portals are fully independent: one changes gravity, the other changes the gamemode.
+
+Built with the framework (6.10): a portal the player already agrees with does nothing and is used up all the same.
 
 ### 9.5 Test level
 

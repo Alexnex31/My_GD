@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) and the options screen (5) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5) and the gamemode framework (6: one table row and one file per mode, gravity portals) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -119,10 +119,11 @@ spike 3400 0 2 rot=180       # ceiling spike
 block 5000 650 2 w=8 h=1     # 400 x 50 platform
 slope 6000 750 2             # 100 x 100, 45 deg, rising to the right
 portal 2100 750 2 ship
+gravity 4000 750 2 up         # gravity portal: the player falls upward
 ```
 
 - **Header**: any line whose first word isn't an object type, written `key <value>`. `name`, `author`, `music`, `music_offset`, `bpm` and `first_beat` describe the level; the optional `start_gamemode`, `start_speed`, `start_size`, `start_gravity`, `start_x` and `start_y` say where and how an attempt begins. Unknown keys are ignored with a warning, so the file still loads.
-- **Body**: `type x y size [word] [key=value ...]`, with types `block`, `slope`, `spike` and `portal` (whose word is the gamemode: `cube`, `ship`).
+- **Body**: `type x y size [word] [key=value ...]`, with types `block`, `slope`, `spike`, `portal` (whose word is the gamemode: `cube`, `ship`) and `gravity` (a gravity portal, whose word is `up` or `down`).
 - `x` and `y` are the object's top-left corner in world pixels, `y` grows downward and the ground's surface is at `y = 850`.
 - `size` is in grid units of 50 px, so `size 2` is the 100 x 100 block that matches the player. `w=` and `h=` override it per axis, `rot=` turns the object by any angle.
 - Sizes must be at least 1: a zero or negative size rejects the line, naming the file and the line.
