@@ -96,6 +96,31 @@ static void test_ship_flies_over(void)
     sim_free(&s);
 }
 
+/*
+** Up through a gravity portal, a jump off the ceiling over a hanging spike,
+** back down, a jump on the ground (FEATURES 9.4). Without the ceiling there
+** is nothing to do: every run ends at the kill ceiling.
+*/
+static void test_gravity_portals(void)
+{
+    sim_t s;
+    bot_result_t r;
+
+    load(&s, "gravity 1000 700 2 up\nblock 1100 300 2 w=60 h=2\n"
+        "spike 2500 400 2 rot=180\ngravity 3800 400 2 down\n"
+        "spike 5000 750 2\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_FOUND && r.attempts > 2);
+    CHECK(replays(&s, &r));
+    bot_result_free(&r);
+    sim_free(&s);
+    load(&s, "gravity 1000 700 2 up\nspike 5000 750 2\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_NO_PATH && r.furthest < 100.0f);
+    bot_result_free(&r);
+    sim_free(&s);
+}
+
 static int numeric_name(const struct dirent **a, const struct dirent **b)
 {
     long x = strtol((*a)->d_name, NULL, 10);
@@ -151,5 +176,6 @@ void test_bot(void)
     test_spike_needs_a_jump();
     test_wall_too_tall();
     test_ship_flies_over();
+    test_gravity_portals();
     test_levels();
 }

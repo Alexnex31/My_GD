@@ -17,6 +17,7 @@ void test_tick(void);
 void test_slopes(void);
 void test_portal(void);
 void test_start(void);
+void test_gravity(void);
 void test_progress(void);
 void test_input(void);
 void test_settings(void);

@@ -20,6 +20,7 @@ int main(void)
     test_slopes();
     test_portal();
     test_start();
+    test_gravity();
     test_progress();
     test_input();
     test_settings();
