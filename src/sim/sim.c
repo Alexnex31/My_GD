@@ -66,7 +66,11 @@ void sim_reset(sim_t *s)
     st->cam.pos.y = camera_rest_y(&st->player, &st->bounds);
 }
 
-/* The tick, in the order of 3.4: forces, movement, effects, camera. */
+/*
+** The tick, in the order of 3.4: forces, movement, effects, camera. The mode
+** is read again at each step: step 5 can change it (a portal), and that must
+** only reach the next tick's physics (FEATURES 6.3).
+*/
 void sim_tick(sim_t *s, input_t in)
 {
     run_state_t *st = &s->st;
@@ -76,8 +80,8 @@ void sim_tick(sim_t *s, input_t in)
         return;
     p->prev_pos = p->pos;
     player_update_hold(p, in);               /* 0. fresh / used / none          */
-    player_apply_input(p, in);               /* 1. the jump, the ship's thrust  */
-    player_apply_gravity(p);                 /* 2. gravity and the fall cap     */
+    MODES[p->mode].apply_input(p, in);       /* 1. the mode's impulses          */
+    MODES[p->mode].apply_forces(p);          /* 2. gravity and the fall cap     */
     move_and_collide(s);                     /* 3. legs, contacts, deaths (4.4) */
     if (p->alive)
         collide_kill_ceiling(p, &s->lvl);    /* 4. flipped gravity only (4.7)   */
@@ -90,7 +94,7 @@ void sim_tick(sim_t *s, input_t in)
     if (p->alive && st->distance >= s->lvl.end_shift)
         st->complete = true;                 /* 7.                              */
     if (p->alive)
-        player_update_rotation(p);           /* 8. the icon, cosmetic           */
+        MODES[p->mode].update_rotation(p);   /* 8. the icon, cosmetic           */
 }
 
 float sim_percent(const sim_t *s)

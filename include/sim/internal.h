@@ -13,10 +13,19 @@
 /* The pieces of one tick (3.4). Only the simulation calls these. */
 
 void player_update_hold(player_t *p, input_t in);
-void player_apply_input(player_t *p, input_t in);
-void player_apply_gravity(player_t *p);
+void player_apply_gravity(player_t *p);            /* every mode's forces so far */
 void player_flip_gravity(player_t *p);
-void player_update_rotation(player_t *p);          /* cosmetic (9.4) */
+
+/*
+** The modes' own code, one file each, reached through MODES[] only
+** (FEATURES 6.1). They change the velocity and never move the player. The
+** rotation is cosmetic (9.4): computed in the tick so it doesn't depend on
+** the frame rate, and left out of the state hash because it decides nothing.
+*/
+void cube_input(player_t *p, input_t in);
+void cube_rotation(player_t *p);
+void ship_input(player_t *p, input_t in);
+void ship_rotation(player_t *p);
 
 void move_and_collide(sim_t *s);                   /* 4.4 */
 void collide_kill_ceiling(player_t *p, const level_data_t *lvl);   /* 4.7 */

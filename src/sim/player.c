@@ -2,7 +2,7 @@
 ** ALEXNEX PROJECT, 2026
 ** sim/player.c
 ** File description:
-** the forces acting on the player: input, gravity, gravity flips (3.4)
+** what every mode shares: the hold, gravity, gravity flips (3.4)
 */
 
 #include <math.h>
@@ -17,21 +17,6 @@ void player_update_hold(player_t *p, input_t in)
         p->hold = HOLD_FRESH;
     else if (!in.held)
         p->hold = HOLD_NONE;
-}
-
-void player_apply_input(player_t *p, input_t in)
-{
-    bool down = in.held || in.pressed;       /* a tap inside one tick still counts */
-
-    if (p->mode == MODE_CUBE && down && p->can_jump) {
-        p->vy = PER_TICK(CUBE_JUMP_V);       /* an impulse: it sets the rise speed */
-        p->can_jump = false;
-        p->grounded = false;
-        p->hold = HOLD_USED;                 /* this hold activates no orb now */
-    }
-    if (p->mode == MODE_SHIP && down && p->vy < PER_TICK(SHIP_MAX_VY))
-        p->vy = fmin(p->vy + PER_TICK2(SHIP_THRUST),
-            PER_TICK(SHIP_MAX_VY) + MODES[MODE_SHIP].gravity);
 }
 
 /*
@@ -57,26 +42,4 @@ void player_flip_gravity(player_t *p)
     p->vy = -p->vy;
     p->grounded = false;
     p->can_jump = false;
-}
-
-/*
-** The icon's angle (9.4). Cosmetic: it is computed in the tick so it doesn't
-** depend on the frame rate and a replay shows the same thing, and it is left
-** out of the state hash (G.11) because it decides nothing.
-*/
-void player_update_rotation(player_t *p)
-{
-    float surface = (float)(atan2(p->support_normal.x,
-        -p->support_normal.y * p->gravity_dir) * 180.0 / M_PI);
-
-    if (p->mode == MODE_SHIP) {
-        p->rotation = (float)(-atan2(p->vy, p->vx) * 180.0 / M_PI
-            * p->gravity_dir);
-        return;
-    }
-    if (!p->grounded) {
-        p->rotation += (float)PER_TICK(CUBE_SPIN) * (float)p->gravity_dir;
-        return;
-    }
-    p->rotation = surface + roundf((p->rotation - surface) / 90.0f) * 90.0f;
 }

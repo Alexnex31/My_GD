@@ -150,8 +150,9 @@ static void try_surfaces(sim_t *s, vec2_t d, event_t *out)
 }
 
 /*
-** When this leg kills: the inner box against neutral objects, or the rigid
-** square against harm, whichever comes first. INFINITY when neither does.
+** When this leg kills: the inner box against neutral objects (the whole
+** square for a mode they always kill), or the rigid square against harm,
+** whichever comes first. INFINITY when neither does.
 ** Surfaces are not tested: they never kill (4.3).
 */
 static double leg_death_time(sim_t *s, vec2_t d)
@@ -165,7 +166,8 @@ static double leg_death_time(sim_t *s, vec2_t d)
         const object_t *o = &s->lvl.objects[s->cand[k]];
 
         if (OBJ_CATEGORY[o->type] == CAT_NEUTRAL)
-            t = sweep_box_touch(p->pos, m->inner_half, d, &o->hitbox);
+            t = sweep_box_touch(p->pos, mode_neutral_kill_half(m), d,
+                &o->hitbox);
         else if (OBJ_CATEGORY[o->type] == CAT_HARM)
             t = sweep_box_touch(p->pos, m->half, d, &o->hitbox);
         else

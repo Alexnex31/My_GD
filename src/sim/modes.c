@@ -2,10 +2,11 @@
 ** ALEXNEX PROJECT, 2026
 ** sim/modes.c
 ** File description:
-** header file for my_gd project
+** the tables everything reads: object categories, gamemodes (FEATURES 6.1)
 */
 
 #include <string.h>
+#include "sim/internal.h"
 #include "sim/modes.h"
 
 const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT] = {
@@ -18,12 +19,25 @@ const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT] = {
 const mode_ops_t MODES[MODE_COUNT] = {
     [MODE_CUBE] = {.name = "cube", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
         .gravity = PER_TICK2(CUBE_GRAVITY),
-        .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0},
+        .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
+        .apply_input = cube_input, .apply_forces = player_apply_gravity,
+        .update_rotation = cube_rotation},
     [MODE_SHIP] = {.name = "ship", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
         .gravity = PER_TICK2(SHIP_GRAVITY),
         .max_fall = PER_TICK(SHIP_MAX_VY), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .corridor_height = 1000.0, .bot_decision_ticks = 12},
+        .corridor_height = 1000.0, .bot_decision_ticks = 12,
+        .apply_input = ship_input, .apply_forces = player_apply_gravity,
+        .update_rotation = ship_rotation},
 };
+
+/*
+** The square that dies on a neutral object: the small inner box, or the whole
+** rigid square for a mode nothing may touch (the wave, FEATURES 6.4).
+*/
+double mode_neutral_kill_half(const mode_ops_t *m)
+{
+    return m->neutral_kills ? m->half : m->inner_half;
+}
 
 double modes_tallest_corridor(void)
 {

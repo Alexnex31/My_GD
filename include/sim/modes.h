@@ -18,13 +18,19 @@ typedef struct mode_ops {
     double max_fall;           /* px/tick, fall speed cap                            */
     double head_restitution;   /* ceiling hit: < 0 dies, else share of vy bounced back */
     double corridor_height;   /* the corridor this mode's portal opens, px; 0: none (5.2) */
+    bool neutral_kills;       /* any contact with a neutral object kills (the wave);
+                                 the ground and corridor surfaces don't            */
     bool keep_vy_on_surface;  /* sliding on a surface doesn't reset vy (the wave)   */
     int bot_decision_ticks;   /* the bot's choices: 0 when it can jump, else every N ticks (8.3) */
+    void (*apply_input)(player_t *p, input_t in);   /* impulses, input-driven speed */
+    void (*apply_forces)(player_t *p);              /* gravity and caps; never moves */
+    void (*update_rotation)(player_t *p);           /* the icon, cosmetic (9.4)     */
 } mode_ops_t;
 
 extern const mode_ops_t MODES[MODE_COUNT];
 
 int mode_from_name(const char *name);      /* -1 if unknown (5.5) */
+double mode_neutral_kill_half(const mode_ops_t *m);   /* FEATURES 6.4 */
 double modes_tallest_corridor(void);       /* over MODES[]: the kill line (4.7) */
 
 #endif
