@@ -241,6 +241,14 @@ static void test_left_right(void)
     CHECK(f.cycler == 4);
     click_at(&f, 1700, 520);
     CHECK(f.cycler == 0);
+    setup(&f);                                       /* on a button: they move */
+    key(&f, KEY_Right, 0);
+    CHECK(f.ui.focused == TOGGLE);
+    key(&f, KEY_Right, 0);
+    CHECK(f.ui.focused == TOGGLE && f.toggle == 0);  /* only from a button */
+    setup(&f);
+    key(&f, KEY_Left, 0);
+    CHECK(f.ui.focused == LIST);
 }
 
 /* A held arrow: first repeat after 300 ms, then every 80 ms (3.5). */
