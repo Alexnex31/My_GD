@@ -332,7 +332,7 @@ For each event, in order:
 
 1. If a modal dialog is open (confirmation, key capture), it gets the event; stop.
 2. If a widget has **mouse capture** (a slider being dragged), it gets mouse moves and the release, even outside its bounds; stop.
-3. Keyboard navigation: Up/Down move focus (skipping disabled widgets, wrapping around); Left/Right go to the focused widget (sliders and cyclers change value); Enter/Space activate; Escape goes to the screen's "back" action.
+3. Keyboard navigation: Up/Down move focus (skipping disabled widgets, wrapping around); Left/Right go to the focused widget (sliders and cyclers change value; on a button they move the focus like Up/Down, so a dialog's side-by-side buttons are reachable); Enter/Space activate; Escape goes to the screen's "back" action.
 4. Mouse: find the widget under the mouse; hover moves focus to it; press starts capture or pressed state.
 5. The jump never goes through events: its own thread polls it (1.3). A UI click in a level stops the ticks that would cover it (1.5).
 
@@ -396,7 +396,7 @@ static void slider_follow(ui_screen_t *ui, widget_t *w, float x)
 
 `on_change` is only called when the value actually changes, so dragging doesn't spam volume updates with the same value.
 
-**Held arrows repeat** every 80 ms after a 300 ms delay, on `ui_update`'s clock, since OS key repeat is off (1.3): Up/Down move the focus (or a list's selection), Left/Right change a slider or a cycler. A hitch replays at most 4 repeats.
+**Held arrows repeat** every 80 ms after a 300 ms delay, on `ui_update`'s clock, since OS key repeat is off (1.3): Up/Down move the focus (or a list's selection), Left/Right change a slider or a cycler, or move the focus from a button. A hitch replays at most 4 repeats.
 
 Cycler: `< label >`. Left/Right move through `choices`, wrapping around; a click on its left third goes back, anywhere else forward, and Enter goes forward.
 
@@ -419,6 +419,7 @@ struct ui_screen {
     int capturing;                 /* the keybind waiting for an input, -1 if none */
     /* the mouse, the held arrow and its next repeat */
     ui_screen_t *modal;            /* a dialog on top: it gets every event, it's drawn last */
+    ui_rect_t panel;               /* a dialog's own background, behind its widgets and text */
     void *ctx;
     float label_x;                 /* rows' labels start here (5.1); 0: right-aligned against the widget */
     void (*on_back)(void *ctx);                             /* Escape */
@@ -663,7 +664,7 @@ The end-of-level screen shows `♪ Title — Artist (License)`. A Credits screen
 - **Sync (4.8):** level start, death, respawn and completion follow the table; the drift check runs once a second while playing. Pause, focus loss and checkpoint respawns wait for pause (PLAN 10.4) and practice mode.
 - **Level vs song (4.9):** `--check` prints the song, its offset and both lengths, and warns when the level is longer; in game, the song loops then.
 - **Menu vs level (4.10):** the manager tracks whether the menu owns the playback (`menu_playing`), not which file is loaded: a level that plays the menu's own song (`back_mus.ogg` today) still saves the menu's position on the way in and gives it back on the way out.
-- **Picker (4.6):** the level list shows "Song: Title — Artist" under each level ("(yours)" for an override); clicking it opens the picker over the dimmed list. Moving the selection plays 10 s; Enter saves `song=` (the "Default" row removes it); Escape cancels; both resume the menu song where it was.
+- **Picker (4.6):** the level list shows "Song: Title — Artist" under each level's Play button ("(yours)" for an override); clicking it opens the picker over the dimmed list. Moving the selection plays 10 s; Enter saves `song=` (the "Default" row removes it); Escape cancels; both resume the menu song where it was.
 - **Credits (4.11):** the end screen shows "Song: Title — Artist (License)". The Credits screen isn't there yet: it needs a main menu entry and `res/CREDITS.md`.
 - **Text:** SFML reads `char *` in the locale's encoding, so song titles and the em dash go through `utf8_to_utf32`. The game's font has no ♪, so the lines start with "Song:".
 
