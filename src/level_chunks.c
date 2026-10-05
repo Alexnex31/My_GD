@@ -20,13 +20,24 @@ static draw_layer_t layer_of(const object_t *o)
     return LAYER_BLOCK;
 }
 
-/* Cyan for a cube portal, pink for a ship one; white for everything else. */
+/* One row per mode, like MODES[] (FEATURES 6.1): a new mode adds its own. */
+static const sfColor PORTAL_COLORS[MODE_COUNT] = {
+    [MODE_CUBE] = {0, 230, 230, 255},
+    [MODE_SHIP] = {255, 120, 220, 255},
+};
+
+/*
+** A mode portal has its mode's colour; a gravity portal is yellow when it
+** sends the player up and blue when it brings it back down, as in GD.
+*/
 static sfColor object_color(const object_t *o)
 {
+    if (o->type == OBJ_GRAVITY)
+        return o->portal_gravity < 0 ? (sfColor){255, 220, 40, 255}
+            : (sfColor){60, 120, 255, 255};
     if (o->type != OBJ_PORTAL)
         return sfWhite;
-    return o->portal_mode == MODE_SHIP ? (sfColor){255, 120, 220, 255}
-        : (sfColor){0, 230, 230, 255};
+    return PORTAL_COLORS[o->portal_mode];
 }
 
 /*

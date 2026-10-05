@@ -208,16 +208,20 @@ static void render_background(gd_t *gd, level_t *lv, vec2_t cam)
 static void setup_player_sprite(gd_t *gd, level_t *lv)
 {
     const player_t *p = &lv->sim.st.player;
-    sfTexture *tex = p->mode == MODE_SHIP ? gd->res->ship_icon
-        : gd->res->player_icon;
+    sfTexture *const icons[MODE_COUNT] = {   /* one per mode (FEATURES 6.1) */
+        [MODE_CUBE] = gd->res->player_icon,
+        [MODE_SHIP] = gd->res->ship_icon,
+    };
+    sfTexture *tex = icons[p->mode];
     sfVector2u size = sfTexture_getSize(tex);
     double side = 2.0 * MODES[p->mode].half;
 
     sfSprite_setTexture(lv->player_sprite, tex, sfTrue);
     sfSprite_setOrigin(lv->player_sprite,
         (sfVector2f){size.x / 2.0f, size.y / 2.0f});
-    sfSprite_setScale(lv->player_sprite,
-        (sfVector2f){(float)(side / size.x), (float)(side / size.y)});
+    sfSprite_setScale(lv->player_sprite,     /* upside down with its gravity */
+        (sfVector2f){(float)(side / size.x),
+        (float)(side / size.y) * (float)p->gravity_dir});
 }
 
 static void render_player(gd_t *gd, level_t *lv)

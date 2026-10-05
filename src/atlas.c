@@ -15,6 +15,7 @@ static const char *const ATLAS_FILES[OBJ_TYPE_COUNT] = {
     [OBJ_SLOPE] = "res/block.png",
     [OBJ_SPIKE] = "res/spike.png",
     [OBJ_PORTAL] = "res/cube_portal.png",
+    [OBJ_GRAVITY] = "res/cube_portal.png",
 };
 
 /*
