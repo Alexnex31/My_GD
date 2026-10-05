@@ -14,6 +14,7 @@ const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT] = {
     [OBJ_SLOPE] = CAT_NEUTRAL,
     [OBJ_SPIKE] = CAT_HARM,
     [OBJ_PORTAL] = CAT_INTERACTIVE,
+    [OBJ_GRAVITY] = CAT_INTERACTIVE,
 };
 
 const mode_ops_t MODES[MODE_COUNT] = {

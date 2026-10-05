@@ -116,7 +116,7 @@ static void portal_shape(object_t *o, bool given_w, bool given_h)
     double block = o->size * UNIT;            /* the cell as written: 1 block */
     vec2_t center = {o->rect.x + block / 2.0, o->rect.y + block / 2.0};
 
-    if (o->type != OBJ_PORTAL)
+    if (o->type != OBJ_PORTAL && o->type != OBJ_GRAVITY)
         return;
     if (!given_w) {                          /* derived: centered on the cell */
         o->rect.w = block * PORTAL_BOX_W;
@@ -158,6 +158,7 @@ static int type_from_name(const char *name, obj_type_t *out)
     static const char *const names[OBJ_TYPE_COUNT] = {
         [OBJ_BLOCK] = "block", [OBJ_SLOPE] = "slope",
         [OBJ_SPIKE] = "spike", [OBJ_PORTAL] = "portal",
+        [OBJ_GRAVITY] = "gravity",
     };
 
     for (int i = 0; i < OBJ_TYPE_COUNT; i++)
@@ -168,11 +169,28 @@ static int type_from_name(const char *name, obj_type_t *out)
     return -1;
 }
 
+/* A gravity portal's word: the way it makes the player fall (FEATURES 9.4). */
+static int gravity_word(object_t *o, const char *word, parse_ctx_t *ctx)
+{
+    if (word != NULL && strcmp(word, "up") == 0)
+        o->portal_gravity = -1;
+    else if (word != NULL && strcmp(word, "down") == 0)
+        o->portal_gravity = 1;
+    else {
+        warn(ctx, "gravity needs up or down, line skipped");
+        return -1;
+    }
+    hitbox_for_object(o);
+    return 0;
+}
+
 /* The extra word (portals need a mode, 5.5), then the hitbox. */
 static int object_init(object_t *o, const char *word, parse_ctx_t *ctx)
 {
     int mode = 0;
 
+    if (o->type == OBJ_GRAVITY)
+        return gravity_word(o, word, ctx);
     if (o->type == OBJ_PORTAL) {
         mode = word == NULL ? -1 : mode_from_name(word);
         if (mode < 0) {

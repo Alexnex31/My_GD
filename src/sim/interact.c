@@ -2,7 +2,7 @@
 ** ALEXNEX PROJECT, 2026
 ** sim/interact.c
 ** File description:
-** objects that act once and then lose their hitbox: portals (4.6, 5.1, 5.2)
+** objects that act once and then lose their hitbox: mode and gravity portals (4.6, 5.1, 5.2)
 */
 
 #include <math.h>
@@ -99,16 +99,29 @@ static void enter_portal(sim_t *s, const object_t *o)
         s->st.bounds.active = false;         /* its boundaries stop existing now */
 }
 
+/*
+** A gravity portal makes the player fall its way, and that is all: the motion
+** is kept, the mode is kept and no corridor appears (FEATURES 9.4). One the
+** player already agrees with is used up all the same.
+*/
+static void enter_gravity(sim_t *s, const object_t *o)
+{
+    if (s->st.player.gravity_dir != o->portal_gravity)
+        player_flip_gravity(&s->st.player);
+}
+
 static bool interactive_wants_activation(const sim_t *s, const object_t *o)
 {
-    (void)s;
-    return o->type == OBJ_PORTAL;            /* pads, orbs and the rest: FEATURES */
+    (void)s;                                 /* pads, orbs and the rest: FEATURES */
+    return o->type == OBJ_PORTAL || o->type == OBJ_GRAVITY;
 }
 
 static void interactive_act(sim_t *s, const object_t *o)
 {
     if (o->type == OBJ_PORTAL)
         enter_portal(s, o);
+    if (o->type == OBJ_GRAVITY)
+        enter_gravity(s, o);
 }
 
 /* It acts once, then keeps its sprite and loses its hitbox (5.1). */

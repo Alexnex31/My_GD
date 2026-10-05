@@ -27,7 +27,8 @@ typedef enum obj_type {
     OBJ_SLOPE,                /* neutral: right triangle (7.2)               */
     OBJ_SPIKE,                /* harm                                        */
     OBJ_PORTAL,               /* interactive: acts once, then untouchable    */
-    /* later: OBJ_SAW (harm), OBJ_PAD, OBJ_ORB, OBJ_GRAVITY, OBJ_SPEED (FEATURES 10) */
+    OBJ_GRAVITY,              /* interactive: a gravity portal (FEATURES 9.4) */
+    /* later: OBJ_SAW (harm), OBJ_PAD, OBJ_ORB, OBJ_SPEED (FEATURES 10) */
     OBJ_TYPE_COUNT
 } obj_type_t;
 
@@ -74,6 +75,7 @@ typedef struct object {       /* level data: never modified after load */
     hitbox_t hitbox;          /* computed once at load, rotation included      */
     int size;                 /* as written in the file                        */
     gamemode_t portal_mode;   /* OBJ_PORTAL only                                */
+    int portal_gravity;       /* OBJ_GRAVITY only: +1 down, -1 up               */
     int line;                 /* source line, for messages and stable sort      */
 } object_t;
 
