@@ -227,6 +227,8 @@ static void adjust(ui_screen_t *ui, int dir)
     if (!usable(ui, ui->focused))
         return;
     w = &ui->widgets[ui->focused];
+    if (w->kind == W_BUTTON)
+        navigate(ui, dir);                   /* a dialog's buttons, side by side */
     if (w->kind == W_SLIDER)
         slider_step(ui, w, dir);
     if (w->kind == W_CYCLER)

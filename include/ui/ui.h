@@ -100,6 +100,7 @@ struct ui_screen {
     void *ctx;
     float label_x;                /* where row labels start; 0: right-aligned
                                      against their widget                    */
+    ui_rect_t panel;              /* drawn behind a dialog; no width: none   */
     void (*on_back)(void *ctx);                        /* Escape            */
     void (*on_key)(void *ctx, binding_t key, bool shift);  /* the others: Tab */
 };

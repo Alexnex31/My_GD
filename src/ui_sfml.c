@@ -249,6 +249,8 @@ static void draw_capture(gd_t *gd, const widget_t *w)
 void ui_draw(gd_t *gd, const ui_screen_t *ui)
 {
     sfRenderWindow_setView(gd->w, gd->ui_view);
+    if (ui->panel.w > 0.0f)
+        rect(gd, ui->panel, TRACK, OUTLINE_W);   /* darker: its buttons show */
     for (int i = 0; i < ui->count; i++)
         draw_widget(gd, ui, i);
     if (ui->capturing >= 0)

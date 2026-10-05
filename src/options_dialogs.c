@@ -47,6 +47,7 @@ void options_open_dialog(option_m_t *om, options_dialog_t which)
         .on_activate = second_button};
     ui_init(&om->dialog_ui, om->dialog_widgets, 2, om);
     om->dialog_ui.on_back = dialog_back;
+    om->dialog_ui.panel = (ui_rect_t){260.0f, 370.0f, 1400.0f, 370.0f};
     om->rows.modal = &om->dialog_ui;
     om->revert_at_ms = ui_now_ms() + REVERT_MS;
 }
