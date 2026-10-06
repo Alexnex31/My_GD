@@ -145,6 +145,21 @@ static void test_ufo_level(void)
     sim_free(&s);
 }
 
+/* FEATURES 8.6: a jump into the portal, then between a spike and two blocks. */
+static void test_wave_level(void)
+{
+    sim_t s;
+    bot_result_t r;
+
+    load(&s, "portal 1500 350 2 wave\nspike 2200 750 2\nblock 2600 250 2\n"
+        "block 3000 550 2\nportal 4000 350 2 cube\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_FOUND && r.attempts > 2);
+    CHECK(replays(&s, &r));
+    bot_result_free(&r);
+    sim_free(&s);
+}
+
 static int numeric_name(const struct dirent **a, const struct dirent **b)
 {
     long x = strtol((*a)->d_name, NULL, 10);
@@ -202,5 +217,6 @@ void test_bot(void)
     test_ship_flies_over();
     test_gravity_portals();
     test_ufo_level();
+    test_wave_level();
     test_levels();
 }

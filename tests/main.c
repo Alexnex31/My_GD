@@ -22,6 +22,8 @@ int main(void)
     test_start();
     test_gravity();
     test_ufo();
+    test_wave();
+    test_trail();
     test_progress();
     test_input();
     test_settings();
