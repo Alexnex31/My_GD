@@ -121,6 +121,30 @@ static void test_gravity_portals(void)
     sim_free(&s);
 }
 
+/*
+** FEATURES 7.5: a 300 px wall takes two hops, then a spike, then a cube
+** again. The same level without the UFO portal is the cube's too tall wall.
+*/
+static void test_ufo_level(void)
+{
+    sim_t s;
+    bot_result_t r;
+
+    load(&s, "portal 1500 650 2 ufo\nblock 2300 550 2\nblock 2300 650 2\n"
+        "block 2300 750 2\nspike 2900 750 2\nportal 3600 650 2 cube\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_FOUND && r.attempts > 2);
+    CHECK(replays(&s, &r));
+    bot_result_free(&r);
+    sim_free(&s);
+    load(&s, "block 2300 550 2\nblock 2300 650 2\n"
+        "block 2300 750 2\nspike 2900 750 2\nportal 3600 650 2 cube\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_NO_PATH);
+    bot_result_free(&r);
+    sim_free(&s);
+}
+
 static int numeric_name(const struct dirent **a, const struct dirent **b)
 {
     long x = strtol((*a)->d_name, NULL, 10);
@@ -177,5 +201,6 @@ void test_bot(void)
     test_wall_too_tall();
     test_ship_flies_over();
     test_gravity_portals();
+    test_ufo_level();
     test_levels();
 }
