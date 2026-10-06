@@ -211,6 +211,7 @@ static void setup_player_sprite(gd_t *gd, level_t *lv)
     sfTexture *const icons[MODE_COUNT] = {   /* one per mode (FEATURES 6.1) */
         [MODE_CUBE] = gd->res->player_icon,
         [MODE_SHIP] = gd->res->ship_icon,
+        [MODE_UFO] = gd->res->ship_icon,     /* stands in until it has its own */
     };
     sfTexture *tex = icons[p->mode];
     sfVector2u size = sfTexture_getSize(tex);
