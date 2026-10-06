@@ -15,6 +15,7 @@
     #include "sim/sim.h"
     #include "view.h"
     #include "music/library.h"
+    #include "fx/trail.h"
 
 typedef struct gd gd_t;
 
@@ -77,6 +78,8 @@ typedef struct level {
     song_choice_t song;           /* what plays, from where (FEATURES 4.4)    */
     sfText *notice_text;          /* "Song missing", for a few seconds        */
     float notice_left;
+    trail_t trail;                /* the wave's path, corners only (FEATURES 8.5) */
+    sfVertexArray *trail_va;      /* its strip, built again each frame         */
 } level_t;
 
 /* The scene (3.6): events, then whole ticks, then one render. */
@@ -117,6 +120,7 @@ void render_objects(gd_t *gd, level_t *lv, float cam_x);
 
 /* The camera the renderer uses: the player's x, the sim's y, pixel snapped. */
 vec2_t level_camera(gd_t *gd, const level_t *lv);
+void render_trail(gd_t *gd, level_t *lv, vec2_t head, float cam_x);
 
 /* Seconds from the completion until the player reaches the end wall (9.8). */
 float level_end_flight(const level_t *lv);

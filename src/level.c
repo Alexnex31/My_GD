@@ -124,6 +124,9 @@ level_t *level_start(gd_t *gd, const char *id)
     lv->flash_sprite = sfSprite_create();
     sfSprite_setTexture(lv->flash_sprite, gd->atlas, sfTrue);
     lv->player_sprite = sfSprite_create();
+    lv->trail_va = sfVertexArray_create();
+    sfVertexArray_setPrimitiveType(lv->trail_va, sfTriangleStrip);
+    trail_reset(&lv->trail, &lv->sim.st.player);
     lv->ground_sprite = sfSprite_create();
     sfTexture_setRepeated(gd->res->ground, sfTrue);      /* tiled, not stretched */
     sfSprite_setTexture(lv->ground_sprite, gd->res->ground, sfTrue);
@@ -186,6 +189,7 @@ void level_free(level_t *lv, gd_t *gd)
     sfSprite_destroy(lv->flash_sprite);
     free(lv->seen_spent);
     sfSprite_destroy(lv->player_sprite);
+    sfVertexArray_destroy(lv->trail_va);
     sfSprite_destroy(lv->ground_sprite);
     sfSprite_destroy(lv->background_sprite);
     sfSprite_destroy(lv->strip_sprite);
@@ -215,6 +219,7 @@ void level_on_death(level_t *lv, gd_t *gd)
 void level_respawn(level_t *lv, gd_t *gd)
 {
     sim_reset(&lv->sim);
+    trail_reset(&lv->trail, &lv->sim.st.player);
     lv->state = LEVEL_PLAYING;
     lv->fade_left = 0.0f;
     lv->drawn_bounds = lv->sim.st.bounds;
@@ -257,6 +262,7 @@ void level_step(level_t *lv, gd_t *gd, input_t in)
     if (lv->state != LEVEL_PLAYING)
         return;
     sim_tick(&lv->sim, in);
+    trail_after_tick(&lv->trail, &lv->sim.st.player);
     if (!lv->sim.st.player.alive)
         level_on_death(lv, gd);
     else if (lv->sim.st.complete)

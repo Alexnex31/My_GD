@@ -204,6 +204,9 @@ static void render_background(gd_t *gd, level_t *lv, vec2_t cam)
     (void)ts;
 }
 
+/* The wave's square is 30 px, too small to read: its icon is drawn at 60 (8.4). */
+#define ICON_MIN_SIDE 60.0
+
 /* Texture, origin and scale for the current mode: both draw paths need them. */
 static void setup_player_sprite(gd_t *gd, level_t *lv)
 {
@@ -212,10 +215,11 @@ static void setup_player_sprite(gd_t *gd, level_t *lv)
         [MODE_CUBE] = gd->res->player_icon,
         [MODE_SHIP] = gd->res->ship_icon,
         [MODE_UFO] = gd->res->ship_icon,     /* stands in until it has its own */
+        [MODE_WAVE] = gd->res->player_icon,  /* the same */
     };
     sfTexture *tex = icons[p->mode];
     sfVector2u size = sfTexture_getSize(tex);
-    double side = 2.0 * MODES[p->mode].half;
+    double side = fmax(2.0 * MODES[p->mode].half, ICON_MIN_SIDE);
 
     sfSprite_setTexture(lv->player_sprite, tex, sfTrue);
     sfSprite_setOrigin(lv->player_sprite,
@@ -230,6 +234,8 @@ static void render_player(gd_t *gd, level_t *lv)
     const player_t *p = &lv->sim.st.player;
     vec2_t pos = drawn_player_pos(lv);
 
+    render_trail(gd, lv, lv->state == LEVEL_DYING ? lv->death_pos : pos,
+        (float)level_camera(gd, lv).x);
     if (lv->state == LEVEL_DYING)
         return render_explosion(gd, lv);     /* it takes the player's place */
     setup_player_sprite(gd, lv);
@@ -324,6 +330,7 @@ static void render_end_sequence(gd_t *gd, level_t *lv, vec2_t cam)
     render_ground(gd, lv, (float)cam.x);
     render_objects(gd, lv, (float)cam.x);
     draw_end_wall(gd, lv, cam);
+    render_trail(gd, lv, (vec2_t){x, p->pos.y}, (float)cam.x);
     setup_player_sprite(gd, lv);
     sfSprite_setPosition(lv->player_sprite,
         (sfVector2f){(float)x, (float)p->pos.y});

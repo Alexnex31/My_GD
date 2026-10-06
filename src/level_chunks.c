@@ -25,6 +25,7 @@ static const sfColor PORTAL_COLORS[MODE_COUNT] = {
     [MODE_CUBE] = {0, 230, 230, 255},
     [MODE_SHIP] = {255, 120, 220, 255},
     [MODE_UFO] = {255, 150, 40, 255},
+    [MODE_WAVE] = {110, 80, 255, 255},
 };
 
 /*
