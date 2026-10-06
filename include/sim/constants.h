@@ -70,6 +70,10 @@
     #define UFO_MAX_FALL        (1.73 * V_UNIT)    /* ours: 1796.8 px/s                  */
     #define UFO_TILT            (1.0 / 3.0)        /* share of the ship's angle (cosmetic) */
 
+    /* The wave (FEATURES 8): no gravity, no constants of its own but its size.
+       One 30 x 30 square is its rigid square and its inner box at once. */
+    #define WAVE_HALF           15.0
+
     /* Contacts (4.4) */
     #define FLOOR_MIN_DOT       0.64279 /* cos(50 deg): steeper than 50 deg is a wall     */
     #define FLOOR_MAX_TAN       1.19175 /* tan(50 deg)                                    */

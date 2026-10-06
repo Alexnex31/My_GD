@@ -35,6 +35,12 @@ const mode_ops_t MODES[MODE_COUNT] = {
         .corridor_height = 1000.0, .bot_decision_ticks = 12,
         .apply_input = ufo_input, .apply_forces = player_apply_gravity,
         .update_rotation = ufo_rotation},
+    [MODE_WAVE] = {.name = "wave", .half = WAVE_HALF, .inner_half = WAVE_HALF,
+        .head_restitution = -1.0,
+        .corridor_height = 1000.0, .neutral_kills = true,
+        .keep_vy_on_surface = true, .bot_decision_ticks = 12,
+        .apply_input = wave_input, .apply_forces = wave_forces,
+        .update_rotation = wave_rotation},
 };
 
 /*

@@ -35,7 +35,7 @@ typedef enum obj_type {
 typedef enum obj_category { CAT_NEUTRAL, CAT_HARM, CAT_INTERACTIVE } obj_category_t;
 extern const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT];
 
-typedef enum gamemode { MODE_CUBE, MODE_SHIP, MODE_UFO, MODE_COUNT } gamemode_t;
+typedef enum gamemode { MODE_CUBE, MODE_SHIP, MODE_UFO, MODE_WAVE, MODE_COUNT } gamemode_t;
 
 typedef enum hold_state {     /* 3.4: GD's buffered clicks and orb locking */
     HOLD_NONE,                /* button up                                 */
