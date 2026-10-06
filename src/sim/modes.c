@@ -29,6 +29,12 @@ const mode_ops_t MODES[MODE_COUNT] = {
         .corridor_height = 1000.0, .bot_decision_ticks = 12,
         .apply_input = ship_input, .apply_forces = player_apply_gravity,
         .update_rotation = ship_rotation},
+    [MODE_UFO] = {.name = "ufo", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
+        .gravity = PER_TICK2(UFO_GRAVITY),
+        .max_fall = PER_TICK(UFO_MAX_FALL), .head_restitution = BOUNCE_RESTITUTION_SHIP,
+        .corridor_height = 1000.0, .bot_decision_ticks = 12,
+        .apply_input = ufo_input, .apply_forces = player_apply_gravity,
+        .update_rotation = ufo_rotation},
 };
 
 /*

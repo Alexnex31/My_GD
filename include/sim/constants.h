@@ -63,6 +63,12 @@
     #define SHIP_GRAVITY        (0.42 * A_UNIT)    /* ours: 4530.5 px/s^2                */
     #define SHIP_THRUST         (0.84 * A_UNIT)    /* ours: 9061.0 px/s^2, = 2x gravity  */
     #define SHIP_MAX_VY         (1.0 * V_UNIT)     /* ours: 1038.6 px/s, = the scroll    */
+    /* The UFO (FEATURES 7): the hop is GD's 1.5666 blocks, and it lasts as long
+       as a cube jump (0.425 s), which is the rhythm that holds an altitude. */
+    #define UFO_GRAVITY         (0.64 * A_UNIT)    /* ours: 6903.6 px/s^2                */
+    #define UFO_JUMP_V          (1.416 * V_UNIT)   /* 1470.7 px/s                        */
+    #define UFO_MAX_FALL        (1.73 * V_UNIT)    /* ours: 1796.8 px/s                  */
+    #define UFO_TILT            (1.0 / 3.0)        /* share of the ship's angle (cosmetic) */
 
     /* Contacts (4.4) */
     #define FLOOR_MIN_DOT       0.64279 /* cos(50 deg): steeper than 50 deg is a wall     */

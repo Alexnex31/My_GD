@@ -26,6 +26,8 @@ void cube_input(player_t *p, input_t in);
 void cube_rotation(player_t *p);
 void ship_input(player_t *p, input_t in);
 void ship_rotation(player_t *p);
+void ufo_input(player_t *p, input_t in);
+void ufo_rotation(player_t *p);
 
 void move_and_collide(sim_t *s);                   /* 4.4 */
 void collide_kill_ceiling(player_t *p, const level_data_t *lvl);   /* 4.7 */
