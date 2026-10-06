@@ -86,9 +86,26 @@ void corridor_from_center(sim_t *s, double center)
 }
 
 /*
+** A mode bigger than the one it replaces can find itself partly under the
+** ground it was sliding on: a wave there turning into a cube is 35 px inside
+** it. A surface is never crossed (4.3), so the player is put back on it, by
+** exactly that much and no further. Objects are left to the contact rules.
+** Only the ground can be in the way: a new corridor is placed around the
+** player, and the ground is the one thing that can cut it short (5.2).
+*/
+static void stay_above_the_ground(player_t *p)
+{
+    double lowest = GROUND_Y - MODES[p->mode].half;
+
+    if (p->pos.y > lowest)
+        p->pos.y = lowest;
+}
+
+/*
 ** A mode portal changes the gamemode and nothing else: same position, same
 ** speeds, same gravity, same hold (5.2). A same-mode portal still switches
-** to its own corridor.
+** to its own corridor. The one exception to "same position" is a player
+** that grew into the ground.
 */
 static void enter_portal(sim_t *s, const object_t *o)
 {
@@ -97,6 +114,7 @@ static void enter_portal(sim_t *s, const object_t *o)
         corridor_from_center(s, o->rect.y + o->rect.h / 2.0);
     else
         s->st.bounds.active = false;         /* its boundaries stop existing now */
+    stay_above_the_ground(&s->st.player);
 }
 
 /*
