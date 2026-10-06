@@ -1042,9 +1042,9 @@ A negative value is a speed **toward the floor the player is falling to**: for t
 
 ### 6.10 As built
 
-- **The table:** `MODES` (`src/sim/modes.c`, `include/sim/modes.h`) has every field of 6.1, with a row for the cube and the ship; the UFO, wave and ball add theirs (7–9). A mode's own code is one file, `src/sim/mode_cube.c` and `src/sim/mode_ship.c`: its input and its icon's rotation. `src/sim/player.c` keeps what every mode shares: the hold rule, gravity up to the mode's fall cap (`player_apply_gravity`, the `apply_forces` of both rows) and `player_flip_gravity`.
+- **The table:** `MODES` (`src/sim/modes.c`, `include/sim/modes.h`) has every field of 6.1, with a row for the cube, the ship, the UFO (7) and the wave (8); the ball adds its own (9). A mode's own code is one file, `src/sim/mode_<name>.c`: its input and its icon's rotation. `src/sim/player.c` keeps what every mode shares: the hold rule, gravity up to the mode's fall cap (`player_apply_gravity`, the `apply_forces` of every row but the wave's) and `player_flip_gravity`.
 - **The tick (6.3)** calls `MODES[p->mode]` at each step and no longer names a mode. Moving the code was checked to change nothing: every tick's state hash over 20000 ticks, on every level and three input patterns, is the same before and after.
-- **`neutral_kills` (6.4):** the square that dies on a neutral object is `mode_neutral_kill_half`: the inner box, or the whole rigid square for a mode nothing may touch. No row sets it until the wave (8).
+- **`neutral_kills` (6.4):** the square that dies on a neutral object is `mode_neutral_kill_half`: the inner box, or the whole rigid square for a mode nothing may touch. Only the wave's row sets it (8).
 - **Gravity portals (9.4)** are in, ahead of the ball, because they are what flips gravity in a level: `gravity x y size up|down`, an interactive object with a mode portal's shape. Yellow sends the player up, blue brings it back down.
 - **The game layer** reads per-mode arrays for the icon and the portal colour, and draws the icon upside down when gravity is flipped.
 - **Tests:** `tests/test_gravity.c` (the table's rows, the parser, a flip keeps position and on-screen speed, a portal acts once, landing exactly 50 px under a block, there and back, the kill ceiling, gravity and gamemode independent) and a gravity level in `tests/test_bot.c`.
@@ -1082,7 +1082,7 @@ void ufo_rotation(player_t *p)
 }
 ```
 
-Forces are `default_forces` with the UFO's row of the table (gravity 3600, caps 1300): nothing UFO-specific. The engine moves it.
+Forces are `default_forces` with the UFO's row of the table (gravity 6903.6 px/s², fall cap 1796.8 px/s): nothing UFO-specific. The engine moves it.
 
 The icon tilts with a third of the ship's angle: enough to show direction, not enough to look like a ship. Cosmetic only (PLAN 9.4).
 
@@ -1105,7 +1105,7 @@ The hover rhythm equals the hop duration `T = 2v/g`: to hold altitude, press exa
 
 - A wall of height `H` needs about `ceil(H / 155)` hops if they're chained near each apex. The test level's 300 px wall takes 2.
 - Ceilings: a hop that hits a ceiling bounces back down with 30% of its speed; players feel this as "bonking". Keep gaps at least 250 px tall in early UFO sections.
-- The bot solves the test level in 73 attempts.
+- The bot solves the test level in 40 attempts (73 in the prototype).
 
 ### 7.5 Test level
 
@@ -1120,6 +1120,13 @@ portal 3600 650 2 cube
 ```
 
 Expected: completable by the bot; impossible for a cube (the wall is 300 px, above the cube's 213.3 px jump).
+
+### 7.6 As built
+
+- **The mode:** `MODE_UFO`, its row in `MODES` and `src/sim/mode_ufo.c` (`ufo_input`, `ufo_rotation`), with the constants of 7.2 in `constants.h`. A press sets the rise speed, on the ground or in the air; a hold alone does nothing, including one carried into the attempt or kept through a landing. The press marks the hold used.
+- **Measured in the engine:** 153.6 px, apex on tick 51 (0.2125 s), grounded again after 102 ticks. In the air the rhythm that holds an altitude sits between 101 ticks (climbs 1.6 px a hop) and 102 (sinks 4.5 px): on the ground the floor hides that half tick.
+- **The game layer:** an orange portal, and the ship's icon standing in until the UFO has its own.
+- **Tests:** `tests/test_ufo.c` (the numbers of 7.3, holding, assign and not add from five speeds, the tap rhythm, the fall cap, the ceiling bounce on a block and on the corridor, landing, walls and spikes, flipped gravity, portals in and out, the icon's lean) and the level of 7.5 in `tests/test_bot.c`, with and without its UFO portal.
 
 ---
 
@@ -1214,6 +1221,16 @@ portal 4000 350 2 cube
 ```
 
 Expected: completable by the bot (16 attempts in the prototype).
+
+### 8.7 As built
+
+- **The mode:** `MODE_WAVE`, its row in `MODES` and `src/sim/mode_wave.c` (`wave_input`, `wave_forces`, `wave_rotation`), `WAVE_HALF` in `constants.h`. The hold is never used: flying uses nothing (PLAN 3.4).
+- **The icon's angle** is read from what the tick really did (`prev_pos` to `pos`) and not from `vy` as in 8.2: `vy` is kept while sliding (8.3), so it would show a wave pointing 45° into the floor it slides on. It is 45° in the air and flat along a surface. The icon is drawn 60 px wide (8.4), so it overlaps a surface it slides on by 15 px.
+- **Leaving wave mode on the ground:** a wave sliding there is 35 px lower than a cube standing there. The portal puts the bigger square back on the ground, by exactly that much, on the tick it acts (`stay_above_the_ground`, `src/sim/interact.c`); objects are left to the contact rules. It is the one case where a mode portal moves the player (PLAN 5.2), and only the ground can cause it: a new corridor is placed around the player.
+- **The floor spike:** a spike's box ends 32 px above the ground (PLAN 4.2), and the wave is 30 px tall, so a wave sliding on the ground passes under a spike standing on it. The level of 8.6 is solved that way too. Raise the spike or put a block there when a wave must not pass.
+- **The trail (8.5)** is two parts. `src/fx/trail.c` (pure, tested) keeps the corners: one where each tick that turned started, which is exact, where "the current position" of 8.5 step 2 would be a tick late; reaching and leaving a surface are corners, sliding is not. It begins where the portal acted (or at the start, for an attempt that begins as a wave) and ends with the mode; a death leaves it on screen until the respawn. `src/trail_draw.c` builds the strip of 8.5 each frame, with constant vertical thickness (14 px). It fades with the distance behind the player down to the screen's left edge, and not with the corner's index: an index fade made the whole trail change brightness each time a corner was added.
+- **Measured in the engine:** 40 held ticks are 173.1 px each way; floor to ceiling of the corridor takes 225 ticks (0.94 s); the bot solves 8.6 in 12 attempts.
+- **Tests:** `tests/test_wave.c` (the row, 45° at 1× and 2×, a direction change on the tick of the input, a tap, death on a block's top, underside and side, on a slope and a spike, the 30 px square under a block 31 and 29 px above the ground, sliding on the ground and on the corridor's ceiling and leaving each at once, flipped gravity, what the next mode inherits, growing on the ground, the icon's angle), `tests/test_trail.c` (corners, surfaces, portals, attempts, capacity, rounding, dropping what is left of the view) and the level of 8.6 in `tests/test_bot.c`.
 
 ---
 
