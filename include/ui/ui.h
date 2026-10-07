@@ -33,7 +33,8 @@ typedef enum ui_event_kind {
     UI_MOVE,                      /* the mouse moved to x, y                 */
     UI_PRESS,                     /* `input` went down (at x, y if a mouse)  */
     UI_RELEASE,                   /* `input` went up                         */
-    UI_WHEEL                      /* `wheel` notches at x, y, up positive    */
+    UI_WHEEL,                     /* `wheel` notches at x, y, up positive    */
+    UI_TEXT                       /* the character `ch` was typed            */
 } ui_event_kind_t;
 
 typedef struct ui_event {
@@ -43,6 +44,7 @@ typedef struct ui_event {
     float y;
     int wheel;
     bool shift;
+    unsigned int ch;
 } ui_event_t;
 
 typedef enum widget_kind {
@@ -51,7 +53,8 @@ typedef enum widget_kind {
     W_SLIDER,                     /* *value min..max by step                 */
     W_CYCLER,                     /* *value min..max, choices[value], wraps  */
     W_KEYBIND,                    /* *binding, through a capture modal       */
-    W_LIST                        /* *value the selected row, choices[0..max] */
+    W_LIST,                       /* *value the selected row, choices[0..max] */
+    W_TEXT                        /* text[0..text_cap - 1], typed when focused */
 } widget_kind_t;
 
 typedef struct widget widget_t;
@@ -79,6 +82,8 @@ struct widget {
     widget_fn on_change;          /* only when the value really changed     */
     widget_fn on_activate;        /* a button, or a list's chosen row       */
     capture_fn on_capture;        /* NULL: the binding is set as captured   */
+    char *text;                   /* text field: the caller's buffer        */
+    int text_cap;                 /* its size, the NUL included             */
 };
 
 typedef struct ui_screen ui_screen_t;
@@ -138,5 +143,8 @@ float ui_slider_fraction(const widget_t *w);
 int ui_list_rows(const widget_t *w);
 
 bool ui_rect_contains(ui_rect_t r, float x, float y);
+
+/* A text field has the focus: keys are its letters, not shortcuts. */
+bool ui_typing(const ui_screen_t *ui);
 
 #endif

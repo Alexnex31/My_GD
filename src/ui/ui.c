@@ -6,6 +6,7 @@
 */
 
 #include <math.h>
+#include <string.h>
 
 #include "ui/ui.h"
 
@@ -140,8 +141,56 @@ static void activate(ui_screen_t *ui, int i)
         cycler_step(ui, w, 1);
     if (w->kind == W_KEYBIND)
         ui->capturing = i;               /* the next press is the result (5.5) */
-    if ((w->kind == W_BUTTON || w->kind == W_LIST) && w->on_activate != NULL)
+    if ((w->kind == W_BUTTON || w->kind == W_LIST || w->kind == W_TEXT)
+        && w->on_activate != NULL)
         w->on_activate(ui->ctx, w);
+}
+
+bool ui_typing(const ui_screen_t *ui)
+{
+    if (ui->modal != NULL)
+        return ui_typing(ui->modal);
+    return usable(ui, ui->focused) && ui->widgets[ui->focused].kind == W_TEXT;
+}
+
+static bool arrow(ui_screen_t *ui, binding_t key);
+
+/* A printable character goes at the end, while there is room for it. */
+static void type_char(ui_screen_t *ui, unsigned int ch)
+{
+    widget_t *w = &ui->widgets[ui->focused];
+    int len = (int)strlen(w->text);
+
+    if (ch < 32 || ch > 126 || len + 1 >= w->text_cap)
+        return;
+    w->text[len] = (char)ch;
+    w->text[len + 1] = '\0';
+    changed(ui, w);
+}
+
+/*
+** A focused text field's keys: Backspace erases, Enter confirms, Up and Down
+** still leave it, and every other key is a letter that UI_TEXT brings, so
+** Space types a space and no shortcut fires (FEATURES 11.6).
+*/
+static void text_key(ui_screen_t *ui, const ui_event_t *ev, int64_t now)
+{
+    widget_t *w = &ui->widgets[ui->focused];
+    int len = (int)strlen(w->text);
+
+    if (is_key(ev->input, KEY_Backspace) && len > 0) {
+        w->text[len - 1] = '\0';
+        changed(ui, w);
+    }
+    if (is_key(ev->input, KEY_Enter))
+        activate(ui, ui->focused);
+    if (is_key(ev->input, KEY_Escape) && ui->on_back != NULL)
+        return ui->on_back(ui->ctx);
+    if ((is_key(ev->input, KEY_Up) || is_key(ev->input, KEY_Down))
+        && arrow(ui, ev->input)) {
+        ui->repeat_key = ev->input;
+        ui->repeat_at_ms = now + UI_REPEAT_DELAY_MS;
+    }
 }
 
 /* A cycler's left third goes back; a list's row is chosen, then activated. */
@@ -152,6 +201,8 @@ static void click(ui_screen_t *ui, int i, float x, float y)
 
     if (w->kind == W_CYCLER && x < w->bounds.x + w->bounds.w / 3.0f)
         return cycler_step(ui, w, -1);
+    if (w->kind == W_TEXT)
+        return;                              /* a click focuses it: Enter confirms */
     if (w->kind != W_LIST)
         return activate(ui, i);
     row = w->scroll + (int)((y - w->bounds.y) / UI_ROW_H);
@@ -250,6 +301,8 @@ static bool arrow(ui_screen_t *ui, binding_t key)
 static void key_press(ui_screen_t *ui, const ui_event_t *ev, int64_t now)
 {
     ui->repeat_key = NO_KEY;
+    if (ui_typing(ui))
+        return text_key(ui, ev, now);
     if (arrow(ui, ev->input)) {
         ui->repeat_key = ev->input;
         ui->repeat_at_ms = now + UI_REPEAT_DELAY_MS;
@@ -311,6 +364,8 @@ void ui_event(ui_screen_t *ui, const ui_event_t *ev, int64_t now_ms)
         mouse_move(ui, ev->x, ev->y);
     if (ev->kind == UI_WHEEL)
         wheel(ui, ev);
+    if (ev->kind == UI_TEXT && ui_typing(ui))
+        type_char(ui, ev->ch);
     if (ev->kind == UI_PRESS && is_left_click(ev->input))
         mouse_down(ui, ev->x, ev->y);
     if (ev->kind == UI_PRESS && ev->input.kind == BIND_KEY)

@@ -97,6 +97,11 @@ static bool mouse_event(gd_t *gd, const sfEvent *ev, ui_event_t *out)
 bool ui_from_sf(gd_t *gd, const sfEvent *ev, ui_event_t *out)
 {
     *out = (ui_event_t){0};
+    if (ev->type == sfEvtTextEntered) {
+        out->kind = UI_TEXT;
+        out->ch = ev->text.unicode;
+        return true;
+    }
     if ((ev->type == sfEvtKeyPressed || ev->type == sfEvtKeyReleased)
         && ev->key.code >= 0 && (int)ev->key.code < KEY_COUNT) {
         out->kind = ev->type == sfEvtKeyPressed ? UI_PRESS : UI_RELEASE;
@@ -215,6 +220,8 @@ static void draw_content(gd_t *gd, const widget_t *w, ui_rect_t r, float a)
     }
     if (w->kind == W_LIST)
         draw_list(gd, w, r, a);
+    if (w->kind == W_TEXT)
+        text(gd, w->text, (sfVector2f){r.x + 20.0f, center(r).y}, 0, a);
 }
 
 static void draw_widget(gd_t *gd, const ui_screen_t *ui, int i)

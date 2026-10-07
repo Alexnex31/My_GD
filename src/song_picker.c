@@ -115,7 +115,7 @@ void song_picker_open(level_list_t *list, gd_t *gd, int index)
     list->picker_list = (widget_t){W_LIST, NULL, {360.0f, 220.0f, 1200.0f,
         PICKER_ROWS * UI_ROW_H}, true, &list->picker_row, NULL, 0,
         (int)gd->library.count, 1, (const char *const *)list->picker_rows, 0,
-        picker_moved, picker_chosen, NULL};
+        picker_moved, picker_chosen, NULL, NULL, 0};
     if (list->picker_row >= PICKER_ROWS)
         list->picker_list.scroll = list->picker_row - PICKER_ROWS + 1;
     ui_init(&list->picker, &list->picker_list, 1, list);
