@@ -18,6 +18,7 @@ static const sfColor END_LINE = {80, 220, 120, 255};
 static const sfColor KILL_LINE = {255, 70, 70, 255};
 static const sfColor PANEL_FILL = {18, 20, 32, 255};
 static const sfColor PICKED = {60, 110, 200, 255};
+static const sfColor SELECTED = {90, 255, 140, 255};
 
 typedef struct span {         /* what the canvas shows, world coordinates */
     double left;
@@ -109,6 +110,53 @@ static void draw_objects(editor_t *ed, gd_t *gd, span_t v)
         draw_vertex_array(gd, ed->objects[l], &rs);
 }
 
+/* A selected object's own rect, turned as it is, in lines over everything. */
+static void outline(editor_t *ed, const object_t *o)
+{
+    vec2_t c = {o->rect.x + o->rect.w / 2.0, o->rect.y + o->rect.h / 2.0};
+    vec2_t p[4] = {{o->rect.x, o->rect.y}, {o->rect.x + o->rect.w, o->rect.y},
+        {o->rect.x + o->rect.w, o->rect.y + o->rect.h},
+        {o->rect.x, o->rect.y + o->rect.h}};
+    double rad = o->rotation * M_PI / 180.0;
+
+    for (int i = 0; i < 4; i++)
+        p[i] = (vec2_t){c.x + (p[i].x - c.x) * cos(rad) - (p[i].y - c.y)
+            * sin(rad), c.y + (p[i].x - c.x) * sin(rad) + (p[i].y - c.y)
+            * cos(rad)};
+    for (int i = 0; i < 4; i++)
+        line(ed, p[i].x, p[i].y, p[(i + 1) % 4].x, p[(i + 1) % 4].y, SELECTED);
+}
+
+/* Its shape again, plain green and see-through, so it shows at any zoom. */
+static void tint(editor_t *ed, gd_t *gd, const object_t *o)
+{
+    sfVertex six[6];
+
+    object_vertices(gd, o, six);
+    for (int k = 0; k < 6; k++) {
+        six[k].color = (sfColor){90, 255, 140, 90};
+        sfVertexArray_append(ed->objects[0], six[k]);
+    }
+}
+
+static void draw_selection(editor_t *ed, gd_t *gd)
+{
+    rect_t box = editor_box(ed, gd);
+
+    sfVertexArray_clear(ed->lines);
+    sfVertexArray_clear(ed->objects[0]);
+    for (size_t i = 0; i < ed->lv.count; i++)
+        if (ed->lv.objects[i].selected) {
+            tint(ed, gd, &ed->lv.objects[i].obj);
+            outline(ed, &ed->lv.objects[i].obj);
+        }
+    draw_vertex_array(gd, ed->objects[0], NULL);
+    draw_vertex_array(gd, ed->lines, NULL);
+    if (ed->mouse == ED_BOXING)
+        fill(gd, ed, (sfFloatRect){(float)box.x, (float)box.y, (float)box.w,
+            (float)box.h}, (sfColor){90, 255, 140, 30}, SELECTED);
+}
+
 /* Where an attempt begins: the player's own icon, faint. */
 static void draw_start(editor_t *ed, gd_t *gd, const level_start_t *st,
     sfColor tint)
@@ -145,7 +193,9 @@ static void draw_canvas(editor_t *ed, gd_t *gd)
     draw_start(ed, gd, &ed->lv.hdr.start, (sfColor){255, 255, 255, 150});
     for (size_t i = 0; i < ed->lv.nb_starts; i++)
         draw_start(ed, gd, &ed->lv.starts[i], (sfColor){120, 220, 255, 150});
-    if (editor_mouse_on_canvas(gd) && !ed->panning)
+    draw_selection(ed, gd);
+    if (editor_mouse_on_canvas(gd) && ed->tool == ED_TOOL_PLACE
+        && ed->mouse != ED_PANNING)
         fill(gd, ed, (sfFloatRect){(float)ed_snap(at.x, ed->grid),
             (float)ed_snap(at.y, ed->grid), 100.0f, 100.0f},
             (sfColor){255, 255, 255, 25}, (sfColor){255, 255, 255, 160});
@@ -184,18 +234,24 @@ static void draw_palette(editor_t *ed, gd_t *gd)
 
 static void draw_toolbar(editor_t *ed, gd_t *gd)
 {
-    char line1[256];
+    static const char *const HELP[] = {
+        "PLACE (Tab: select)   Left: place   Right: delete   1-9: entry",
+        "SELECT (Tab: place)   Click, Shift+click, box   Drag or arrows: "
+        "move   ZQSD: a block   Del   Ctrl+A C V D",
+    };
+    char text[320];
 
     fill(gd, ed, (sfFloatRect){0.0f, 0.0f, VIEW_W, ED_TOOLBAR_H}, PANEL_FILL,
         sfTransparent);
-    snprintf(line1, sizeof(line1),
-        "%s%s   -   level %s   -   %zu objects   -   Grid %.0f   -   Zoom %.0f%%",
-        ed->lv.hdr.name, ed->lv.dirty ? " *" : "", ed->lv.id, ed->lv.count,
-        ed->grid, 100.0f / ed->zoom);
-    label(ed, gd, line1, 20.0f, 8.0f, 28, sfWhite);
-    label(ed, gd, "Left: place   Right: delete   Wheel: scroll   Ctrl+wheel: "
-        "zoom   Middle or Space+drag: pan   G: grid   Ctrl+S: save   Esc: "
-        "leave", 20.0f, 48.0f, 18, (sfColor){180, 190, 210, 255});
+    snprintf(text, sizeof(text), "%s%s   -   level %s   -   %zu objects, "
+        "%zu selected   -   Grid %.0f   -   Zoom %.0f%%", ed->lv.hdr.name,
+        ed->lv.dirty ? " *" : "", ed->lv.id, ed->lv.count,
+        ed_selected(&ed->lv), ed->grid, 100.0f / ed->zoom);
+    label(ed, gd, text, 20.0f, 8.0f, 28, sfWhite);
+    snprintf(text, sizeof(text), "%s   Ctrl+Z / Ctrl+Y: undo, redo   Wheel, "
+        "Ctrl+wheel, middle: view   G: grid   Ctrl+S: save   Esc",
+        HELP[ed->tool]);
+    label(ed, gd, text, 20.0f, 48.0f, 18, (sfColor){180, 190, 210, 255});
     if (ui_now_ms() < ed->notice_until_ms)
         label(ed, gd, ed->notice, ED_PALETTE_W + 30.0f, VIEW_H - 60.0f, 30,
             (sfColor){255, 230, 120, 255});
