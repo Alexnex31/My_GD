@@ -600,7 +600,8 @@ So the simulation stores velocities in **px per tick** and accelerations in **px
     #define CUBE_JUMP_V         (1.9522 * V_UNIT)  /* 2027.6 px/s: GD's 1.94 raised so the
                                                     measured apex is its 2.1333 blocks (11.1) */
     #define CUBE_MAX_FALL       (2.6 * V_UNIT)     /* 2700.4 px/s                        */
-    #define CUBE_SPIN           324      /* deg/s, the icon's spin in the air (cosmetic) */
+    #define CUBE_JUMP_TICKS     102      /* a jump on flat ground, press to landing        */
+    #define CUBE_SPIN           (180.0 * TICK_RATE / CUBE_JUMP_TICKS)   /* 423.5 deg/s (cosmetic) */
     #define RISE_EPSILON        (1.0 / 4096.0)   /* px/tick, jump-zone momentum test (4.3) */
     /* The ship: GD never published these, so they are ours, chosen from the arc
        they draw rather than from a number (FEATURES 6.9). The cap is exactly the
@@ -685,7 +686,7 @@ typedef enum obj_type {
 typedef enum obj_category { CAT_NEUTRAL, CAT_HARM, CAT_INTERACTIVE } obj_category_t;
 extern const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT];
 
-typedef enum gamemode { MODE_CUBE, MODE_SHIP, MODE_COUNT } gamemode_t;   /* FEATURES adds MODE_UFO, MODE_WAVE (7, 8) */
+typedef enum gamemode { MODE_CUBE, MODE_SHIP, MODE_COUNT } gamemode_t;   /* FEATURES adds MODE_UFO, MODE_WAVE, MODE_BALL (7-9) */
 
 typedef enum hold_state {     /* 3.4: GD's buffered clicks and orb locking */
     HOLD_NONE,                /* button up                                 */
@@ -958,13 +959,13 @@ void player_apply_input(player_t *p, input_t in)
 
 - A hold is **fresh** from the moment it's pressed, and a hold that was already down when the attempt started is fresh too (`sim_reset` sets `HOLD_FRESH`; releasing sets `HOLD_NONE`).
 - **A buffered click** is a hold started *before* a contact and still held *at* the contact (a landing, entering an orb). It acts then. A press released before the contact does nothing. That's why the jump test is simply "down at the tick `can_jump` is true" (4.3): there is no press memory.
-- **Using a hold** (the cube jumping off a surface, FEATURES' ball flipping, the UFO hopping, activating an orb) makes it **used**. A used hold still jumps off every surface it lands on while it stays down (surface jumps don't care whether the hold is fresh or used), but it activates **no orb** until it's released and pressed again.
+- **Using a hold** (the cube jumping off a surface, FEATURES' ball flipping, the UFO hopping, activating an orb) makes it **used**. A used hold still makes the **cube** jump off every surface it lands on while it stays down (the cube's surface jumps don't care whether the hold is fresh or used), but it activates **no orb** until it's released and pressed again. The **ball** is stricter: its flip needs a fresh hold, so a hold kept down flips once and no more (FEATURES 9.1).
 - **Ship and wave** holds are always fresh: flying, and bumping into surfaces while flying, never use them.
 - **Orb priority:** on a tick where the player touches a live orb with a fresh hold, the orb acts and the tick's input is consumed: no surface jump that tick, even if `can_jump` is true (FEATURES 10.2).
 
 `hold` is part of the run state (snapshots, hash). In this plan's scope only the cube's jump uses it; orbs, the ball and the UFO are in FEATURES.
 
-`down` is `held || pressed` for every mode that reads the button's state (cube, ship, and FEATURES' ball and wave): a tap inside one tick isn't `held` at the tick's end, but its `pressed` still gives one tick of jump, thrust or rise.
+`down` is `held || pressed` for every mode that reads the button's state (cube, ship, and FEATURES' wave): a tap inside one tick isn't `held` at the tick's end, but its `pressed` still gives one tick of jump, thrust or rise.
 
 ```c
 void player_apply_gravity(player_t *p)
@@ -2598,7 +2599,7 @@ void player_update_rotation(player_t *p)                 /* cosmetic, 2.2 rule 4
 - In the air the cube spins; when it lands it snaps to the nearest quarter turn **relative to the surface**, so it lies flat on flat ground and along a slope on a slope. That snap is purely visual: the player's position was decided by the square or the circle (4.4).
 - On a slope, the circle's center is exactly 50 px from the surface, so the tilted icon (100 × 100, drawn around `pos`) sits flush on it with no correction.
 - `atan2f` is fine here: rotation never feeds back into the physics.
-- FEATURES' ball rolls: the game layer adds `distance / 50` radians to its drawn angle (a circle of radius 50 rolling without sliding).
+- FEATURES' ball rolls: its `update_rotation` turns it `BALL_SPIN` (one turn a second at 1×, FEATURES 9.7), in the tick like the others.
 
 Today the cube only spins while its **screen** y is above 750 and snaps to 0° on landing. So it stops spinning during the last 50 px of a fall to the ground, and it snaps back from any angle (a visible jolt). Now it spins for the whole jump and snaps onto whatever it lands on, like GD. The ship tilts with its motion.
 
@@ -2769,7 +2770,7 @@ Each of these has a default chosen from GD's feel; adjust with the overlay and t
 | `BOUNCE_MIN_SPEED` | 60 px/s | below this, a ceiling hit just stops: sliding instead of vibrating |
 | Spike hitbox | middle 40% × bottom 80% | the forgiveness of spikes (4.2) |
 | `CAM_TAU` | 0.08 s | camera smoothing (3.5) |
-| `CUBE_SPIN` | 324°/s | how fast the icon spins in the air (cosmetic) |
+| `CUBE_SPIN` | 423.5°/s | how fast the icon spins in the air: exactly half a turn over a jump on flat ground (102 ticks), so the landing has nothing to snap (cosmetic) |
 | `KILL_CEILING_MARGIN` | 600 px | flipped gravity only: must stay above what a flipped player can legitimately reach, corridors included (4.7) |
 
 Keep the trigonometric literals and `CAM_LERP` in sync with their formulas: the unit tests (8.1) fail otherwise.

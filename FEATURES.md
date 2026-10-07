@@ -14,7 +14,7 @@ v1 described each feature. This version specifies each one precisely enough to i
 
 References like "PLAN 3.4" point to PLAN.md.
 
-**v3** (matching PLAN v3, the semi-physics engine): modes only change the velocity (`apply_input`, `apply_forces`), the engine moves the player and resolves contacts (6.1–6.5); head hits bounce the ship, UFO and ball (30%) and kill the cube and wave, except against the ground and corridor boundaries: surfaces the player can't cross, which never kill anyone; corridors are snapped to the grid and lock the camera; pads and orbs set `vy`, speed portals set `vx`; saws are circle harm objects (10.6); `slope` and `saw` join the grammar. Input follows GD's hold rule (PLAN 3.4): no press memory or time buffer; a hold is fresh until it jumps, flips, hops or activates an orb; used holds keep jumping off surfaces but ignore orbs; orbs win over surface jumps. Gravity is a constant acceleration whose sign is `gravity_dir`; gravity portals and ball clicks **only** flip it, through PLAN 3.4's `player_flip_gravity`, which keeps the player's motion (no speed reset, no ball push), while blue pads, blue orbs and green orbs flip it and then set a speed toward the new floor, as GD does (10.1). Physics constants are GD's own, written in GD's velocity units (6.9).
+**v3** (matching PLAN v3, the semi-physics engine): modes only change the velocity (`apply_input`, `apply_forces`), the engine moves the player and resolves contacts (6.1–6.5); head hits bounce the ship, UFO and ball (30%) and kill the cube and wave, except against the ground and corridor boundaries: surfaces the player can't cross, which never kill anyone; corridors are snapped to the grid and lock the camera; pads and orbs set `vy`, speed portals set `vx`; saws are circle harm objects (10.6); `slope` and `saw` join the grammar. Input follows GD's hold rule (PLAN 3.4): no press memory or time buffer; a hold is fresh until it jumps, flips, hops or activates an orb; used holds keep jumping off surfaces but ignore orbs; orbs win over surface jumps. Gravity is a constant acceleration whose sign is `gravity_dir`; gravity portals **only** flip it, through PLAN 3.4's `player_flip_gravity`, which keeps the player's motion (no speed reset); a ball click flips it the same way and adds a small push off the surface it leaves (9.2); while blue pads, blue orbs and green orbs flip it and then set a speed toward the new floor, as GD does (10.1). Physics constants are GD's own, written in GD's velocity units (6.9).
 
 **v2.2** (review pass, matching PLAN v2.2): the sim is level data + a snapshot-able run state (`s->st.*`); every object can be rotated by any angle and sized with `w`/`h`; a fixed kill ceiling replaces the camera-relative out-of-bounds rule; all jump inputs (including the left mouse button and a gamepad) are rebindable; same-mode portals switch to the new corridor; pads have thin hitboxes; orbs have an explicit tick step; the mini portal is `mini`; start positions carry any mode, gravity and speed; the bot's results are information, never a blocker; an audio offset setting compensates output latency.
 
@@ -1042,7 +1042,7 @@ A negative value is a speed **toward the floor the player is falling to**: for t
 
 ### 6.10 As built
 
-- **The table:** `MODES` (`src/sim/modes.c`, `include/sim/modes.h`) has every field of 6.1, with a row for the cube, the ship, the UFO (7) and the wave (8); the ball adds its own (9). A mode's own code is one file, `src/sim/mode_<name>.c`: its input and its icon's rotation. `src/sim/player.c` keeps what every mode shares: the hold rule, gravity up to the mode's fall cap (`player_apply_gravity`, the `apply_forces` of every row but the wave's) and `player_flip_gravity`.
+- **The table:** `MODES` (`src/sim/modes.c`, `include/sim/modes.h`) has every field of 6.1, with a row for the cube, the ship, the UFO (7), the wave (8) and the ball (9). A mode's own code is one file, `src/sim/mode_<name>.c`: its input and its icon's rotation. `src/sim/player.c` keeps what every mode shares: the hold rule, gravity up to the mode's fall cap (`player_apply_gravity`, the `apply_forces` of every row but the wave's) and `player_flip_gravity`.
 - **The tick (6.3)** calls `MODES[p->mode]` at each step and no longer names a mode. Moving the code was checked to change nothing: every tick's state hash over 20000 ticks, on every level and three input patterns, is the same before and after.
 - **`neutral_kills` (6.4):** the square that dies on a neutral object is `mode_neutral_kill_half`: the inner box, or the whole rigid square for a mode nothing may touch. Only the wave's row sets it (8).
 - **Gravity portals (9.4)** are in, ahead of the ball, because they are what flips gravity in a level: `gravity x y size up|down`, an interactive object with a mode portal's shape. Yellow sends the player up, blue brings it back down.
@@ -1227,10 +1227,11 @@ Expected: completable by the bot (16 attempts in the prototype).
 - **The mode:** `MODE_WAVE`, its row in `MODES` and `src/sim/mode_wave.c` (`wave_input`, `wave_forces`, `wave_rotation`), `WAVE_HALF` in `constants.h`. The hold is never used: flying uses nothing (PLAN 3.4).
 - **The icon's angle** is read from what the tick really did (`prev_pos` to `pos`) and not from `vy` as in 8.2: `vy` is kept while sliding (8.3), so it would show a wave pointing 45° into the floor it slides on. It is 45° in the air and flat along a surface. The icon is drawn 60 px wide (8.4), so it overlaps a surface it slides on by 15 px.
 - **Leaving wave mode on the ground:** a wave sliding there is 35 px lower than a cube standing there. The portal puts the bigger square back on the ground, by exactly that much, on the tick it acts (`stay_above_the_ground`, `src/sim/interact.c`); objects are left to the contact rules. It is the one case where a mode portal moves the player (PLAN 5.2), and only the ground can cause it: a new corridor is placed around the player.
-- **The floor spike:** a spike's box ends 32 px above the ground (PLAN 4.2), and the wave is 30 px tall, so a wave sliding on the ground passes under a spike standing on it. The level of 8.6 is solved that way too. Raise the spike or put a block there when a wave must not pass.
+- **The floor spike:** a spike's box ends 32 px above the ground (PLAN 4.2), and the wave is 30 px tall, so a wave sliding on the ground passes under a spike standing on it. Raise the spike or put a block there when a wave must not pass.
 - **The trail (8.5)** is two parts. `src/fx/trail.c` (pure, tested) keeps the corners: one where each tick that turned started, which is exact, where "the current position" of 8.5 step 2 would be a tick late; reaching and leaving a surface are corners, sliding is not. It begins where the portal acted (or at the start, for an attempt that begins as a wave) and ends with the mode; a death leaves it on screen until the respawn. `src/trail_draw.c` builds the strip of 8.5 each frame, with constant vertical thickness (14 px). It fades with the distance behind the player down to the screen's left edge, and not with the corner's index: an index fade made the whole trail change brightness each time a corner was added.
-- **Measured in the engine:** 40 held ticks are 173.1 px each way; floor to ceiling of the corridor takes 225 ticks (0.94 s); the bot solves 8.6 in 12 attempts.
-- **Tests:** `tests/test_wave.c` (the row, 45° at 1× and 2×, a direction change on the tick of the input, a tap, death on a block's top, underside and side, on a slope and a spike, the 30 px square under a block 31 and 29 px above the ground, sliding on the ground and on the corridor's ceiling and leaving each at once, flipped gravity, what the next mode inherits, growing on the ground, the icon's angle), `tests/test_trail.c` (corners, surfaces, portals, attempts, capacity, rounding, dropping what is left of the view) and the level of 8.6 in `tests/test_bot.c`.
+- **Measured in the engine:** 40 held ticks are 173.1 px each way; floor to ceiling of the corridor takes 225 ticks (0.94 s).
+- **Tests:** `tests/test_wave.c` (the row, 45° at 1× and 2×, a direction change on the tick of the input, a tap, death on a block's top, underside and side, on a slope and a spike, the 30 px square under a block 31 and 29 px above the ground, sliding on the ground and on the corridor's ceiling and leaving each at once, flipped gravity, what the next mode inherits, growing on the ground, the icon's angle), `tests/test_trail.c` (corners, surfaces, portals, attempts, capacity, rounding, dropping what is left of the view) and a wave level in `tests/test_bot.c`.
+- **The level of 8.6 is no test of the wave.** Its portal's hitbox ends at y = 540 and a cube on the ground reaches 750, so a cube passes under it, jumps the spike and walks under both blocks: the bot's 12 attempts were a cube's, with no tick spent as a wave. The level in `tests/test_bot.c` has its portal on the ground (`portal 1500 650 2 wave`), a floor block, a ceiling block and a taller floor block, and the test replays the found path and counts the ticks spent as a wave (89 attempts).
 
 ---
 
@@ -1239,7 +1240,7 @@ Expected: completable by the bot (16 attempts in the prototype).
 ### 9.1 Behavior
 
 - Rolls along the floor surface.
-- It's a cube that flips its gravity instead of jumping, and nothing else: when the button is down (held or just pressed) and the ball can jump (`can_jump`, PLAN 4.3), gravity flips and the ball falls to the other surface. Holding through landings flips again on every landing, like the cube's auto-jump.
+- A click flips its gravity and pushes it gently off the surface it leaves: when the hold is **fresh** (PLAN 3.4) and the ball can jump (`can_jump`, PLAN 4.3), gravity flips and the ball falls to the other surface. The flip uses the hold up, like a UFO's hop: kept down, the ball does **not** flip again on landing. A hold still fresh when the ball lands (pressed in the air and kept down) flips there, once.
 - No press memory: a click released before the ball can flip does nothing (PLAN 3.4).
 - Lands on block tops (or undersides when flipped) and slopes, bounces off ceilings (30%), dies on spikes and when a block reaches its inner box.
 - Enters with a corridor.
@@ -1247,13 +1248,16 @@ Expected: completable by the bot (16 attempts in the prototype).
 ### 9.2 Physics
 
 ```c
-#define BALL_GRAVITY    (0.75 * A_UNIT)  /* ours: 8090.2 px/s^2 */
-#define BALL_MAX_FALL   (2.67 * V_UNIT)  /* ours: 2773.1 px/s   */
+#define BALL_GRAVITY    (0.5 * A_UNIT)   /* ours: 5393.4 px/s^2 */
+#define BALL_MAX_FALL   (1.6 * V_UNIT)   /* ours: 1661.8 px/s   */
+#define BALL_FLIP_V     (0.4 * V_UNIT)   /* ours: 415.4 px/s, the push off the surface it leaves */
+#define BALL_SPIN       360              /* deg/s at 1x, the icon's roll (cosmetic) */
 
 void ball_input(player_t *p, input_t in)
 {
-    if ((in.held || in.pressed) && p->can_jump) {  /* the cube's jump condition, PLAN 3.4 */
-        player_flip_gravity(p);             /* PLAN 3.4: flip the constant gravity, nothing else */
+    if (p->hold == HOLD_FRESH && p->can_jump) {    /* a used hold flips nothing, PLAN 3.4 */
+        player_flip_gravity(p);             /* PLAN 3.4: flip the constant gravity */
+        p->vy = fmin(p->vy, -PER_TICK(BALL_FLIP_V));   /* and leave this side: toward the new floor */
         p->hold = HOLD_USED;
     }
 }
@@ -1264,9 +1268,9 @@ void ball_rotation(player_t *p)
 }
 ```
 
-Forces are `default_forces` with the ball's row (gravity 4200, fall cap 2000). The flip only changes `gravity_dir` and `vy`; the engine does the rest, including landing on block undersides once gravity is flipped (6.4).
+Forces are `default_forces` with the ball's row (gravity 5393.4 px/s², fall cap 1661.8 px/s). The flip only changes `gravity_dir` and `vy`; the engine does the rest, including landing on block undersides once gravity is flipped (6.4).
 
-A click only flips the gravity. The ball is on the ground, so its speed is 0: it starts from rest and the new gravity accelerates it toward the other surface. It moves 0.14 px on the first tick, 2.1 px after 5 ticks and 4 px after 7 (about 30 ms), so it's visibly moving almost at once. If it feels sluggish in play-testing, the fix is a stronger `BALL_GRAVITY`, not a push: the click stays a pure gravity flip.
+A click flips the gravity and gives the ball a small speed toward its new floor (`BALL_FLIP_V`, a quarter of the fall cap). A pure flip, starting from rest, was tried first and felt weak: 0.09 px on the first tick, 4 px after 9. With the push the ball leaves its side at once, 1.8 px on the first tick and 10 px after 5, and the flipped gravity does the rest. The push sets a speed and never slows a ball already going faster that way.
 
 Rolling is drawn by the game layer (PLAN 9.4): the icon turns by `distance / 50` radians, a circle of radius 50 rolling without sliding.
 
@@ -1274,10 +1278,10 @@ Rolling is drawn by the game layer (PLAN 9.4): the icon turns by `distance / 50`
 
 | Measurement | Value |
 |---|---|
-| Flip across the ball's 800 px corridor (700 px of travel for the 100 px ball), from rest | **≈0.42 s** (about 100 ticks: `sqrt(2 × 700 / 8090)`; re-measure in the engine) |
+| Flip across the ball's 800 px corridor (700 px of travel for the 100 px ball), from rest | **0.51 s** (122 ticks, measured in the engine) |
 | Flipped ball landing under a block (block bottom y = 400) | grounded at **y = 450**, alive |
 
-At the normal speed (1038.6 px/s), a full flip covers about 432 px horizontally (4.3 blocks). That's the minimum spacing between floor and ceiling hazards the player must dodge with consecutive flips; use it when designing.
+At the normal speed (1038.6 px/s), a full flip covers about 528 px horizontally (5.3 blocks). That's the minimum spacing between floor and ceiling hazards the player must dodge with consecutive flips; use it when designing.
 
 ### 9.4 Gravity portals
 
@@ -1302,11 +1306,24 @@ spike 3400 750 2
 portal 4200 350 2 cube
 ```
 
-The ball's corridor for a portal at y = 350 is 800 px tall: centered at 450, so 50..850, its floor on the ground. Spikes alternate floor, ceiling (rotated 180°, pointing down, PLAN 4.2), floor, 600 px apart: more than the ~460 px a flip needs. Expected: completable. (The prototype found it in 31 bot attempts, but it had no rotation, so its ceiling spike used an upward-pointing hitbox; re-measure once PLAN 4.2 exists.)
+The ball's corridor for a portal at y = 350 is 800 px tall: centered at 450, so 50..850, its floor on the ground. Spikes alternate floor, ceiling (rotated 180°, pointing down, PLAN 4.2), floor, 600 px apart: more than the 528 px a flip needs. Expected: completable. (The prototype found it in 31 bot attempts, but it had no rotation, so its ceiling spike used an upward-pointing hitbox; re-measure once PLAN 4.2 exists.)
 
 ### 9.6 Mirrored tests
 
 Because every rule is written with `gravity_dir`, mirroring a corridor section vertically around the corridor's center, and starting it with `gravity_dir = -1`, must give exactly the same result as the original. The test harness can generate the mirror automatically and run both through the bot. It mirrors at the **hitbox** level, after `sim_init`: every vertex `y' = 2 × center − y`, vertex order reversed to stay clockwise, axes and bounds recomputed. That works for every shape, including a non-square slope, which no `rot=` value can mirror (a reflection isn't a rotation). Any difference in the bot's result is a direction bug in the contact rules. It doubles collision coverage for one loop in the test runner. It needs a start position inside the section (11.8), since the cube start outside a corridor isn't mirrorable.
+
+### 9.7 As built
+
+- **The mode:** `MODE_BALL`, its row in `MODES` and `src/sim/mode_ball.c` (`ball_input`, `ball_rotation`), the constants of 9.2 in `constants.h`. The flip needs a fresh hold and `can_jump`; a tap inside one tick counts, a click released in the air is lost, and a hold kept down flips once and no more.
+- **Tuned by play-testing:** the first version (gravity 0.75, cap 2.67, a flip in 0.425 s) went up and down too hard, flipped again on every landing while held, and rolled 3.3 turns a second. Gravity 0.5 and cap 1.6 alone (0.575 s) were then too soft, so the click also pushes the ball off its surface at 0.4: a flip across the 800 px corridor takes **122 ticks (0.51 s)**, 528 px of level. Flipped, it lands under a block whose underside is at 400 at y = 450.
+- **The rolling** is computed in the tick (`ball_rotation`), not in the game layer as 9.2 says, so it never jumps at a flip. It is `BALL_SPIN`, one turn a second at 1×, scaled with the speed and reversed on a ceiling: a circle of this size that never slid would turn 3.3 times a second, too fast to read.
+- **The 800 px corridor** needed nothing new. A portal is 280 px tall, so whatever touches it is well inside the corridor it opens, and the ground is the one thing that can cut that corridor short (8.7).
+- **The level of 9.5** has the fault of 8.6: its portal is too high for a cube on the ground, which then jumps the two floor spikes and never becomes a ball (23 attempts, no flip). With the portal on the ground (`portal 1500 650 2 ball`) the corridor is the 50..850 that 9.5 describes, and the bot needs the three flips: 65 attempts. `tests/test_bot.c` uses that one and counts the flips of the found path; the UFO's level counts its ticks as a UFO the same way.
+- **Mirrored tests (9.6):** `tests/test_mirror.c`. One section (floor and ceiling blocks, both kinds of slope, spikes both ways, a tilted block, gravity portals, a mode portal) is turned upside down at the hitbox level and played with flipped gravity. For the ship, the UFO, the ball and the wave, 200 seeded input patterns each, the two runs are compared **on every tick, bit for bit**, deaths included, and the bot must reach the same verdict in the same number of attempts.
+- **The mirror line is y = 0**, not the corridor's center anywhere. Negating a double is exact, so the mirrored run does the same arithmetic with the signs turned. Around another line the coordinates round differently, and a fall that ends exactly on a floor (a ship coming back to the height it left) lands one tick apart in the two runs: a rounding tie, not a direction bug, but enough to make every later tick differ.
+- **What the mirror catches:** with a `gravity_dir` removed from the circle's face rule, from a slope's rise speed, from the jump zone or from the step's ceiling test, the mirror fails and no other test does.
+- **The game layer:** a red portal, the cube's icon rolling. The level list has four columns instead of three, so twelve levels fit on screen.
+- **Tests:** `tests/test_ball.c` (the row, a flip from rest and back, a hold flips once, clicks in the air, landing under a block, the ceiling bounce, spikes and walls, a ship turning into a ball against its ceiling, a wave turning into one on the ground, the rolling).
 
 ---
 
