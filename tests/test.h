@@ -27,6 +27,7 @@ void test_pads(void);
 void test_orbs(void);
 void test_doc(void);
 void test_editor(void);
+void test_edit(void);
 void test_progress(void);
 void test_input(void);
 void test_settings(void);
