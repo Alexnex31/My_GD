@@ -1677,9 +1677,15 @@ Rules:
 
 Test (13): 1000 random commands, then undo all → identical to the start; redo all → identical to the end.
 
-### 11.8 Start position
+### 11.8 Start positions
 
-Editor-only object: `start x y <mode> [up|down] [speed]`. Any gamemode, either gravity, any speed from 10.3's list. Saved in the file, ignored by the game outside the editor. Playtest from it with:
+A level can hold any number of **start positions**: `start x y <mode> [up|down] [speed]` lines in its body. Any gamemode, either gravity, any speed from 10.3's list. They are markers and nothing else: no hitbox, invisible in play, and the run never meets one.
+
+- They are **alternatives** to the level's real start, which is the header's (`start_x`, `start_gamemode` and the others, PLAN 7.2). Placing, moving or deleting a start position never changes the real one.
+- They form a list, in the file's order. In the game and in a playtest the player moves through it with **A** (previous) and **E** (next); the real start is the first entry.
+- **Only an attempt begun at the real start counts**: one begun at a start position records no best and no completion. It is practice.
+
+An attempt begins at one with:
 
 ```c
 void sim_reset_at(sim_t *s, double x, double y, gamemode_t mode, int gravity_dir, double speed)
@@ -1771,7 +1777,7 @@ Draw only beats in view: compute `k_min` and `k_max` from the view's left and ri
 
 ### 11.12 Saving
 
-1. New level: ask for a name (text field). File name = lowercase name, spaces → `_`, only `[a-z0-9_-]`, max 48 chars; if taken, add `_2`, `_3`…
+1. New level: ask for a name (text field). The file is `levels/<id>.gd`, the id being one past the highest that exists (PLAN 7.2: ids are digits, and progress is keyed by them); the name goes in the `name` header.
 2. Write `levels/<file>.tmp` with `level_write`, check `fclose`, `rename` over `levels/<file>`.
 3. Content: the header fields that aren't at their default value, then objects **sorted by x** (then y). Sorted files are readable and give small git diffs. Optional fields are written only when they differ from their default (`rot=` when not 0, `w=`/`h=` when not equal to `size`), followed by the object's `extra` fields unchanged.
 4. `dirty = false`.
@@ -1792,6 +1798,18 @@ Recomputed after each edit (cheap):
 - Surfaces facing up that are steeper than 50°: they're walls, not floors (PLAN 4.4), which is rarely intended for a rotated block or slope.
 
 Show counts in the toolbar; clicking cycles the camera through the flagged objects.
+
+### 11.13b As built: groundwork, E1 and E2
+
+- **The loader is three parts** (`src/sim/level_parse.c`, `level_write.c`, `level_build.c`). `level_parse_doc` reads a level as a document: its objects in file order, the fields of each line nothing edits (`group=`, unknown keys) kept as written, and its start positions. `level_write` gives the text back: the header fields that aren't at their default, the start positions, then the objects by x then y with only the fields each needs, written to a `.tmp` file and renamed. `sim_init` builds a simulation from a document. `sim_load_mem` is now parse then build; every level plays tick for tick as before.
+- **What a save keeps and loses.** Written and parsed again, every level of `levels/` gives the same text and plays the same. A save does **not** keep comments, blank lines or the order of the lines: the file is rewritten whole.
+- **Start positions (11.8)** are parsed, kept in `lvl.starts`, saved, and drawn in the editor as faint blue icons. Choosing one with A/E and attempts that don't count come with E5.
+- **The text field** is a toolkit widget (`W_TEXT`): typed characters, Backspace, Enter confirms, a click only focuses it, and no key is a shortcut while it has the focus.
+- **The editor's level** (`src/editor/ed_level.c`, pure and tested): objects with ids never given twice, open, save, the cell under the mouse, what a click hits (the object drawn on top, in its own turned frame), and the palette's entries, generated from the object, mode and colour tables. A placed object is made by the loader from its own line, so what is placed is what the game reads back; the same object is never placed twice in a cell.
+- **E1, the canvas** (`src/editor_canvas.c`, `editor_draw.c`): the level drawn with the game's own vertices and atlas, pan (middle button or Space and drag), the wheel along the level, Ctrl and the wheel to zoom around the mouse from 25% to 400%, a grid that thins out when zoomed out, the ground, the level's end and the kill ceiling as lines, the real start and the start positions as icons. Objects are rebuilt each frame for what is in view, not kept in the game's chunk buffers: simpler, and fast enough at this size.
+- **E2, making a level** (`src/editor_scene.c`, `editor_menu.c`): the editor opens on a list of the levels and a field to name a new one. Left click places the palette's entry (keys 1 to 9, the arrows, or a click on it), dragging paints, right click deletes, G switches the grid between 50 and 25, Ctrl+S saves. Leaving with unsaved changes warns once; the dialog is E7's.
+- **The level list** in the game scrolls (wheel, Up, Down), so a thirteenth level is reachable.
+- **Tests:** `tests/test_doc.c` (start positions, kept fields, every kind of object line written back as it was, the header, every level of `levels/` round trip and played from a document, the file written whole), `tests/test_editor.c` (ids, open and save, snapping, the hit test, the palette, placing, a placed level played, the next id) and the text field in `tests/test_ui.c`.
 
 ### 11.14 Stages
 

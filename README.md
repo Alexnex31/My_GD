@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) and jump pads and orbs (10.1, 10.2) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2) and the first two stages of the level editor (11: open a level or make a new one, place, delete, save) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -86,6 +86,24 @@ The full list is in `FEATURES.md` 2.2. The **options screen** (the main menu's o
 - **Display:** a new fullscreen setting or window size asks to be kept, and reverts by itself after 10 s, so an unsupported mode fixes itself.
 - **Data:** Reset progress asks first, and keeps the old file as `save/progress.txt.bak`. Open save folder opens `save/` and prints its path.
 
+## Level editor
+
+The third button of the main menu opens it: a list of the levels to open, and a field to name a new one (it takes the next free id).
+
+| Input | Action |
+|---|---|
+| Left click, or drag | Place the palette's entry in the cell under the mouse |
+| Right click, or drag | Delete what is under the mouse |
+| 1 to 9, Up / Down, or a click on the palette | Choose what to place |
+| Wheel / Shift+wheel | Scroll along the level / up and down |
+| Ctrl+wheel | Zoom around the mouse, 25% to 400% |
+| Middle button, or Space and drag | Pan |
+| G | Grid 50 / 25 |
+| Ctrl+S | Save |
+| Escape | Leave (warns once if there are unsaved changes) |
+
+The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects sorted by position, comments and blank lines gone. Selecting, moving, undo, properties, playtest and the rest are the next stages (`FEATURES.md` 11.14).
+
 ## Music
 
 Songs live in `music/` (`.ogg` recommended; `.wav`, `.flac` and `.mp3` work too), described in `music/songs.txt`:
@@ -125,7 +143,7 @@ orb 5000 500 2 pink           # jump orb: launches on a click while touching it
 ```
 
 - **Header**: any line whose first word isn't an object type, written `key <value>`. `name`, `author`, `music`, `music_offset`, `bpm` and `first_beat` describe the level; the optional `start_gamemode`, `start_speed`, `start_size`, `start_gravity`, `start_x` and `start_y` say where and how an attempt begins. Unknown keys are ignored with a warning, so the file still loads.
-- **Body**: `type x y size [word] [key=value ...]`, with types `block`, `slope`, `spike`, `portal` (whose word is the gamemode: `cube`, `ship`, `ufo`, `wave`, `ball`) `gravity` (a gravity portal, whose word is `up` or `down`), `pad` (a jump pad: `yellow`, `pink`, `red` or `blue`) and `orb` (a jump orb, clicked while touching it: `yellow`, `pink`, `red`, `blue`, `green` or `black`).
+- **Body**: `type x y size [word] [key=value ...]`, with types `block`, `slope`, `spike`, `portal` (whose word is the gamemode: `cube`, `ship`, `ufo`, `wave`, `ball`) `gravity` (a gravity portal, whose word is `up` or `down`), `start` (another place to begin an attempt for practice, `start x y mode [up|down] [speed]`: no size, no hitbox, and the real start stays the header's), `pad` (a jump pad: `yellow`, `pink`, `red` or `blue`) and `orb` (a jump orb, clicked while touching it: `yellow`, `pink`, `red`, `blue`, `green` or `black`).
 - `x` and `y` are the object's top-left corner in world pixels, `y` grows downward and the ground's surface is at `y = 850`.
 - `size` is in grid units of 50 px, so `size 2` is the 100 x 100 block that matches the player. `w=` and `h=` override it per axis, `rot=` turns the object by any angle.
 - Sizes must be at least 1: a zero or negative size rejects the line, naming the file and the line.
@@ -142,6 +160,7 @@ src/            game layer (window, scenes, menus, rendering)
 src/sim/        the simulation: no SFML, no globals, deterministic
 src/ui/         the widget toolkit's core: no SFML either, tested the same way
 src/fx/         effects that only read the simulation (the wave's trail): no SFML, tested
+src/editor/     the level the editor edits (ids, open, save, hit test): no SFML, tested
 levels/         level files
 music/          songs and songs.txt
 res/            textures, fonts, sounds
