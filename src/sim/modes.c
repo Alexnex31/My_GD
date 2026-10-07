@@ -16,6 +16,7 @@ const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT] = {
     [OBJ_PORTAL] = CAT_INTERACTIVE,
     [OBJ_GRAVITY] = CAT_INTERACTIVE,
     [OBJ_PAD] = CAT_INTERACTIVE,
+    [OBJ_ORB] = CAT_INTERACTIVE,
 };
 
 /*
@@ -94,7 +95,9 @@ int launch_from_name(const char *name)
 
 double launch_speed(const object_t *o)
 {
-    return o->type == OBJ_PAD ? LAUNCHES[o->launch].pad_v : 0.0;
+    if (o->type == OBJ_PAD)
+        return LAUNCHES[o->launch].pad_v;
+    return o->type == OBJ_ORB ? LAUNCHES[o->launch].orb_v : 0.0;
 }
 
 int mode_from_name(const char *name)

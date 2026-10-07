@@ -129,9 +129,11 @@ static void enter_gravity(sim_t *s, const object_t *o)
 }
 
 /*
-** A pad sets the rise speed to its own, whatever the player was doing: the
-** same launch every time, and no mode's cap cuts it (3.4). Blue flips the
-** gravity first, and its speed is toward the new floor (FEATURES 10.1).
+** A pad or an orb sets the rise speed to its own, whatever the player was
+** doing: the same launch every time, and no mode's cap cuts it (3.4). Blue
+** and green flip the gravity first, and their speed is in the new gravity:
+** toward the new floor for blue, a jump away from it for green.
+** An orb uses the hold that activated it (FEATURES 10.1, 10.2).
 */
 static void launch(sim_t *s, const object_t *o)
 {
@@ -142,13 +144,15 @@ static void launch(sim_t *s, const object_t *o)
     p->vy = PER_TICK(launch_speed(o) * V_UNIT);
     p->grounded = false;
     p->can_jump = false;
+    if (o->type == OBJ_ORB)
+        p->hold = HOLD_USED;
 }
 
-/* Every interactive object so far acts on a touch alone (5.1). */
+/* An orb needs a hold nothing has used yet; the others only a touch (5.1). */
 static bool interactive_wants_activation(const sim_t *s, const object_t *o)
 {
-    (void)s;
-    (void)o;
+    if (o->type == OBJ_ORB)
+        return s->st.player.hold == HOLD_FRESH;
     return true;
 }
 
@@ -158,7 +162,7 @@ static void interactive_act(sim_t *s, const object_t *o)
         enter_portal(s, o);
     if (o->type == OBJ_GRAVITY)
         enter_gravity(s, o);
-    if (o->type == OBJ_PAD)
+    if (o->type == OBJ_PAD || o->type == OBJ_ORB)
         launch(s, o);
 }
 
@@ -171,6 +175,34 @@ static void touch_interactive(sim_t *s, size_t i)
         return;
     interactive_act(s, o);
     set_spent(&s->st, i);
+}
+
+/*
+** Tick step 0: a hold that is fresh while the player is already inside a
+** live orb (it flew in without pressing, and the press comes now). The orb
+** acts before the mode's own input and takes the click: nothing else may
+** jump, hop or flip on it this tick, so the orb wins over a surface jump
+** (FEATURES 10.2). One orb per hold: the first in the level's order.
+*/
+input_t activate_orbs(sim_t *s, input_t in)
+{
+    const player_t *p = &s->st.player;
+    double half = MODES[p->mode].half;
+
+    if (p->hold != HOLD_FRESH)
+        return in;
+    for (size_t i = s->st.first_active; i < s->lvl.nb_objects; i++) {
+        const object_t *o = &s->lvl.objects[i];
+
+        if (o->hitbox.aabb.x > p->pos.x + half)
+            break;                           /* sorted: nothing further touches */
+        if (o->type != OBJ_ORB || is_spent(&s->st, i)
+            || !overlap_box_poly(p->pos, half, &o->hitbox))
+            continue;
+        touch_interactive(s, i);
+        return (input_t){false, false};
+    }
+    return in;
 }
 
 void apply_interactive(sim_t *s)

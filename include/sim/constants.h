@@ -29,11 +29,13 @@
     #define PORTAL_BOX_W        1.2
     #define PORTAL_BOX_H        2.8
 
-    /* A pad is a thin plate at the bottom of its cell, like GD's (FEATURES 10.1). */
+    /* A pad is a thin plate at the bottom of its cell, like GD's; an orb's box
+       is a little smaller than its cell: 80 x 80 px at size 2 (FEATURES 10). */
     #define PAD_BOX_X           0.1
     #define PAD_BOX_Y           0.75
     #define PAD_BOX_W           0.8
     #define PAD_BOX_H           0.25
+    #define ORB_BOX_INSET       0.1
 
     /* Player */
     #define PLAYER_HALF         50.0    /* rigid square 100x100, circle radius 50 (4.3) */

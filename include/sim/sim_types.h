@@ -29,7 +29,8 @@ typedef enum obj_type {
     OBJ_PORTAL,               /* interactive: acts once, then untouchable    */
     OBJ_GRAVITY,              /* interactive: a gravity portal (FEATURES 9.4) */
     OBJ_PAD,                  /* interactive: launches on touch (FEATURES 10.1) */
-    /* later: OBJ_SAW (harm), OBJ_ORB, OBJ_SPEED (FEATURES 10) */
+    OBJ_ORB,                  /* interactive: launches on a fresh hold (10.2)  */
+    /* later: OBJ_SAW (harm), OBJ_SPEED (FEATURES 10) */
     OBJ_TYPE_COUNT
 } obj_type_t;
 
@@ -83,7 +84,7 @@ typedef struct object {       /* level data: never modified after load */
     int size;                 /* as written in the file                        */
     gamemode_t portal_mode;   /* OBJ_PORTAL only                                */
     int portal_gravity;       /* OBJ_GRAVITY only: +1 down, -1 up               */
-    launch_kind_t launch;     /* OBJ_PAD: its colour                            */
+    launch_kind_t launch;     /* OBJ_PAD, OBJ_ORB: its colour                   */
     int line;                 /* source line, for messages and stable sort      */
 } object_t;
 

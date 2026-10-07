@@ -201,8 +201,8 @@ rect_t object_drawn_bounds(const object_t *o)
 
 /*
 ** The box a type's hitbox is, inside its rect and before rotation (4.2):
-** a spike's is inset in its sprite, a pad's is a plate along the bottom.
-** A pad is drawn in it.
+** a spike's is inset in its sprite, a pad's is a plate along the bottom, an
+** orb's is a little smaller than its cell. Pads and orbs are drawn in it.
 */
 rect_t object_local_box(const object_t *o)
 {
@@ -214,6 +214,10 @@ rect_t object_local_box(const object_t *o)
     if (o->type == OBJ_PAD)
         return (rect_t){r.x + PAD_BOX_X * r.w, r.y + PAD_BOX_Y * r.h,
             PAD_BOX_W * r.w, PAD_BOX_H * r.h};
+    if (o->type == OBJ_ORB)
+        return (rect_t){r.x + ORB_BOX_INSET * r.w, r.y + ORB_BOX_INSET * r.h,
+            (1.0 - 2.0 * ORB_BOX_INSET) * r.w,
+            (1.0 - 2.0 * ORB_BOX_INSET) * r.h};
     return r;
 }
 

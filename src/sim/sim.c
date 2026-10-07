@@ -80,6 +80,7 @@ void sim_tick(sim_t *s, input_t in)
         return;
     p->prev_pos = p->pos;
     player_update_hold(p, in);               /* 0. fresh / used / none          */
+    in = activate_orbs(s, in);               /*    an orb it is in takes the click */
     MODES[p->mode].apply_input(p, in);       /* 1. the mode's impulses          */
     MODES[p->mode].apply_forces(p);          /* 2. gravity and the fall cap     */
     move_and_collide(s);                     /* 3. legs, contacts, deaths (4.4) */
