@@ -31,6 +31,7 @@ int main(void)
     test_doc();
     test_editor();
     test_edit();
+    test_props();
     test_progress();
     test_input();
     test_settings();
