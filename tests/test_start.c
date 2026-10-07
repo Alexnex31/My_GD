@@ -94,7 +94,7 @@ static void test_start_gamemode(void)
     CHECK(s.st.player.grounded && s.st.player.can_jump);
     sim_free(&s);
     /* an unknown mode warns and the level starts as a cube */
-    load(&s, "start_gamemode ball\nblock 5000 700 2\n");
+    load(&s, "start_gamemode spider\nblock 5000 700 2\n");
     CHECK(warnings == 1);
     CHECK(s.st.player.mode == MODE_CUBE);
     sim_free(&s);

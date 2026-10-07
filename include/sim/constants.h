@@ -74,6 +74,16 @@
        One 30 x 30 square is its rigid square and its inner box at once. */
     #define WAVE_HALF           15.0
 
+    /* The ball (FEATURES 9): a click flips its gravity. Ours, chosen from the
+       crossing they give: 0.5 s from one side of its corridor to the other,
+       about 5 blocks of level. The icon turns once a second at 1x: a real
+       rolling circle of this size would turn 3.3 times, too fast to read. */
+    #define BALL_GRAVITY        (0.5 * A_UNIT)     /* ours: 5393.4 px/s^2                */
+    #define BALL_MAX_FALL       (1.6 * V_UNIT)     /* ours: 1661.8 px/s                  */
+    #define BALL_FLIP_V         (0.4 * V_UNIT)     /* ours: 415.4 px/s, the push off the
+                                                    surface it leaves: a quarter of the cap */
+    #define BALL_SPIN           360      /* deg/s at 1x, the icon's roll (cosmetic)      */
+
     /* Contacts (4.4) */
     #define FLOOR_MIN_DOT       0.64279 /* cos(50 deg): steeper than 50 deg is a wall     */
     #define FLOOR_MAX_TAN       1.19175 /* tan(50 deg)                                    */

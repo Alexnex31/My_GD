@@ -31,6 +31,8 @@ void ufo_rotation(player_t *p);
 void wave_input(player_t *p, input_t in);
 void wave_forces(player_t *p);
 void wave_rotation(player_t *p);
+void ball_input(player_t *p, input_t in);
+void ball_rotation(player_t *p);
 
 void move_and_collide(sim_t *s);                   /* 4.4 */
 void collide_kill_ceiling(player_t *p, const level_data_t *lvl);   /* 4.7 */

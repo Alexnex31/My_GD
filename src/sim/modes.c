@@ -41,6 +41,12 @@ const mode_ops_t MODES[MODE_COUNT] = {
         .keep_vy_on_surface = true, .bot_decision_ticks = 12,
         .apply_input = wave_input, .apply_forces = wave_forces,
         .update_rotation = wave_rotation},
+    [MODE_BALL] = {.name = "ball", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
+        .gravity = PER_TICK2(BALL_GRAVITY),
+        .max_fall = PER_TICK(BALL_MAX_FALL), .head_restitution = BOUNCE_RESTITUTION_SHIP,
+        .corridor_height = 800.0,
+        .apply_input = ball_input, .apply_forces = player_apply_gravity,
+        .update_rotation = ball_rotation},
 };
 
 /*
