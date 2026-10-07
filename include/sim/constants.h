@@ -53,7 +53,9 @@
     #define CUBE_JUMP_V         (1.9522 * V_UNIT)  /* 2027.6 px/s: GD's 1.94 raised so the
                                                     measured apex is its 2.1333 blocks (11.1) */
     #define CUBE_MAX_FALL       (2.6 * V_UNIT)     /* 2700.4 px/s                        */
-    #define CUBE_SPIN           324      /* deg/s, the icon's spin in the air (cosmetic) */
+    #define CUBE_JUMP_TICKS     102      /* a jump on flat ground, press to landing        */
+    #define CUBE_SPIN           (180.0 * TICK_RATE / CUBE_JUMP_TICKS)   /* 423.5 deg/s: the icon
+                                    turns exactly half a turn over that jump (cosmetic) */
     #define RISE_EPSILON        (1.0 / 4096.0)   /* px/tick, jump-zone momentum test (4.3) */
     /* The ship: GD never published these, so they are ours, chosen from the arc
        they draw rather than from a number (6.9). The cap is exactly the scroll

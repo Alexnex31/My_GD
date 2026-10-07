@@ -39,6 +39,30 @@ static void ship_held_speed(double *lowest, double *highest)
     sim_free(&s);
 }
 
+/*
+** A jump on flat ground turns the cube half a turn, and it arrives there by
+** itself: the landing has nothing left to snap.
+*/
+static void cube_half_turn(void)
+{
+    const char *text = "block 100000 700 2\n";
+    sim_t s;
+    float last = 0.0f;
+    int ticks = 1;
+
+    sim_load_mem(&s, text, strlen(text), "1", NULL);
+    sim_tick(&s, (input_t){true, true});
+    while (!s.st.player.grounded && ticks < 500) {
+        last = s.st.player.rotation;
+        sim_tick(&s, (input_t){false, false});
+        ticks += 1;
+    }
+    CHECK(ticks == CUBE_JUMP_TICKS);
+    CHECK(s.st.player.rotation == 180.0f);
+    CHECK(last > 177.0f && last < 180.0f);       /* one tick short of it */
+    sim_free(&s);
+}
+
 void test_constants(void)
 {
     double lowest = 0.0;
@@ -52,6 +76,7 @@ void test_constants(void)
     CHECK(PER_TICK(SPEED_VFAST) == 6.5);
     CHECK(PER_TICK(SPEED_XFAST) == 8.0);
     CHECK(modes_tallest_corridor() == 1000.0);           /* the ship's (5.2) */
+    cube_half_turn();
     ship_held_speed(&lowest, &highest);
     CHECK(highest == PER_TICK(SHIP_MAX_VY));           /* never above the cap */
     CHECK(lowest >= PER_TICK(SHIP_MAX_VY) - MODES[MODE_SHIP].gravity);
