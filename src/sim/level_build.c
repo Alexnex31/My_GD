@@ -80,9 +80,12 @@ int sim_load_mem(sim_t *s, const char *buf, size_t len, const char *id,
     s->lvl.file_hash = fnv1a(buf, len);  /* the version, from the bytes read */
     s->lvl.skipped_lines = level_parse_doc(buf, len, id, &doc, &s->lvl.hdr,
         log);
-    s->lvl.objects = doc.objs;           /* the sim keeps this array */
+    s->lvl.objects = doc.objs;           /* the sim keeps these two arrays */
     s->lvl.nb_objects = doc.count;
+    s->lvl.starts = doc.starts;
+    s->lvl.nb_starts = doc.nb_starts;
     doc.objs = NULL;
+    doc.starts = NULL;
     level_doc_free(&doc);
     if (s->lvl.hdr.start.mini && log != NULL)
         log("start_size mini has no effect yet: the mini scale is FEATURES 10.4");
@@ -107,6 +110,11 @@ int sim_init(sim_t *s, const level_doc_t *doc, const level_header_t *hdr,
         s->lvl.objects[i] = doc->objs[i];
         s->lvl.objects[i].line = (int)i + 1;
     }
+    s->lvl.starts = sim_xcalloc(doc->nb_starts + 1, sizeof(level_start_t));
+    s->lvl.nb_starts = doc->nb_starts;
+    if (doc->nb_starts > 0)
+        memcpy(s->lvl.starts, doc->starts,
+            doc->nb_starts * sizeof(level_start_t));
     sim_ready(s);
     return 0;
 }
@@ -203,6 +211,7 @@ int sim_load(sim_t *s, const char *path, sim_log_fn log)
 void sim_free(sim_t *s)
 {
     free(s->lvl.objects);
+    free(s->lvl.starts);
     free(s->st.spent);
     memset(s, 0, sizeof(*s));
 }

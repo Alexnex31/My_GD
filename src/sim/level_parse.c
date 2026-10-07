@@ -361,6 +361,43 @@ static bool start_speed(const char *text, level_start_t *st, parse_ctx_t *ctx)
     return true;
 }
 
+/*
+** start x y mode [up|down] [speed]: another place an attempt can begin, for
+** practice (FEATURES 11.8). It has no hitbox and is no object: the run never
+** meets it. 0 kept, -1 skipped, 1 not a start line at all.
+*/
+static int parse_start(char *line, level_start_t *st, parse_ctx_t *ctx)
+{
+    char *tok[MAX_TOKENS];
+    int n = split_words(line, tok, MAX_TOKENS);
+    int mode = n >= 4 ? mode_from_name(tok[3]) : -1;
+    int next = 4;
+
+    if (n < 1 || strcmp(tok[0], "start") != 0)
+        return 1;
+    *st = (level_start_t){.speed_mult = 1.0, .gravity_dir = 1};
+    if (n < 4 || mode < 0 || !parse_double(tok[1], &st->pos.x)
+        || !parse_double(tok[2], &st->pos.y)
+        || fabs(st->pos.x) > LEVEL_COORD_MAX
+        || fabs(st->pos.y) > LEVEL_COORD_MAX) {
+        warn(ctx, "start needs x y and a gamemode, line skipped");
+        return -1;
+    }
+    st->mode = (gamemode_t)mode;
+    if (next < n && (strcmp(tok[next], "up") == 0
+        || strcmp(tok[next], "down") == 0)) {
+        st->gravity_dir = strcmp(tok[next], "up") == 0 ? -1 : 1;
+        next += 1;
+    }
+    if (next < n && known_speed(tok[next], &st->speed_mult))
+        next += 1;
+    if (next < n) {
+        warn(ctx, "start takes up or down, then a speed, line skipped");
+        return -1;
+    }
+    return 0;
+}
+
 static bool header_number(const char *key, const char *value,
     level_header_t *hdr, parse_ctx_t *ctx)
 {
@@ -507,24 +544,38 @@ static int skip_object(char *line)
 
     if (split_words(line, tok, 1) < 1)
         return 1;
+    if (strcmp(tok[0], "start") == 0)
+        return 0;
     return type_from_name(tok[0], &type) != 0;
 }
 
 typedef struct parse_out {    /* what the caller wants filled, each or NULL */
     object_t **objs;
     char ***extras;
+    level_start_t **starts;
     size_t *count;
+    size_t *nb_starts;
 } parse_out_t;
 
-/* One line that isn't blank: an object, or else a header field. */
+/* One line that isn't blank: a start, an object, or else a header field. */
 static int parse_line(char *line, parse_out_t *out, level_header_t *hdr,
     parse_ctx_t *ctx)
 {
     char copy[1024];
     char extra[256] = "";
+    level_start_t st;
     int ret;
 
-    memcpy(copy, line, sizeof(copy));         /* the parser splits in place */
+    memcpy(copy, line, sizeof(copy));         /* the parsers split in place */
+    ret = parse_start(copy, &st, ctx);
+    if (ret <= 0) {
+        if (ret == 0 && out->starts != NULL) {
+            (*out->starts)[*out->nb_starts] = st;
+            *out->nb_starts += 1;
+        }
+        return ret;
+    }
+    memcpy(copy, line, sizeof(copy));
     if (out->objs == NULL)
         ret = skip_object(copy);
     else {
@@ -555,6 +606,8 @@ static int parse_all(const char *buf, size_t len, const char *source,
         *out->objs = sim_xcalloc(lines, sizeof(object_t));
     if (out->extras != NULL)
         *out->extras = sim_xcalloc(lines, sizeof(char *));
+    if (out->starts != NULL)
+        *out->starts = sim_xcalloc(lines, sizeof(level_start_t));
     while (pos < len) {
         pos = next_line(buf, len, pos, line, sizeof(line));
         ctx.lineno += 1;
@@ -570,7 +623,8 @@ int level_parse_mem(const char *buf, size_t len, const char *source,
     object_t **objs, size_t *count, level_header_t *hdr, sim_log_fn log)
 {
     size_t nb = 0;
-    parse_out_t out = {.objs = objs, .count = &nb};
+    size_t nb_starts = 0;
+    parse_out_t out = {.objs = objs, .count = &nb, .nb_starts = &nb_starts};
     int skipped = parse_all(buf, len, source, &out, hdr, log);
 
     if (count != NULL)
@@ -581,7 +635,8 @@ int level_parse_mem(const char *buf, size_t len, const char *source,
 int level_parse_doc(const char *buf, size_t len, const char *source,
     level_doc_t *doc, level_header_t *hdr, sim_log_fn log)
 {
-    parse_out_t out = {&doc->objs, &doc->extras, &doc->count};
+    parse_out_t out = {&doc->objs, &doc->extras, &doc->starts, &doc->count,
+        &doc->nb_starts};
 
     *doc = (level_doc_t){0};
     return parse_all(buf, len, source, &out, hdr, log);
@@ -593,6 +648,7 @@ void level_doc_free(level_doc_t *doc)
         free(doc->extras[i]);
     free(doc->extras);
     free(doc->objs);
+    free(doc->starts);
     *doc = (level_doc_t){0};
 }
 

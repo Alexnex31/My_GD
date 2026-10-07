@@ -75,6 +75,19 @@ static void put_header(text_buf_t *b, const level_header_t *h)
         put(b, "start_size mini\n");
 }
 
+static void put_starts(text_buf_t *b, const level_doc_t *doc)
+{
+    for (size_t i = 0; i < doc->nb_starts; i++) {
+        const level_start_t *st = &doc->starts[i];
+
+        put(b, "start %.10g %.10g %s%s", st->pos.x, st->pos.y,
+            MODES[st->mode].name, st->gravity_dir < 0 ? " up" : "");
+        if (st->speed_mult != 1.0)
+            put(b, " %.10g", st->speed_mult);
+        put(b, "\n");
+    }
+}
+
 /* A portal's rect is derived from its cell when the line gives no w or h. */
 static bool is_portal_shaped(const object_t *o)
 {
@@ -160,6 +173,7 @@ char *level_write_mem(const level_doc_t *doc, const level_header_t *hdr)
     size_t *order = sim_xcalloc(doc->count + 1, sizeof(size_t));
 
     put_header(&b, hdr);
+    put_starts(&b, doc);
     if (b.len > 0 && doc->count > 0)
         put(&b, "\n");
     for (size_t i = 0; i < doc->count; i++)

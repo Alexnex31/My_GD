@@ -23,14 +23,16 @@ int level_parse_mem(const char *buf, size_t len, const char *source,
 
 /*
 ** A level as a document, for what edits one (FEATURES 11.1): its objects in
-** file order, and what each line carried that nothing here edits (group=,
-** keys from a newer version) to be written back unchanged. The header is
-** kept beside it.
+** file order, what each line carried that nothing here edits (group=, keys
+** from a newer version) to be written back unchanged, and its other start
+** positions. The header is kept beside it.
 */
 typedef struct level_doc {
     object_t *objs;
     char **extras;            /* per object: " key=value ..." or NULL */
     size_t count;
+    level_start_t *starts;
+    size_t nb_starts;
 } level_doc_t;
 
 /* Returns the lines it skipped, like level_parse_mem. hdr holds its defaults. */
@@ -40,8 +42,9 @@ void level_doc_free(level_doc_t *doc);
 void level_header_defaults(level_header_t *hdr, const char *id);
 
 /*
-** The file's text: the header fields that aren't at their default, then the
-** objects by x then y, each with only the fields it needs. Parsing it gives the same document back. malloc'd, NUL terminated.
+** The file's text: the header fields that aren't at their default, the start
+** positions, then the objects by x then y, each with only the fields it
+** needs. Parsing it gives the same document back. malloc'd, NUL terminated.
 */
 char *level_write_mem(const level_doc_t *doc, const level_header_t *hdr);
 /* To <path>.tmp, then renamed over path: a crash never leaves half a level. */
