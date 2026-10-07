@@ -98,6 +98,18 @@ static void append_object(sfVertex *v, const object_t *o, sfFloatRect tex,
             t[order[k]]};
 }
 
+/* The same six vertices, for what draws objects that still change: the
+** editor's canvas shows exactly what the game will (FEATURES 11.4). */
+void object_vertices(gd_t *gd, const object_t *o, sfVertex *v)
+{
+    append_object(v, o, gd->atlas_rect[o->type], object_color(o));
+}
+
+int object_layer(const object_t *o)
+{
+    return (int)layer_of(o);
+}
+
 static size_t chunk_index(const object_t *o)
 {
     rect_t d = object_drawn_bounds(o);

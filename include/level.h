@@ -117,6 +117,8 @@ void input_stop(gd_t *gd);
 void level_build_chunks(level_t *lv, gd_t *gd);
 void level_free_chunks(level_t *lv);
 void render_objects(gd_t *gd, level_t *lv, float cam_x);
+void object_vertices(gd_t *gd, const object_t *o, sfVertex *v);   /* 6 of them */
+int object_layer(const object_t *o);
 
 /* The camera the renderer uses: the player's x, the sim's y, pixel snapped. */
 vec2_t level_camera(gd_t *gd, const level_t *lv);
