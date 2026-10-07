@@ -22,7 +22,7 @@ OUT       = build/$(BUILD)
 
 SIM_SRC   = $(wildcard src/sim/*.c)
 CORE_SRC  = $(wildcard src/ui/*.c) $(wildcard src/music/*.c) \
-            $(wildcard src/fx/*.c)
+            $(wildcard src/fx/*.c) $(wildcard src/editor/*.c)
 GAME_SRC  = $(wildcard src/*.c)
 SIM_OBJ   = $(SIM_SRC:%.c=$(OUT)/%.o)
 CORE_OBJ  = $(CORE_SRC:%.c=$(OUT)/%.o)
@@ -31,6 +31,7 @@ DEP       = $(SIM_OBJ:.o=.d) $(CORE_OBJ:.o=.d) $(GAME_OBJ:.o=.d)
 TEST_SRC  = $(wildcard tests/*.c)
 HDR       = $(wildcard include/sim/*.h) $(wildcard include/ui/*.h) \
             $(wildcard include/music/*.h) $(wildcard include/fx/*.h) \
+            $(wildcard include/editor/*.h) \
             $(wildcard tests/*.h)
 TEST_FLAGS = -Wall -Wextra -Iinclude -ffp-contract=off -g -fsanitize=address,undefined
 
