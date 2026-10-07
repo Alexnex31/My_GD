@@ -6,6 +6,8 @@
 */
 
 #include "test.h"
+#include <string.h>
+
 #include "ui/ui.h"
 
 enum { BUTTON, TOGGLE, SLIDER, OFF, CYCLER, KEYBIND, LIST, COUNT };
@@ -395,6 +397,57 @@ static void test_modal(void)
     CHECK(f.activations == 1);
 }
 
+static void type(fixture_t *f, const char *s)
+{
+    for (; *s != '\0'; s++)
+        ui_event(&f->ui, &(ui_event_t){.kind = UI_TEXT,
+            .ch = (unsigned char)*s}, 0);
+}
+
+/*
+** A text field: typed characters go in while it has the focus, Backspace
+** erases, Enter confirms, and no key is a shortcut meanwhile (11.6).
+*/
+static void test_text_field(void)
+{
+    fixture_t f;
+    char name[8] = "ab";
+
+    setup(&f);
+    f.w[0] = (widget_t){.kind = W_TEXT, .label = "Name", .bounds = row_at(0),
+        .enabled = true, .text = name, .text_cap = sizeof(name),
+        .on_change = on_change, .on_activate = on_activate};
+    f.ui.focused = 0;
+    CHECK(ui_typing(&f.ui));
+    type(&f, "c d");
+    CHECK(strcmp(name, "abc d") == 0 && f.changes == 3);
+    type(&f, "efgh");                          /* room for two more only */
+    CHECK(strcmp(name, "abc def") == 0);
+    type(&f, "\b\n\x7f");                      /* control codes type nothing */
+    CHECK(strcmp(name, "abc def") == 0);
+    key(&f, KEY_Backspace, 0);
+    CHECK(strcmp(name, "abc de") == 0);
+    key(&f, KEY_Space, 0);                     /* a letter, not "activate" */
+    key(&f, KEY_S, 0);                         /* nor a shortcut */
+    CHECK(f.activations == 0 && f.keys == 0);
+    key(&f, KEY_Enter, 0);
+    CHECK(f.activations == 1);
+    click_at(&f, 1500, 120);                   /* a click only focuses it */
+    CHECK(f.activations == 1 && ui_typing(&f.ui));
+    key(&f, KEY_Escape, 0);
+    CHECK(f.backs == 1);
+    key(&f, KEY_Down, 0);                      /* the arrows still leave it */
+    CHECK(f.ui.focused == 1 && !ui_typing(&f.ui));
+    type(&f, "zz");
+    CHECK(strcmp(name, "abc de") == 0);        /* not focused: not typed */
+    key(&f, KEY_S, 0);
+    CHECK(f.keys == 1);
+    name[0] = '\0';
+    f.ui.focused = 0;
+    key(&f, KEY_Backspace, 0);                 /* empty: nothing to erase */
+    CHECK(name[0] == '\0');
+}
+
 void test_ui(void)
 {
     test_button_activates_on_release();
@@ -407,4 +460,5 @@ void test_ui(void)
     test_list();
     test_looks();
     test_modal();
+    test_text_field();
 }
