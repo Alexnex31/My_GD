@@ -65,6 +65,8 @@ void ed_level_measure(const ed_level_t *lv, double *end_x, double *kill_y);
 int ed_add(ed_level_t *lv, const object_t *obj, const char *extra);  /* its id */
 bool ed_remove(ed_level_t *lv, int id);
 ed_object_t *ed_find(ed_level_t *lv, int id);
+/* Puts an object back where it was, with the id it had: an undo (11.7). */
+void ed_insert(ed_level_t *lv, const ed_object_t *o, size_t at);
 
 /* The cell a point is in: floor, so it is the cell under the mouse (11.4). */
 double ed_snap(double v, double grid);
@@ -78,6 +80,9 @@ int ed_entries(ed_entry_t *out, int max);
 ** the very same object, so a dragged click doesn't stack copies (11.13).
 */
 bool ed_place(ed_level_t *lv, const ed_entry_t *e, vec2_t at, double grid);
+/* The object that would be placed, without placing it; false as above. */
+bool ed_place_object(const ed_level_t *lv, const ed_entry_t *e, vec2_t at,
+    double grid, object_t *out);
 
 /* The id a new level takes: one past the highest of those that exist. */
 void ed_next_id(const char *const *ids, size_t count, char *out, size_t size);

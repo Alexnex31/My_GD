@@ -32,24 +32,42 @@ void ed_level_free(ed_level_t *lv)
     *lv = (ed_level_t){0};
 }
 
-int ed_add(ed_level_t *lv, const object_t *obj, const char *extra)
+static void make_room(ed_level_t *lv)
 {
     ed_object_t *bigger;
 
-    if (lv->count == lv->cap) {
-        lv->cap = lv->cap == 0 ? 64 : lv->cap * 2;
-        bigger = sim_xcalloc(lv->cap, sizeof(ed_object_t));
-        if (lv->count > 0)
-            memcpy(bigger, lv->objects, lv->count * sizeof(ed_object_t));
-        free(lv->objects);
-        lv->objects = bigger;
-    }
+    if (lv->count < lv->cap)
+        return;
+    lv->cap = lv->cap == 0 ? 64 : lv->cap * 2;
+    bigger = sim_xcalloc(lv->cap, sizeof(ed_object_t));
+    if (lv->count > 0)
+        memcpy(bigger, lv->objects, lv->count * sizeof(ed_object_t));
+    free(lv->objects);
+    lv->objects = bigger;
+}
+
+int ed_add(ed_level_t *lv, const object_t *obj, const char *extra)
+{
+    make_room(lv);
     lv->objects[lv->count] = (ed_object_t){.id = lv->next_id, .obj = *obj,
         .extra = extra != NULL ? sim_xstrdup(extra) : NULL};
     lv->count += 1;
     lv->next_id += 1;
     lv->dirty = true;
     return lv->next_id - 1;
+}
+
+void ed_insert(ed_level_t *lv, const ed_object_t *o, size_t at)
+{
+    make_room(lv);
+    at = at > lv->count ? lv->count : at;
+    memmove(&lv->objects[at + 1], &lv->objects[at],
+        (lv->count - at) * sizeof(ed_object_t));
+    lv->objects[at] = (ed_object_t){.id = o->id, .obj = o->obj,
+        .extra = o->extra != NULL ? sim_xstrdup(o->extra) : NULL};
+    lv->count += 1;
+    lv->next_id = o->id >= lv->next_id ? o->id + 1 : lv->next_id;
+    lv->dirty = true;
 }
 
 ed_object_t *ed_find(ed_level_t *lv, int id)
@@ -277,19 +295,28 @@ static bool same_object(const object_t *a, const object_t *b)
 
 /* The object is made by the loader from its line: what is placed is what
 ** the game will read back. */
-bool ed_place(ed_level_t *lv, const ed_entry_t *e, vec2_t at, double grid)
+bool ed_place_object(const ed_level_t *lv, const ed_entry_t *e, vec2_t at,
+    double grid, object_t *out)
 {
     char line[128];
-    object_t o;
 
     snprintf(line, sizeof(line), "%s %.10g %.10g 2%s%s",
         obj_type_name(e->type), ed_snap(at.x, grid), ed_snap(at.y, grid),
         e->word != NULL ? " " : "", e->word != NULL ? e->word : "");
-    if (level_object_from_line(line, &o) != 0)
+    if (level_object_from_line(line, out) != 0)
         return false;
     for (size_t i = 0; i < lv->count; i++)
-        if (same_object(&lv->objects[i].obj, &o))
+        if (same_object(&lv->objects[i].obj, out))
             return false;
+    return true;
+}
+
+bool ed_place(ed_level_t *lv, const ed_entry_t *e, vec2_t at, double grid)
+{
+    object_t o;
+
+    if (!ed_place_object(lv, e, at, grid, &o))
+        return false;
     ed_add(lv, &o, NULL);
     return true;
 }
