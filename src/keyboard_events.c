@@ -98,27 +98,6 @@ void keyboard_events_main_menu(main_m_t **menu, gd_t *gd)
     }
 }
 
-void go_back_editorm_main(editor_m_t **editor_m, gd_t *gd)
-{
-    free_editor_menu(*editor_m);
-    *editor_m = NULL;
-    gd->menu = 'm';
-}
-
-void keyboard_events_editor_menu(editor_m_t **editor_m, gd_t *gd)
-{
-    while (poll_event(gd)) {
-        if (gd->event->type == sfEvtClosed) {
-            close_window(gd->w);
-            return;
-        }
-        if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeyEscape) {
-            go_back_editorm_main(editor_m, gd);
-            return;
-        }
-    }
-}
-
 void go_back_list_main(level_list_t **lvl_list, gd_t *gd)
 {
     free_level_list_menu(*lvl_list);

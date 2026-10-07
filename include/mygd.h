@@ -49,7 +49,7 @@ main_m_t *create_main_menu(gd_t *gd);
 
 
 void free_editor_menu(editor_m_t *om);
-void print_editor_menu(editor_m_t *om, sfRenderWindow *w);
+void print_editor_menu(editor_m_t *om, gd_t *gd);
 editor_m_t *create_editor_menu(gd_t *gd);
 
 void free_level_button(level_button_t *lb);

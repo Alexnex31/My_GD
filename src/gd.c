@@ -172,7 +172,7 @@ void handle_editor_menu(gd_t *gd, editor_m_t **editor_menu)
 {
     if (*editor_menu == NULL)
         *editor_menu = create_editor_menu(gd);
-    print_editor_menu(*editor_menu, gd->w);
+    print_editor_menu(*editor_menu, gd);
     print_cursor(gd->cursor, gd->w);
     keyboard_events_editor_menu(editor_menu, gd);
 }

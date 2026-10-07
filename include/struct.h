@@ -73,8 +73,28 @@ typedef struct level_list {
     sfText *picker_title;
 } level_list_t;
 
+    #define ED_PICKER_MAX 256     /* levels the editor's list shows          */
+
+struct editor;
+
+/*
+** The editor's scene: a list of levels to open and a field to name a new
+** one, then the editor itself once a level is chosen (FEATURES 11).
+*/
 typedef struct editor_menu {
     sfSprite *background;
+    struct gd *gd;
+    struct editor *ed;            /* NULL while the list is shown            */
+    ui_screen_t ui;
+    widget_t widgets[3];
+    char **ids;                   /* levels/, in id order                    */
+    char **rows;                  /* "id   name", what the list shows        */
+    int nb;
+    int row;
+    char name[64];                /* the new level's                         */
+    bool want_open;               /* set by the callbacks, done after events */
+    bool want_new;
+    bool want_back;
 } editor_m_t;
 
 typedef struct main_menu {
