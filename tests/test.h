@@ -21,6 +21,7 @@ void test_gravity(void);
 void test_ufo(void);
 void test_wave(void);
 void test_trail(void);
+void test_ball(void);
 void test_progress(void);
 void test_input(void);
 void test_settings(void);

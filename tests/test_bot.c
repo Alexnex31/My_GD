@@ -160,6 +160,53 @@ static void test_wave_level(void)
     sim_free(&s);
 }
 
+/*
+** What the found run did as `mode`: the ticks it spent in it and the times
+** its gravity turned there. A level meant for a mode proves nothing when the
+** path walks around the portal.
+*/
+static void run_as(sim_t *s, const bot_result_t *r, gamemode_t mode,
+    long *ticks, int *flips)
+{
+    bool prev = false;
+    int dir;
+
+    *ticks = 0;
+    *flips = 0;
+    sim_reset(s);
+    for (long t = 0; t < r->ticks; t++) {
+        dir = s->st.player.gravity_dir;
+        sim_tick(s, (input_t){r->inputs[t], r->inputs[t] && !prev});
+        prev = r->inputs[t];
+        if (s->st.player.mode != mode)
+            continue;
+        *ticks += 1;
+        *flips += dir != s->st.player.gravity_dir;
+    }
+}
+
+/*
+** FEATURES 9.5, its portals on the ground so the path has to take them: a
+** floor spike, a ceiling spike, a floor spike, one flip for each.
+*/
+static void test_ball_level(void)
+{
+    sim_t s;
+    bot_result_t r;
+    long ticks;
+    int flips;
+
+    load(&s, "portal 1500 650 2 ball\nspike 2200 750 2\n"
+        "spike 2800 0 2 rot=180\nspike 3400 750 2\nportal 4200 650 2 cube\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_FOUND && r.attempts > 2);
+    CHECK(replays(&s, &r));
+    run_as(&s, &r, MODE_BALL, &ticks, &flips);
+    CHECK(ticks > 500 && flips >= 3);
+    bot_result_free(&r);
+    sim_free(&s);
+}
+
 static int numeric_name(const struct dirent **a, const struct dirent **b)
 {
     long x = strtol((*a)->d_name, NULL, 10);
@@ -218,5 +265,6 @@ void test_bot(void)
     test_gravity_portals();
     test_ufo_level();
     test_wave_level();
+    test_ball_level();
     test_levels();
 }
