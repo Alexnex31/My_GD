@@ -531,7 +531,7 @@ The hitbox model:
 
 **Forces.** Every vertical change is a force on the player's body:
 
-- **gravity**: a constant acceleration toward the player's current floor, per gamemode. Its sign is `gravity_dir` (+1: pulls down the screen, −1: pulls up). Everything that changes gravity goes through `player_flip_gravity` (3.4), which flips the sign and nothing else: the player's motion is untouched at the moment of the flip, and the new acceleration does the rest. Gravity portals and the ball's click stop there; GD's blue pads, blue orbs and green orbs flip and then **set** a speed toward the new floor (FEATURES 10.1), which is an impulse like any other, not part of the flip;
+- **gravity**: a constant acceleration toward the player's current floor, per gamemode. Its sign is `gravity_dir` (+1: pulls down the screen, −1: pulls up). Everything that changes gravity goes through `player_flip_gravity` (3.4), which flips the sign and nothing else: the player's motion is untouched at the moment of the flip, and the new acceleration does the rest. Gravity portals and the ball's click stop there; GD's blue pads and blue orbs flip and then **set** a speed toward the new floor, and green orbs flip and then set a jump away from it (FEATURES 10.1, 10.2), which is an impulse like any other, not part of the flip;
 - **ship thrust**: an upward acceleration while the button is held;
 - **the jump**: an impulse from below that **sets** the rise speed (`vy = JUMP_V`); it only applies when the player can jump (grounded);
 - **pads and orbs** (FEATURES 10): impulses that **set** the rise speed to their own value. Setting instead of adding makes a pad launch the same height whatever the player was doing, like GD;

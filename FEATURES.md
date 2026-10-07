@@ -14,7 +14,7 @@ v1 described each feature. This version specifies each one precisely enough to i
 
 References like "PLAN 3.4" point to PLAN.md.
 
-**v3** (matching PLAN v3, the semi-physics engine): modes only change the velocity (`apply_input`, `apply_forces`), the engine moves the player and resolves contacts (6.1–6.5); head hits bounce the ship, UFO and ball (30%) and kill the cube and wave, except against the ground and corridor boundaries: surfaces the player can't cross, which never kill anyone; corridors are snapped to the grid and lock the camera; pads and orbs set `vy`, speed portals set `vx`; saws are circle harm objects (10.6); `slope` and `saw` join the grammar. Input follows GD's hold rule (PLAN 3.4): no press memory or time buffer; a hold is fresh until it jumps, flips, hops or activates an orb; used holds keep jumping off surfaces but ignore orbs; orbs win over surface jumps. Gravity is a constant acceleration whose sign is `gravity_dir`; gravity portals **only** flip it, through PLAN 3.4's `player_flip_gravity`, which keeps the player's motion (no speed reset); a ball click flips it the same way and adds a small push off the surface it leaves (9.2); while blue pads, blue orbs and green orbs flip it and then set a speed toward the new floor, as GD does (10.1). Physics constants are GD's own, written in GD's velocity units (6.9).
+**v3** (matching PLAN v3, the semi-physics engine): modes only change the velocity (`apply_input`, `apply_forces`), the engine moves the player and resolves contacts (6.1–6.5); head hits bounce the ship, UFO and ball (30%) and kill the cube and wave, except against the ground and corridor boundaries: surfaces the player can't cross, which never kill anyone; corridors are snapped to the grid and lock the camera; pads and orbs set `vy`, speed portals set `vx`; saws are circle harm objects (10.6); `slope` and `saw` join the grammar. Input follows GD's hold rule (PLAN 3.4): no press memory or time buffer; a hold is fresh until it jumps, flips, hops or activates an orb; used holds keep jumping off surfaces but ignore orbs; orbs win over surface jumps. Gravity is a constant acceleration whose sign is `gravity_dir`; gravity portals **only** flip it, through PLAN 3.4's `player_flip_gravity`, which keeps the player's motion (no speed reset); a ball click flips it the same way and adds a small push off the surface it leaves (9.2); while blue pads and blue orbs flip it and then set a speed toward the new floor, and green orbs flip it and then jump away from it (10.1, 10.2). Physics constants are GD's own, written in GD's velocity units (6.9).
 
 **v2.2** (review pass, matching PLAN v2.2): the sim is level data + a snapshot-able run state (`s->st.*`); every object can be rotated by any angle and sized with `w`/`h`; a fixed kill ceiling replaces the camera-relative out-of-bounds rule; all jump inputs (including the left mouse button and a gamepad) are rebindable; same-mode portals switch to the new corridor; pads have thin hitboxes; orbs have an explicit tick step; the mini portal is `mini`; start positions carry any mode, gravity and speed; the bot's results are information, never a blocker; an audio offset setting compensates output latency.
 
@@ -86,9 +86,12 @@ Code conventions: simulation state is `s->lvl` (immutable level data) and `s->st
 6  Gamemode framework   medium   includes gravity direction
 7  UFO, wave            small each
 8  Ball                 small    (framework did the hard part)
-9  Level editor         large, in 7 usable stages
-10 Pads, orbs, speed portals, robot, swing, spider   small each
+9  Pads, orbs           small each   (10.1, 10.2: done before the editor)
+10 Level editor         large, in 7 usable stages
+11 Saws, speed portals, robot, swing, spider, mini   small each
 ```
+
+Pads and orbs were moved ahead of the editor: they are simulation work like the modes, and the editor's palette is built from the object table, so what exists before it starts is in it for free.
 
 Why the modes come before the editor: the editor's palette, properties and playtest are all generated from the mode table (6.2). Build the table first, and the editor supports every mode for free. New modes don't need the editor to be tested: their test levels are five lines of text, and the bot checks them.
 
@@ -1003,7 +1006,7 @@ Both count in **GD blocks**: a block is the player's size, so **1 block = our 10
 | Yellow / pink / red orb | 1.91 / 1.37 / 2.68 | 10.2 |
 | Mini orbs | 1.43 / 0.94 / 2.05 | 10.4 |
 | Blue pad and blue orb | −1.37 | flip, then 1.37 toward the new floor (10.1) |
-| Green orb | −1.91 | flip, then 1.91 in the new gravity |
+| Green orb | −1.91 in GD's tables | flip, then a jump of 1.91 away from the new floor (10.2) |
 | Black orb | −2.6 | straight toward the floor, at the fall cap |
 | Ship, UFO, ball, wave | not published | ours (7–9), except the UFO's hop height |
 
@@ -1015,7 +1018,7 @@ Both count in **GD blocks**: a block is the player's size, so **1 block = our 10
 
 The first version of these (0.99, 2.24, 2.24) crossed the corridor in 0.49 s falling and 0.63 s climbing, with a vertical cap of 23.3 blocks/s — more than twice the horizontal speed. Gravity was also **stronger than the cube's** (0.99 against 0.876), which is backwards: GD's ship is the floatier of the two. Measure a change here with the arc, not with the constants.
 
-A negative value is a speed **toward the floor the player is falling to**: for the flip objects (blue pad, blue orb, green orb) it's applied after the flip, so it throws the player at its new floor; the black orb doesn't flip, so it slams the player at the floor it already had. Blue keeps the same 1.37 for mini, and green the same 1.91.
+A negative value is a speed **toward the floor the player is falling to**: for the blue pad and the blue orb it's applied after the flip, so it throws the player at its new floor; the black orb doesn't flip, so it slams the player at the floor it already had. The green orb flips and then sets a **positive** 1.91, a jump in the new gravity (10.2). Blue keeps the same 1.37 for mini, and green the same 1.91.
 
 **Jump and hop heights:**
 
@@ -1377,7 +1380,7 @@ Pads push **vertically** (relative to gravity): they set `vy`, never `vx`, even 
 | Pink | 1.37 | 1422.9 | `vy = 1.37 * V_UNIT` (1.07 blocks) |
 | Red | 2.68 | 2783.5 | `vy = 2.68 * V_UNIT` (4.10 blocks) |
 | Blue | −1.37 | 1422.9 | flips the gravity, then `vy = -1.37 * V_UNIT`: launched toward the new floor (like the blue pad, 10.1) |
-| Green | −1.91 | 1983.7 | flips the gravity, then `vy = -1.91 * V_UNIT`: a stronger blue orb |
+| Green | 1.91 | 1983.7 | flips the gravity, then `vy = 1.91 * V_UNIT`: a yellow orb in the other gravity, the player jumps away from its new floor and then falls to it |
 | Black | −2.6 | 2700.4 | no flip: `vy = -2.6 * V_UNIT`, slammed toward the floor at the fall cap |
 
 GD's dash orbs (green and pink, value 0) are a different mechanic and stay out of scope. Precise rules:
@@ -1416,6 +1419,17 @@ GD's dash orbs (green and pink, value 0) are a different mechanic and stay out o
 - Ship and wave holds are never used by flying (PLAN 3.4), so a ship holding for a while that enters an orb activates it.
 - An orb is an interactive object (PLAN 5.1) whose activation condition is touch **and** a fresh hold. It becomes `spent` (no hitbox, still drawn) only when it actually acts; flying through it without pressing leaves it live.
 - **Bot:** in addition to each mode's decision points, the bot makes a decision on every tick where the player overlaps a live orb, or is about to reach one: hold, keep holding, or **release**. Releasing matters: a used hold must be released before a new press can activate an orb, so "release now, press on the orb" is a path the bot has to be able to try. The hold state is part of the run state, so the bot's memo (PLAN 8.3) already tells a fresh hold from a used one.
+
+### 10.2b As built (pads and orbs)
+
+- **One table:** `LAUNCHES` (`src/sim/modes.c`) has a row per colour with its speed as a pad and as an orb, in GD's units, and whether it flips; 0 means that object doesn't come in that colour (no green or black pad). `launch` in `src/sim/interact.c` is the effect of both: flip if the colour flips, then **set** the rise speed.
+- **Pads:** `pad x y size yellow|pink|red|blue`, the plate of 10.1 along the bottom of the cell, turned with `rot=`. Measured: a cube rises 432, 179 and 752 px from the yellow, pink and red pads, which is GD's 4.38, 1.83 and 7.60 blocks less half a tick of the launch speed. The wave sets its own speed every tick, so only a blue pad's flip shows on it.
+- **Orbs:** `orb x y size yellow|pink|red|blue|green|black`. The hitbox is a square of 0.8 of the cell, **80 × 80 px** at size 2, centered. The two cases of 10.2 are `activate_orbs` (step 0, a press while already inside: the orb acts before the mode's input and the tick's input is consumed) and the interactive step (the square reaches the orb during the move with a hold still fresh).
+- **The ball and the UFO need no special case:** the orb marks the hold used and consumes the press, so a ball can't flip and a UFO can't hop on the click an orb took.
+- **Green is not a stronger blue.** It was first built as 10.2 said then, a flip and 1.91 toward the new floor, which played like a black orb with a gravity switch. It is a flip and then a yellow orb's jump in the new gravity: on screen the player first moves toward the side it is leaving, then falls to the other. Blue (pad and orb) stays a flip and a throw at the new floor. One consequence: clicked while standing on a surface, a green orb jumps *into* that surface, which stops the player there (a bounce for the modes that bounce) before the new gravity takes it away. It is meant to be clicked in the air.
+- **The bot** makes a decision on every tick where a live orb overlaps the player horizontally or will within 12 ticks (`near_live_orb`, `src/sim/bot.c`), whatever the mode: a cube in the air has no other moment to choose in, and "release, then press on the orb" has to be a run it can try.
+- **The game layer:** neither has an image yet. `src/atlas.c` draws two white shapes at startup, a plate and a ring around a dot, and each object is tinted with its colour and drawn in its hitbox.
+- **Tests:** `tests/test_pads.c` (the grammar and the plate, the table, the three heights, set and not add, acts once, a ship and a UFO past their caps, the blue pad, a pad hanging from a ceiling, the wave), `tests/test_orbs.c` (the grammar and the box, every colour pressed inside, a buffered hold on the exact tick, a click released before, a used hold, one orb per hold, the orb before the surface jump, UFO and ball, the ship's hold), a pad level and an orb level in `tests/test_bot.c`, each impossible without its object and checked to be solved through it, and pads and orbs in the mirrored section (9.6): the 800 mirrored runs meet 127 pads and 318 orbs.
 
 ### 10.3 Speed portals
 
@@ -1868,7 +1882,7 @@ All in `tests/`, linking only `src/sim/` (PLAN 8). "Measured" values come from t
 | Ball | flip across the ball's 800 px corridor, from rest | ≈0.42 s (about 100 ticks) |
 | Gravity | a pure flip (gravity portal, ball click) | world velocity identical just before and just after; `gravity_dir` negated; `vy` negated; nothing else changes |
 | Gravity | blue pad or blue orb on flat ground | `gravity_dir` negated, then `vy = −1422.9` px/s: the player leaves for the ceiling at that speed whatever it was doing |
-| Gravity | green orb while falling | flip, then `vy = −1983.7` px/s; the previous fall speed is discarded |
+| Gravity | green orb while falling | flip, then `vy = +1983.7` px/s, a jump away from the new floor; the previous fall speed is discarded |
 | Ball | press and release 1 to 20 ticks before landing | no flip |
 | Ball | hold from before landing, through the landing | flips on the landing tick; still held, flips again on the next landing |
 | Holds | cube jumps off the ground and keeps holding into an orb | the orb doesn't activate; the cube lands and jumps again |
