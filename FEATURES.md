@@ -1811,6 +1811,17 @@ Show counts in the toolbar; clicking cycles the camera through the flagged objec
 - **The level list** in the game scrolls (wheel, Up, Down), so a thirteenth level is reachable.
 - **Tests:** `tests/test_doc.c` (start positions, kept fields, every kind of object line written back as it was, the header, every level of `levels/` round trip and played from a document, the file written whole), `tests/test_editor.c` (ids, open and save, snapping, the hit test, the palette, placing, a placed level played, the next id) and the text field in `tests/test_ui.c`.
 
+### 11.13c As built: E3
+
+- **Undo and redo** (`src/editor/ed_history.c`, pure and tested). Every edit of the objects goes through it. Three kinds of command instead of 11.7's four: `ADD`, `REMOVE` and `CHANGE`, which keeps each object whole before and after. A move is a `CHANGE`, so undoing it puts back the exact numbers and never `x + dx - dx`; E4's turns and resizes will be the same command. A removed object comes back with its id and at its place in the list, so what is drawn on top is the same again.
+- **One gesture, one step.** The scene starts a gesture at each mouse press and each key; objects added, or removed, during the same gesture join the same command. A painted stroke, a paste, a deleted selection are each one Ctrl+Z. 256 commands are kept; a new edit forgets what was undone.
+- **The selection** (`src/editor/ed_select.c`, pure and tested) is each object's flag: a click selects one, Shift+click toggles one, a box takes everything drawn inside or across it (Shift adds to what was selected), Ctrl+A takes all.
+- **Moving.** A press on an object becomes a drag after 4 px. The selection is grabbed as it was, and every position is that plus the mouse's travel **rounded** to the grid (11.4 says `snap`, but `floor` would move a whole cell for one pixel to the left); objects off the grid keep their offset. Dropping it is one command, Escape puts everything back. The arrows move the selection one grid step, with Shift one pixel. Z, Q, S and D move it a whole block, 100 px, whatever the grid. Each move rebuilds the hitbox.
+- **Copies.** Ctrl+C keeps copies (the fields nothing edits included), Ctrl+V puts their top left corner in the cell under the mouse, cell to cell so offsets are kept, Ctrl+D puts the selection again one grid step to the right. The copies become the selection.
+- **Two tools** (`src/editor_mouse.c`), Tab switches: Place (E2's painting) and Select. Right click deletes in both. Picking a palette entry goes back to Place. Placing drops the selection. A held move key (arrows, Z, Q, S, D) or Ctrl+Z / Ctrl+Y repeats: once at the press, then after 350 ms every 60 ms. The editor does it itself, the window's own key repeat being off for the game's input (1.3). Escape cancels a drag or a box, then drops the selection, then leaves. No key edits while a mouse button is in the middle of something.
+- Selected objects are tinted green and outlined along their own turned rect.
+- **Tests:** `tests/test_edit.c`: each command undone and redone, strokes as one step, the 256 limit, the selection, a drag (travel not added up, offsets kept, hitbox moved, cancel, a drag back to where it started is no step), copies into another level, and 11.7's random test: six runs of random edits, where every undo and every redo must give exactly the level there was at that depth, ids and order included.
+
 ### 11.14 Stages
 
 | Stage | Contents | Done when |

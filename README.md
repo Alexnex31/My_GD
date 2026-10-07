@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2) and the first two stages of the level editor (11: open a level or make a new one, place, delete, save) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2) and the first three stages of the level editor (11: open a level or make a new one, place, delete, save, select, move, copy, undo) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -90,19 +90,31 @@ The full list is in `FEATURES.md` 2.2. The **options screen** (the main menu's o
 
 The third button of the main menu opens it: a list of the levels to open, and a field to name a new one (it takes the next free id).
 
+Two tools, `Tab` switches between them: **Place** and **Select**.
+
 | Input | Action |
 |---|---|
-| Left click, or drag | Place the palette's entry in the cell under the mouse |
+| Left click, or drag (Place) | Place the palette's entry in the cell under the mouse (and drop the selection) |
+| Left click (Select) | Select the object; with Shift, add or remove it |
+| Left drag from an object (Select) | Move the selection, by grid steps |
+| Left drag from nothing (Select) | A box: selects what it touches; with Shift, adds it |
 | Right click, or drag | Delete what is under the mouse |
-| 1 to 9, Up / Down, or a click on the palette | Choose what to place |
+| Arrows / Shift+arrows | Move the selection a grid step / one pixel |
+| Z, Q, S, D | Move the selection a whole block (100 px) up, left, down, right |
+| Delete or Backspace | Delete the selection |
+| Ctrl+A | Select everything |
+| Ctrl+C / Ctrl+V | Copy the selection / paste it at the mouse |
+| Ctrl+D | Duplicate the selection one grid step to the right |
+| Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z | Undo / redo, 256 steps |
+| 1 to 9, Up / Down with nothing selected, or a click on the palette | Choose what to place |
 | Wheel / Shift+wheel | Scroll along the level / up and down |
 | Ctrl+wheel | Zoom around the mouse, 25% to 400% |
 | Middle button, or Space and drag | Pan |
 | G | Grid 50 / 25 |
 | Ctrl+S | Save |
-| Escape | Leave (warns once if there are unsaved changes) |
+| Escape | Cancel a drag, then drop the selection, then leave (warns once if there are unsaved changes) |
 
-The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects sorted by position, comments and blank lines gone. Selecting, moving, undo, properties, playtest and the rest are the next stages (`FEATURES.md` 11.14).
+Holding a move key, Ctrl+Z or Ctrl+Y repeats it. The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects sorted by position, comments and blank lines gone. Properties, rotation, playtest and the rest are the next stages (`FEATURES.md` 11.14).
 
 ## Music
 
@@ -160,7 +172,7 @@ src/            game layer (window, scenes, menus, rendering)
 src/sim/        the simulation: no SFML, no globals, deterministic
 src/ui/         the widget toolkit's core: no SFML either, tested the same way
 src/fx/         effects that only read the simulation (the wave's trail): no SFML, tested
-src/editor/     the level the editor edits (ids, open, save, hit test): no SFML, tested
+src/editor/     the level the editor edits (ids, open, save, hit test, undo, selection): no SFML, tested
 levels/         level files
 music/          songs and songs.txt
 res/            textures, fonts, sounds
