@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2) and the first three stages of the level editor (11: open a level or make a new one, place, delete, save, select, move, copy, undo) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2) and the first four stages of the level editor (11: open a level or make a new one, place, delete, save, select, move, copy, undo, turn, resize, start positions) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -101,6 +101,8 @@ Two tools, `Tab` switches between them: **Place** and **Select**.
 | Right click, or drag | Delete what is under the mouse |
 | Arrows / Shift+arrows | Move the selection a grid step / one pixel |
 | Z, Q, S, D | Move the selection a whole block (100 px) up, left, down, right |
+| R / Shift+R | Turn the selection 90 degrees (several objects turn as one piece) |
+| `[` / `]` | Turn it 15 degrees |
 | Delete or Backspace | Delete the selection |
 | Ctrl+A | Select everything |
 | Ctrl+C / Ctrl+V | Copy the selection / paste it at the mouse |
@@ -114,7 +116,13 @@ Two tools, `Tab` switches between them: **Place** and **Select**.
 | Ctrl+S | Save |
 | Escape | Cancel a drag, then drop the selection, then leave (warns once if there are unsaved changes) |
 
-Holding a move key, Ctrl+Z or Ctrl+Y repeats it. The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects sorted by position, comments and blank lines gone. Properties, rotation, playtest and the rest are the next stages (`FEATURES.md` 11.14).
+Holding a move key, Ctrl+Z or Ctrl+Y repeats it.
+
+With something selected, a panel in the canvas's top right corner shows its properties, each with a minus and a plus: turn (15 degrees), width and height (grid units), kind (a portal's mode, a pad's or an orb's colour, a gravity portal's direction).
+
+**Start positions** are the palette's last entry. They are other places to begin an attempt from, for practice: the level's real start doesn't change, and they aren't obstacles. Selected, the panel sets their gamemode, gravity and speed. Choosing one in the game comes with the playtest stage.
+
+The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects sorted by position, comments and blank lines gone. Playtest, music tools and the rest are the next stages (`FEATURES.md` 11.14).
 
 ## Music
 

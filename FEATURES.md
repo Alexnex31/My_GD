@@ -1822,6 +1822,16 @@ Show counts in the toolbar; clicking cycles the camera through the flagged objec
 - Selected objects are tinted green and outlined along their own turned rect.
 - **Tests:** `tests/test_edit.c`: each command undone and redone, strokes as one step, the 256 limit, the selection, a drag (travel not added up, offsets kept, hitbox moved, cancel, a drag back to where it started is no step), copies into another level, and 11.7's random test: six runs of random edits, where every undo and every redo must give exactly the level there was at that depth, ids and order included.
 
+### 11.13d As built: E4
+
+- **Start positions are editor objects** (`ed_object_t.is_start`, with their `level_start_t`). They are selected, dragged, copied, deleted and undone exactly like a block, with no code of their own for it. They never reach the game as objects: `ed_level_doc` takes them out into the document's start list, in the list's order, and a save writes each as its `start` line. The header's real start is untouched by any of it.
+- **Placing one:** the palette's last entry, "start position". It goes in the middle of the cell clicked, as a cube at normal speed and gravity. On the canvas it is the icon of its mode in a blue frame, drawn and clicked over everything else.
+- **Properties** (`src/editor/ed_props.c`, pure and tested): Turn (15 degrees at a time, wraps at 360), Width and Height (one grid unit of 50 px at a time, never under one, the top left corner stays), Kind (a portal's mode, a pad's or an orb's colour among those its type has, a gravity portal's direction, a start position's mode), and for start positions Gravity and Speed (x0.5 to x4, stopping at the ends). A step applies to every selected object that has the property, as one command; a step that changes nothing is no command. Every change rebuilds the hitbox.
+- **The panel** (`src/editor_panel.c`) shows over the canvas's top right corner whenever something is selected: what it is and where, then one row per property something selected has, each with a minus and a plus. Values that differ across the selection read "mixed".
+- **Turning with keys:** R and Shift+R turn by 90 degrees, `[` and `]` by 15. With several objects selected, R also turns their positions around the selection's center, as one piece, and puts their corners back on the grid; four turns give the piece back as it was.
+- **Not built:** typing an exact value (angle, coordinates) in the panel, and resize handles on the canvas. The panel's steps and the arrow keys cover both for now.
+- **Tests:** `tests/test_props.c` (start positions placed, moved, duplicated, undone, saved, absent from the played level; which rows apply and their text; each property's steps and limits; turning one object and a piece) and the random undo test of `tests/test_edit.c` now also steps properties and turns.
+
 ### 11.14 Stages
 
 | Stage | Contents | Done when |
