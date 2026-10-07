@@ -136,8 +136,8 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     char filepath[256];
     char *attempts_str;
     char *best_str;
-    float x = 200 + (index % 3) * 500;
-    float y = 200 + (index / 3) * 250;
+    float x = 120 + (index % 4) * 450;       /* four columns: 12 levels fit */
+    float y = 200 + (index / 4) * 250;
     sfVector2f text_pos;
 
     snprintf(filepath, 256, "levels/%s.gd", id);
