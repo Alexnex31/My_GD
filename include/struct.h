@@ -62,6 +62,7 @@ typedef struct level_list {
     char **names;
     level_button_t **level_buttons;
     int nb_levels;
+    float scroll;                 /* UI pixels the grid is moved up by      */
     struct gd *gd;                /* for the picker's callbacks             */
     int picker_for;               /* the level whose song is chosen, -1 (4.6) */
     bool picker_closing;          /* closed by a callback: freed after events */

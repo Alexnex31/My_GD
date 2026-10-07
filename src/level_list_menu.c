@@ -52,11 +52,36 @@ void free_level_list_menu(level_list_t *level_list)
     free(level_list);
 }
 
+/* How far the grid can go up: until its last row is whole on screen. */
+float level_list_max_scroll(const level_list_t *list)
+{
+    int rows = (list->nb_levels + LIST_COLUMNS - 1) / LIST_COLUMNS;
+    float bottom = LIST_TOP + (float)rows * LIST_ROW_H;
+
+    return bottom > VIEW_H ? bottom - VIEW_H : 0.0f;
+}
+
+void level_list_scroll(level_list_t *list, float by)
+{
+    float max = level_list_max_scroll(list);
+
+    list->scroll += by;
+    list->scroll = list->scroll < 0.0f ? 0.0f : list->scroll;
+    list->scroll = list->scroll > max ? max : list->scroll;
+}
+
+/*
+** The background stays; the levels are drawn through the same view moved
+** down by the scroll, so more than three rows of them can be reached.
+*/
 void print_level_list(level_list_t *level_list, sfRenderWindow *w)
 {
+    sfView *moved = sfView_copy(level_list->gd->ui_view);
     int i = 0;
 
     sfRenderWindow_drawSprite(w, level_list->background, NULL);
+    sfView_move(moved, (sfVector2f){0.0f, level_list->scroll});
+    sfRenderWindow_setView(w, moved);
     while (i < level_list->nb_levels) {
         if (level_list->level_buttons[i] != NULL) {
             print_button(level_list->level_buttons[i]->play_button, w);
@@ -67,6 +92,8 @@ void print_level_list(level_list_t *level_list, sfRenderWindow *w)
         }
         i += 1;
     }
+    sfRenderWindow_setView(w, level_list->gd->ui_view);
+    sfView_destroy(moved);
 }
 
 static int cmp_id(const void *a, const void *b)
@@ -136,8 +163,8 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     char filepath[256];
     char *attempts_str;
     char *best_str;
-    float x = 120 + (index % 4) * 450;       /* four columns: 12 levels fit */
-    float y = 200 + (index / 4) * 250;
+    float x = 120 + (index % LIST_COLUMNS) * 450;
+    float y = LIST_TOP + (index / LIST_COLUMNS) * LIST_ROW_H;
     sfVector2f text_pos;
 
     snprintf(filepath, 256, "levels/%s.gd", id);

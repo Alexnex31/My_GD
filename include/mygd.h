@@ -55,6 +55,8 @@ editor_m_t *create_editor_menu(gd_t *gd);
 void free_level_button(level_button_t *lb);
 void free_level_list_menu(level_list_t *level_list);
 void print_level_list(level_list_t *level_list, sfRenderWindow *w);
+float level_list_max_scroll(const level_list_t *list);
+void level_list_scroll(level_list_t *list, float by);
 level_list_t *create_level_list(gd_t *gd);
 
 int check_end_screen_buttons(end_level_screen_t *end_screen, int mx, int my);

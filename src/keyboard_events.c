@@ -162,10 +162,18 @@ void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
             song_picker_event(*lvl_list, gd);    /* it has every event */
             continue;
         }
+        if (gd->event->type == sfEvtMouseWheelScrolled)
+            level_list_scroll(*lvl_list,
+                -gd->event->mouseWheelScroll.delta * LIST_ROW_H / 2.0f);
+        if (gd->event->type == sfEvtKeyPressed
+            && (gd->event->key.code == sfKeyDown
+            || gd->event->key.code == sfKeyUp))
+            level_list_scroll(*lvl_list, gd->event->key.code == sfKeyDown
+                ? LIST_ROW_H : -LIST_ROW_H);
         if (gd->event->type == sfEvtMouseButtonPressed
             && gd->event->mouseButton.button == sfMouseLeft
             && song_line_click(*lvl_list, gd, click_pos(gd).x,
-            click_pos(gd).y))
+            click_pos(gd).y + (int)(*lvl_list)->scroll))
             continue;
         if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeyEscape) {
             go_back_list_main(lvl_list, gd);
@@ -173,7 +181,8 @@ void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
         }
         if (gd->event->type == sfEvtMouseButtonPressed && gd->event->mouseButton.button == sfMouseLeft) {
             pos = click_pos(gd);
-            handle_level_buttons_click(lvl_list, gd, pos.x, pos.y);
+            handle_level_buttons_click(lvl_list, gd, pos.x,
+                pos.y + (int)(*lvl_list)->scroll);
             return;
         }
     }

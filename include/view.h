@@ -18,6 +18,10 @@
 
     #define CHUNK_W 1024.0f       /* static vertex buffers, one per chunk (9.2) */
 
+    #define LIST_COLUMNS 4        /* the level list's grid: three rows fit,   */
+    #define LIST_TOP 200.0f       /* the rest is reached by scrolling         */
+    #define LIST_ROW_H 250.0f
+
     #define BAR_W   700.0f        /* the progress bar at the top (9.5)          */
     #define BAR_H   36.0f
     #define END_WALL_W 100.0f    /* the end wall, at the frozen view's right edge (9.8) */
