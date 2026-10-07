@@ -28,9 +28,16 @@ typedef enum obj_type {
     OBJ_SPIKE,                /* harm                                        */
     OBJ_PORTAL,               /* interactive: acts once, then untouchable    */
     OBJ_GRAVITY,              /* interactive: a gravity portal (FEATURES 9.4) */
-    /* later: OBJ_SAW (harm), OBJ_PAD, OBJ_ORB, OBJ_SPEED (FEATURES 10) */
+    OBJ_PAD,                  /* interactive: launches on touch (FEATURES 10.1) */
+    /* later: OBJ_SAW (harm), OBJ_ORB, OBJ_SPEED (FEATURES 10) */
     OBJ_TYPE_COUNT
 } obj_type_t;
+
+typedef enum launch_kind {    /* the colours of pads and orbs (FEATURES 10.1, 10.2) */
+    LAUNCH_YELLOW, LAUNCH_PINK, LAUNCH_RED, LAUNCH_BLUE,
+    LAUNCH_GREEN, LAUNCH_BLACK,                 /* orbs only */
+    LAUNCH_KIND_COUNT
+} launch_kind_t;
 
 typedef enum obj_category { CAT_NEUTRAL, CAT_HARM, CAT_INTERACTIVE } obj_category_t;
 extern const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT];
@@ -76,6 +83,7 @@ typedef struct object {       /* level data: never modified after load */
     int size;                 /* as written in the file                        */
     gamemode_t portal_mode;   /* OBJ_PORTAL only                                */
     int portal_gravity;       /* OBJ_GRAVITY only: +1 down, -1 up               */
+    launch_kind_t launch;     /* OBJ_PAD: its colour                            */
     int line;                 /* source line, for messages and stable sort      */
 } object_t;
 

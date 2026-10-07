@@ -199,6 +199,24 @@ rect_t object_drawn_bounds(const object_t *o)
     return bounds_of(v, 4);
 }
 
+/*
+** The box a type's hitbox is, inside its rect and before rotation (4.2):
+** a spike's is inset in its sprite, a pad's is a plate along the bottom.
+** A pad is drawn in it.
+*/
+rect_t object_local_box(const object_t *o)
+{
+    rect_t r = o->rect;
+
+    if (o->type == OBJ_SPIKE)
+        return (rect_t){r.x + SPIKE_BOX_X * r.w, r.y + SPIKE_BOX_Y * r.h,
+            SPIKE_BOX_W * r.w, SPIKE_BOX_H * r.h};
+    if (o->type == OBJ_PAD)
+        return (rect_t){r.x + PAD_BOX_X * r.w, r.y + PAD_BOX_Y * r.h,
+            PAD_BOX_W * r.w, PAD_BOX_H * r.h};
+    return r;
+}
+
 /* Local shape per type, before rotation (4.2). */
 void hitbox_for_object(object_t *o)
 {
@@ -212,9 +230,6 @@ void hitbox_for_object(object_t *o)
         hitbox_build_poly(&o->hitbox, v, 3, r, o->rotation);
         return;
     }
-    if (o->type == OBJ_SPIKE)
-        r = (rect_t){r.x + SPIKE_BOX_X * r.w, r.y + SPIKE_BOX_Y * r.h,
-            SPIKE_BOX_W * r.w, SPIKE_BOX_H * r.h};
-    rect_corners(r, v);
+    rect_corners(object_local_box(o), v);
     hitbox_build_poly(&o->hitbox, v, 4, o->rect, o->rotation);
 }

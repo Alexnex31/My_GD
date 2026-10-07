@@ -17,6 +17,7 @@ void hitbox_build_poly(hitbox_t *h, const vec2_t *local, int n, rect_t rect,
     double deg);
 void hitbox_build_circle(hitbox_t *h, rect_t rect, double radius);
 void hitbox_for_object(object_t *o);
+rect_t object_local_box(const object_t *o);
 
 /*
 ** Axis k: 0 is y, 1 is x, then the shape's own axes (G.2). Built once at load

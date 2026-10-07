@@ -158,7 +158,7 @@ static int type_from_name(const char *name, obj_type_t *out)
     static const char *const names[OBJ_TYPE_COUNT] = {
         [OBJ_BLOCK] = "block", [OBJ_SLOPE] = "slope",
         [OBJ_SPIKE] = "spike", [OBJ_PORTAL] = "portal",
-        [OBJ_GRAVITY] = "gravity",
+        [OBJ_GRAVITY] = "gravity", [OBJ_PAD] = "pad",
     };
 
     for (int i = 0; i < OBJ_TYPE_COUNT; i++)
@@ -184,6 +184,21 @@ static int gravity_word(object_t *o, const char *word, parse_ctx_t *ctx)
     return 0;
 }
 
+/* A pad's word: its colour, one a pad comes in (10.1). */
+static int launch_word(object_t *o, const char *word, parse_ctx_t *ctx)
+{
+    int kind = word == NULL ? -1 : launch_from_name(word);
+
+    if (kind >= 0)
+        o->launch = (launch_kind_t)kind;
+    if (kind < 0 || launch_speed(o) == 0.0) {
+        warn(ctx, "pad needs yellow, pink, red or blue, line skipped");
+        return -1;
+    }
+    hitbox_for_object(o);
+    return 0;
+}
+
 /* The extra word (portals need a mode, 5.5), then the hitbox. */
 static int object_init(object_t *o, const char *word, parse_ctx_t *ctx)
 {
@@ -191,6 +206,8 @@ static int object_init(object_t *o, const char *word, parse_ctx_t *ctx)
 
     if (o->type == OBJ_GRAVITY)
         return gravity_word(o, word, ctx);
+    if (o->type == OBJ_PAD)
+        return launch_word(o, word, ctx);
     if (o->type == OBJ_PORTAL) {
         mode = word == NULL ? -1 : mode_from_name(word);
         if (mode < 0) {

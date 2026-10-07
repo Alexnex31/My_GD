@@ -29,6 +29,23 @@ typedef struct mode_ops {
 
 extern const mode_ops_t MODES[MODE_COUNT];
 
+/*
+** What a colour does, as a pad and as an orb, in GD's velocity units
+** (FEATURES 6.9): the rise speed it sets, negative toward the floor. 0 means
+** that object doesn't exist in that colour.
+*/
+typedef struct launch_ops {
+    const char *name;         /* name in level files ("yellow", ...)          */
+    double pad_v;
+    double orb_v;
+    bool flips;               /* gravity flips first, then the speed is set    */
+} launch_ops_t;
+
+extern const launch_ops_t LAUNCHES[LAUNCH_KIND_COUNT];
+
+int launch_from_name(const char *name);    /* -1 if unknown */
+double launch_speed(const object_t *o);     /* velocity units; 0: not a launcher */
+
 int mode_from_name(const char *name);      /* -1 if unknown (5.5) */
 double mode_neutral_kill_half(const mode_ops_t *m);   /* FEATURES 6.4 */
 double modes_tallest_corridor(void);       /* over MODES[]: the kill line (4.7) */

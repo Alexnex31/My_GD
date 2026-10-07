@@ -29,6 +29,12 @@
     #define PORTAL_BOX_W        1.2
     #define PORTAL_BOX_H        2.8
 
+    /* A pad is a thin plate at the bottom of its cell, like GD's (FEATURES 10.1). */
+    #define PAD_BOX_X           0.1
+    #define PAD_BOX_Y           0.75
+    #define PAD_BOX_W           0.8
+    #define PAD_BOX_H           0.25
+
     /* Player */
     #define PLAYER_HALF         50.0    /* rigid square 100x100, circle radius 50 (4.3) */
     #define PLAYER_SCREEN_X     500.0   /* the player's x on screen: 26% of the view (9.1) */

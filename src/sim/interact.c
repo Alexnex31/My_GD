@@ -128,10 +128,28 @@ static void enter_gravity(sim_t *s, const object_t *o)
         player_flip_gravity(&s->st.player);
 }
 
+/*
+** A pad sets the rise speed to its own, whatever the player was doing: the
+** same launch every time, and no mode's cap cuts it (3.4). Blue flips the
+** gravity first, and its speed is toward the new floor (FEATURES 10.1).
+*/
+static void launch(sim_t *s, const object_t *o)
+{
+    player_t *p = &s->st.player;
+
+    if (LAUNCHES[o->launch].flips)
+        player_flip_gravity(p);
+    p->vy = PER_TICK(launch_speed(o) * V_UNIT);
+    p->grounded = false;
+    p->can_jump = false;
+}
+
+/* Every interactive object so far acts on a touch alone (5.1). */
 static bool interactive_wants_activation(const sim_t *s, const object_t *o)
 {
-    (void)s;                                 /* pads, orbs and the rest: FEATURES */
-    return o->type == OBJ_PORTAL || o->type == OBJ_GRAVITY;
+    (void)s;
+    (void)o;
+    return true;
 }
 
 static void interactive_act(sim_t *s, const object_t *o)
@@ -140,6 +158,8 @@ static void interactive_act(sim_t *s, const object_t *o)
         enter_portal(s, o);
     if (o->type == OBJ_GRAVITY)
         enter_gravity(s, o);
+    if (o->type == OBJ_PAD)
+        launch(s, o);
 }
 
 /* It acts once, then keeps its sprite and loses its hitbox (5.1). */

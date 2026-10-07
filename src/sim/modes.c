@@ -15,6 +15,22 @@ const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT] = {
     [OBJ_SPIKE] = CAT_HARM,
     [OBJ_PORTAL] = CAT_INTERACTIVE,
     [OBJ_GRAVITY] = CAT_INTERACTIVE,
+    [OBJ_PAD] = CAT_INTERACTIVE,
+};
+
+/*
+** GD's own numbers (FEATURES 10.1, 10.2). Blue flips and throws the player
+** at its new floor; green flips and makes it jump there, a yellow orb in the
+** other gravity; black slams it down.
+*/
+const launch_ops_t LAUNCHES[LAUNCH_KIND_COUNT] = {
+    [LAUNCH_YELLOW] = {.name = "yellow", .pad_v = 2.77, .orb_v = 1.91},
+    [LAUNCH_PINK] = {.name = "pink", .pad_v = 1.79, .orb_v = 1.37},
+    [LAUNCH_RED] = {.name = "red", .pad_v = 3.65, .orb_v = 2.68},
+    [LAUNCH_BLUE] = {.name = "blue", .pad_v = -1.37, .orb_v = -1.37,
+        .flips = true},
+    [LAUNCH_GREEN] = {.name = "green", .orb_v = 1.91, .flips = true},
+    [LAUNCH_BLACK] = {.name = "black", .orb_v = -2.6},
 };
 
 const mode_ops_t MODES[MODE_COUNT] = {
@@ -66,6 +82,19 @@ double modes_tallest_corridor(void)
         if (MODES[i].corridor_height > tallest)
             tallest = MODES[i].corridor_height;
     return tallest;
+}
+
+int launch_from_name(const char *name)
+{
+    for (int i = 0; i < LAUNCH_KIND_COUNT; i++)
+        if (strcmp(LAUNCHES[i].name, name) == 0)
+            return i;
+    return -1;
+}
+
+double launch_speed(const object_t *o)
+{
+    return o->type == OBJ_PAD ? LAUNCHES[o->launch].pad_v : 0.0;
 }
 
 int mode_from_name(const char *name)
