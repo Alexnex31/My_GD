@@ -122,45 +122,6 @@ static void test_gravity_portals(void)
 }
 
 /*
-** FEATURES 7.5: a 300 px wall takes two hops, then a spike, then a cube
-** again. The same level without the UFO portal is the cube's too tall wall.
-*/
-static void test_ufo_level(void)
-{
-    sim_t s;
-    bot_result_t r;
-
-    load(&s, "portal 1500 650 2 ufo\nblock 2300 550 2\nblock 2300 650 2\n"
-        "block 2300 750 2\nspike 2900 750 2\nportal 3600 650 2 cube\n");
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_FOUND && r.attempts > 2);
-    CHECK(replays(&s, &r));
-    bot_result_free(&r);
-    sim_free(&s);
-    load(&s, "block 2300 550 2\nblock 2300 650 2\n"
-        "block 2300 750 2\nspike 2900 750 2\nportal 3600 650 2 cube\n");
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_NO_PATH);
-    bot_result_free(&r);
-    sim_free(&s);
-}
-
-/* FEATURES 8.6: a jump into the portal, then between a spike and two blocks. */
-static void test_wave_level(void)
-{
-    sim_t s;
-    bot_result_t r;
-
-    load(&s, "portal 1500 350 2 wave\nspike 2200 750 2\nblock 2600 250 2\n"
-        "block 3000 550 2\nportal 4000 350 2 cube\n");
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_FOUND && r.attempts > 2);
-    CHECK(replays(&s, &r));
-    bot_result_free(&r);
-    sim_free(&s);
-}
-
-/*
 ** What the found run did as `mode`: the ticks it spent in it and the times
 ** its gravity turned there. A level meant for a mode proves nothing when the
 ** path walks around the portal.
@@ -183,6 +144,60 @@ static void run_as(sim_t *s, const bot_result_t *r, gamemode_t mode,
         *ticks += 1;
         *flips += dir != s->st.player.gravity_dir;
     }
+}
+
+/*
+** FEATURES 7.5: a 300 px wall takes two hops, then a spike, then a cube
+** again. The same level without the UFO portal is the cube's too tall wall.
+*/
+static void test_ufo_level(void)
+{
+    sim_t s;
+    bot_result_t r;
+    long ticks;
+    int flips;
+
+    load(&s, "portal 1500 650 2 ufo\nblock 2300 550 2\nblock 2300 650 2\n"
+        "block 2300 750 2\nspike 2900 750 2\nportal 3600 650 2 cube\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_FOUND && r.attempts > 2);
+    CHECK(replays(&s, &r));
+    run_as(&s, &r, MODE_UFO, &ticks, &flips);
+    CHECK(ticks > 400);
+    bot_result_free(&r);
+    sim_free(&s);
+    load(&s, "block 2300 550 2\nblock 2300 650 2\n"
+        "block 2300 750 2\nspike 2900 750 2\nportal 3600 650 2 cube\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_NO_PATH);
+    bot_result_free(&r);
+    sim_free(&s);
+}
+
+/*
+** The wave: over a floor block, under a ceiling block, over a taller one.
+** The portal stands on the ground, so the path has to take it. FEATURES 8.6
+** as written is no test of the wave: its portal is high enough for a cube
+** to pass under, and a cube then jumps the spike and walks to the end.
+*/
+static void test_wave_level(void)
+{
+    sim_t s;
+    bot_result_t r;
+    long ticks;
+    int flips;
+
+    load(&s, "portal 1500 650 2 wave\nblock 2300 650 2 w=4 h=4\n"
+        "block 3100 -150 2 w=4 h=14\nblock 3900 450 2 w=4 h=8\n"
+        "portal 4700 -200 2 cube\nportal 4700 100 2 cube\n"
+        "portal 4700 400 2 cube\nportal 4700 700 2 cube\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_FOUND && r.attempts > 2);
+    CHECK(replays(&s, &r));
+    run_as(&s, &r, MODE_WAVE, &ticks, &flips);
+    CHECK(ticks > 600);                        /* from one portal to the other */
+    bot_result_free(&r);
+    sim_free(&s);
 }
 
 /*
