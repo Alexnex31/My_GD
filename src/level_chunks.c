@@ -29,6 +29,16 @@ static const sfColor PORTAL_COLORS[MODE_COUNT] = {
     [MODE_BALL] = {255, 60, 60, 255},
 };
 
+/* Pads and orbs wear their own colour, GD's (FEATURES 10.1, 10.2). */
+static const sfColor LAUNCH_COLORS[LAUNCH_KIND_COUNT] = {
+    [LAUNCH_YELLOW] = {255, 220, 40, 255},
+    [LAUNCH_PINK] = {255, 120, 220, 255},
+    [LAUNCH_RED] = {255, 60, 60, 255},
+    [LAUNCH_BLUE] = {60, 120, 255, 255},
+    [LAUNCH_GREEN] = {60, 220, 90, 255},
+    [LAUNCH_BLACK] = {70, 70, 70, 255},
+};
+
 /*
 ** A mode portal has its mode's colour; a gravity portal is yellow when it
 ** sends the player up and blue when it brings it back down, as in GD.
@@ -38,9 +48,23 @@ static sfColor object_color(const object_t *o)
     if (o->type == OBJ_GRAVITY)
         return o->portal_gravity < 0 ? (sfColor){255, 220, 40, 255}
             : (sfColor){60, 120, 255, 255};
+    if (o->type == OBJ_PAD || o->type == OBJ_ORB)
+        return LAUNCH_COLORS[o->launch];
     if (o->type != OBJ_PORTAL)
         return sfWhite;
     return PORTAL_COLORS[o->portal_mode];
+}
+
+/*
+** What an object is drawn in: its rect, except a pad and an orb, which are
+** drawn as their hitbox, the plate and the small square (4.2). Still turned
+** around the rect's center, so a pad at rot=180 hangs from its cell's top.
+*/
+static rect_t drawn_rect(const object_t *o)
+{
+    if (o->type == OBJ_PAD || o->type == OBJ_ORB)
+        return object_local_box(o);
+    return o->rect;
 }
 
 /*
@@ -56,9 +80,9 @@ static void append_object(sfVertex *v, const object_t *o, sfFloatRect tex,
     static const int slope[6] = {3, 1, 2, 2, 2, 2};
     const int *order = o->type == OBJ_SLOPE ? slope : quad;
     vec2_t c = {o->rect.x + o->rect.w / 2.0, o->rect.y + o->rect.h / 2.0};
-    vec2_t p[4] = {{o->rect.x, o->rect.y}, {o->rect.x + o->rect.w, o->rect.y},
-        {o->rect.x + o->rect.w, o->rect.y + o->rect.h},
-        {o->rect.x, o->rect.y + o->rect.h}};
+    rect_t r = drawn_rect(o);
+    vec2_t p[4] = {{r.x, r.y}, {r.x + r.w, r.y}, {r.x + r.w, r.y + r.h},
+        {r.x, r.y + r.h}};
     sfVector2f t[4] = {{tex.left, tex.top}, {tex.left + tex.width, tex.top},
         {tex.left + tex.width, tex.top + tex.height},
         {tex.left, tex.top + tex.height}};

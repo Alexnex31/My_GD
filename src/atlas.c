@@ -10,12 +10,18 @@
 #define PAD 2                     /* border pixels, so a rounded sample can't
                                      reach into the neighbouring image (9.1) */
 
+#define DRAWN_PLATE "#plate"      /* not files: shapes made in drawn_image */
+#define DRAWN_ORB "#orb"
+#define DRAWN_SIZE 64
+
 static const char *const ATLAS_FILES[OBJ_TYPE_COUNT] = {
     [OBJ_BLOCK] = "res/block.png",
     [OBJ_SLOPE] = "res/block.png",
     [OBJ_SPIKE] = "res/spike.png",
     [OBJ_PORTAL] = "res/cube_portal.png",
     [OBJ_GRAVITY] = "res/cube_portal.png",
+    [OBJ_PAD] = DRAWN_PLATE,                 /* no image yet: drawn here in */
+    [OBJ_ORB] = DRAWN_ORB,                   /* white, tinted by its colour */
 };
 
 /*
@@ -39,9 +45,31 @@ static void copy_with_padding(sfImage *dst, const sfImage *src, unsigned int x,
         (sfIntRect){0, (int)s.y - PAD, (int)s.x, PAD}, sfFalse);
 }
 
+/*
+** The stand-ins for objects that have no image yet, white so the object's
+** colour is exactly its tint: a plain plate, and a ring around a dot.
+*/
+static sfImage *drawn_image(const char *name)
+{
+    sfImage *im = sfImage_createFromColor(DRAWN_SIZE, DRAWN_SIZE, sfWhite);
+    float mid = (DRAWN_SIZE - 1) / 2.0f;
+
+    if (strcmp(name, DRAWN_PLATE) == 0)
+        return im;
+    for (unsigned int y = 0; y < DRAWN_SIZE; y++)
+        for (unsigned int x = 0; x < DRAWN_SIZE; x++) {
+            float r = hypotf((float)x - mid, (float)y - mid) / mid;
+
+            if (r > 1.0f || (r > 0.45f && r < 0.72f))
+                sfImage_setPixel(im, x, y, sfTransparent);
+        }
+    return im;
+}
+
 static sfImage *load_image(const char *path)
 {
-    sfImage *im = sfImage_createFromFile(path);
+    sfImage *im = path[0] == '#' ? drawn_image(path)
+        : sfImage_createFromFile(path);
 
     if (im == NULL) {
         dprintf(2, "my_gd: missing asset %s\n", path);
