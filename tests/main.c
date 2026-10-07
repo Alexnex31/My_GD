@@ -26,6 +26,8 @@ int main(void)
     test_trail();
     test_ball();
     test_mirror();
+    test_pads();
+    test_orbs();
     test_progress();
     test_input();
     test_settings();

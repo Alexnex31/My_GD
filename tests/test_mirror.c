@@ -23,7 +23,8 @@
 ** back to the height it left) lands one tick apart in the two runs.
 **
 ** Floors and ceilings, both kinds of slope, spikes both ways, a tilted
-** block, gravity portals and a mode portal on the line. Every corridor
+** block, gravity portals, pads on a floor and under a ceiling, orbs, and a
+** mode portal on the line. Every corridor
 ** these modes open around y = 0 ends above the ground, so the ground plays
 ** no part and the mirror has nothing it lacks.
 */
@@ -33,6 +34,9 @@
     "block 1800 -500 2 h=6\n" \
     "slope 2600 400 2\n" \
     "block 2700 400 2 w=6\n" \
+    "pad 2800 300 2 pink\n" \
+    "orb 3200 -50 2 red\n" \
+    "orb 4200 100 2 green\n" \
     "spike 3400 400 2\n" \
     "spike 3900 -500 2 rot=180\n" \
     "block 4500 -50 2 rot=30\n" \
@@ -42,6 +46,9 @@
     "spike 7900 0 2\n" \
     "gravity 8400 -50 2 down\n" \
     "block 9000 300 2 h=4\n" \
+    "pad 9000 200 2 blue\n" \
+    "orb 9400 -150 2 black\n" \
+    "pad 9650 -300 2 yellow rot=180\n" \
     "block 9600 -500 2 h=4\n" \
     "slope 10200 350 2 w=6 h=3\n" \
     "block 11500 -50 2\n"
@@ -99,6 +106,20 @@ static bool same_run(const sim_t *a, const sim_t *b)
         && a->st.bounds.bottom == -b->st.bounds.top;
 }
 
+static long pads_used;
+static long orbs_used;
+
+/* The runs must meet what the section holds, or agreeing on it says nothing. */
+static void count_launches(const sim_t *s)
+{
+    for (size_t i = 0; i < s->lvl.nb_objects; i++) {
+        if (!is_spent(&s->st, i))
+            continue;
+        pads_used += s->lvl.objects[i].type == OBJ_PAD;
+        orbs_used += s->lvl.objects[i].type == OBJ_ORB;
+    }
+}
+
 /* The button changes every 4 to 67 ticks, from a seed: the same for both. */
 static bool button(unsigned *rng, int *left, bool down)
 {
@@ -144,7 +165,7 @@ static void test_the_mirror(void)
     load(&a, "ship", "ufo");
     load(&b, "ship", "ufo");
     mirror(&b);
-    CHECK(a.lvl.nb_objects == 17 && b.lvl.nb_objects == 17);
+    CHECK(a.lvl.nb_objects == 23 && b.lvl.nb_objects == 23);
     CHECK(b.lvl.objects[0].rect.y == -500.0 && a.lvl.objects[0].rect.y == 400.0);
     CHECK(b.lvl.objects[0].hitbox.aabb.y == -500.0);
     CHECK(b.lvl.objects[0].hitbox.aabb.h == 100.0);
@@ -179,6 +200,7 @@ static void test_mode(const char *mode, const char *next)
     for (unsigned seed = 1; seed <= 200; seed++) {
         ticks = play_both(&a, &b, seed);
         CHECK(ticks > 0);
+        count_launches(&a);
         if (ticks < 0)
             break;
         shortest = ticks < shortest ? ticks : shortest;
@@ -217,6 +239,7 @@ void test_mirror(void)
     test_mode("ufo", "ball");
     test_mode("ball", "wave");
     test_mode("wave", "ship");
+    CHECK(pads_used > 20 && orbs_used > 20);
     test_bot_agrees("ship", "ufo");
     test_bot_agrees("ball", "wave");
 }

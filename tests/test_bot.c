@@ -222,6 +222,65 @@ static void test_ball_level(void)
     sim_free(&s);
 }
 
+/* After a replay: whether the run used the level's first object of a type. */
+static bool used(const sim_t *s, obj_type_t type)
+{
+    for (size_t i = 0; i < s->lvl.nb_objects; i++)
+        if (s->lvl.objects[i].type == type)
+            return is_spent(&s->st, i);
+    return false;
+}
+
+/*
+** A wall 400 px tall behind a yellow pad: the pad's 4.38 blocks clear it,
+** and without the pad nothing does (FEATURES 10.1).
+*/
+static void test_pad_level(void)
+{
+    sim_t s;
+    bot_result_t r;
+
+    load(&s, "pad 1400 750 2 yellow\nblock 1700 450 2 h=8\n"
+        "spike 2600 750 2\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_FOUND);
+    CHECK(replays(&s, &r) && used(&s, OBJ_PAD));
+    bot_result_free(&r);
+    sim_free(&s);
+    load(&s, "block 1700 450 2 h=8\nspike 2600 750 2\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_NO_PATH);
+    bot_result_free(&r);
+    sim_free(&s);
+}
+
+/*
+** Six spikes in a row, too wide for a jump, and an orb above them: the cube
+** has to click it in the air, where it has no other choice to make. The
+** search only finds that because every tick near a live orb is a decision,
+** releases included (FEATURES 10.2).
+*/
+static void test_orb_level(void)
+{
+    sim_t s;
+    bot_result_t r;
+
+    load(&s, "spike 1500 750 2\nspike 1600 750 2\nspike 1700 750 2\n"
+        "spike 1800 750 2\nspike 1900 750 2\nspike 2000 750 2\n"
+        "orb 1750 550 2 yellow\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_FOUND && r.attempts > 2);
+    CHECK(replays(&s, &r) && used(&s, OBJ_ORB));
+    bot_result_free(&r);
+    sim_free(&s);
+    load(&s, "spike 1500 750 2\nspike 1600 750 2\nspike 1700 750 2\n"
+        "spike 1800 750 2\nspike 1900 750 2\nspike 2000 750 2\n");
+    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    CHECK(r.verdict == BOT_NO_PATH);
+    bot_result_free(&r);
+    sim_free(&s);
+}
+
 static int numeric_name(const struct dirent **a, const struct dirent **b)
 {
     long x = strtol((*a)->d_name, NULL, 10);
@@ -281,5 +340,7 @@ void test_bot(void)
     test_ufo_level();
     test_wave_level();
     test_ball_level();
+    test_pad_level();
+    test_orb_level();
     test_levels();
 }
