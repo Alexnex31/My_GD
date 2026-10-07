@@ -50,31 +50,8 @@ void level_finalize(level_data_t *lvl)
     lvl->kill_y = top - KILL_CEILING_MARGIN;
 }
 
-int sim_load_mem(sim_t *s, const char *buf, size_t len, const char *id,
-    sim_log_fn log)
-{
-    memset(s, 0, sizeof(*s));
-    snprintf(s->lvl.id, sizeof(s->lvl.id), "%s", id);
-    snprintf(s->lvl.hdr.name, sizeof(s->lvl.hdr.name), "%s", id);
-    s->lvl.hdr.start = (level_start_t){   /* what the start_ fields override (7.2) */
-        .pos = {PLAYER_SPAWN_X, PLAYER_SPAWN_Y}, .mode = MODE_CUBE,
-        .speed_mult = 1.0, .gravity_dir = 1};
-    s->lvl.file_hash = fnv1a(buf, len);  /* the version, from the bytes read */
-    s->lvl.skipped_lines = level_parse_mem(buf, len, id, &s->lvl.objects,
-        &s->lvl.nb_objects, &s->lvl.hdr, log);
-    if (s->lvl.hdr.start.mini && log != NULL)
-        log("start_size mini has no effect yet: the mini scale is FEATURES 10.4");
-    level_finalize(&s->lvl);
-    s->st.spent_words = (s->lvl.nb_objects + 63) / 64;
-    s->st.spent = sim_xcalloc(s->st.spent_words + 1, sizeof(uint64_t));
-    sim_reset(s);
-    return 0;
-}
-
-static char *read_whole_file(const char *path, size_t *len);
-
-/* The defaults sim_load_mem starts from, for a header read on its own. */
-static void header_defaults(level_header_t *hdr, const char *id)
+/* The defaults the start_ fields override (7.2); the name is the id. */
+void level_header_defaults(level_header_t *hdr, const char *id)
 {
     *hdr = (level_header_t){0};
     snprintf(hdr->name, sizeof(hdr->name), "%s", id);
@@ -82,6 +59,59 @@ static void header_defaults(level_header_t *hdr, const char *id)
         .pos = {PLAYER_SPAWN_X, PLAYER_SPAWN_Y}, .mode = MODE_CUBE,
         .speed_mult = 1.0, .gravity_dir = 1};
 }
+
+/* The level is in s->lvl: sort it, measure it, and stand at its start. */
+static void sim_ready(sim_t *s)
+{
+    level_finalize(&s->lvl);
+    s->st.spent_words = (s->lvl.nb_objects + 63) / 64;
+    s->st.spent = sim_xcalloc(s->st.spent_words + 1, sizeof(uint64_t));
+    sim_reset(s);
+}
+
+int sim_load_mem(sim_t *s, const char *buf, size_t len, const char *id,
+    sim_log_fn log)
+{
+    level_doc_t doc;
+
+    memset(s, 0, sizeof(*s));
+    snprintf(s->lvl.id, sizeof(s->lvl.id), "%s", id);
+    level_header_defaults(&s->lvl.hdr, id);
+    s->lvl.file_hash = fnv1a(buf, len);  /* the version, from the bytes read */
+    s->lvl.skipped_lines = level_parse_doc(buf, len, id, &doc, &s->lvl.hdr,
+        log);
+    s->lvl.objects = doc.objs;           /* the sim keeps this array */
+    s->lvl.nb_objects = doc.count;
+    doc.objs = NULL;
+    level_doc_free(&doc);
+    if (s->lvl.hdr.start.mini && log != NULL)
+        log("start_size mini has no effect yet: the mini scale is FEATURES 10.4");
+    sim_ready(s);
+    return 0;
+}
+
+/*
+** The same level from a document in memory: what the editor playtests and
+** verifies is built exactly like what the game loads (FEATURES 11.1). The
+** objects are numbered in the document's order, which decides ties in x.
+*/
+int sim_init(sim_t *s, const level_doc_t *doc, const level_header_t *hdr,
+    const char *id)
+{
+    memset(s, 0, sizeof(*s));
+    snprintf(s->lvl.id, sizeof(s->lvl.id), "%s", id);
+    s->lvl.hdr = *hdr;
+    s->lvl.objects = sim_xcalloc(doc->count + 1, sizeof(object_t));
+    s->lvl.nb_objects = doc->count;
+    for (size_t i = 0; i < doc->count; i++) {
+        s->lvl.objects[i] = doc->objs[i];
+        s->lvl.objects[i].line = (int)i + 1;
+    }
+    sim_ready(s);
+    return 0;
+}
+
+static char *read_whole_file(const char *path, size_t *len);
 
 int level_read_header(const char *path, level_header_t *hdr,
     uint64_t *file_hash)
@@ -93,7 +123,7 @@ int level_read_header(const char *path, level_header_t *hdr,
     if (text == NULL)
         return -1;
     level_id_from_path(path, id, sizeof(id));
-    header_defaults(hdr, id);
+    level_header_defaults(hdr, id);
     if (file_hash != NULL)
         *file_hash = fnv1a(text, len);
     level_parse_mem(text, len, id, NULL, NULL, hdr, NULL);   /* no object */

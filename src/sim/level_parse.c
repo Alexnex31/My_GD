@@ -24,6 +24,8 @@ typedef struct parse_ctx {
     const char *source;
     int lineno;
     bool group_warned;
+    char *extra;              /* where the fields nothing edits are kept, or NULL */
+    size_t extra_size;
 } parse_ctx_t;
 
 static void warn(parse_ctx_t *ctx, const char *what)
@@ -128,6 +130,17 @@ static void portal_shape(object_t *o, bool given_w, bool given_h)
     }
 }
 
+/* A field this version doesn't act on, kept as written for the next save. */
+static void keep_extra(parse_ctx_t *ctx, const char *key, const char *val)
+{
+    size_t used;
+
+    if (ctx->extra == NULL)
+        return;
+    used = strlen(ctx->extra);
+    snprintf(ctx->extra + used, ctx->extra_size - used, " %s=%s", key, val);
+}
+
 /* One key=value field; an unknown key is ignored, the line stays (7.2). */
 static int parse_field(object_t *o, char *tok, parse_ctx_t *ctx)
 {
@@ -147,19 +160,28 @@ static int parse_field(object_t *o, char *tok, parse_ctx_t *ctx)
         if (!ctx->group_warned)
             warn(ctx, "group= is reserved for triggers, ignored");
         ctx->group_warned = true;
+        keep_extra(ctx, tok, val);
         return 0;
     }
     warn(ctx, "unknown field, ignored");
+    keep_extra(ctx, tok, val);
     return 0;
+}
+
+static const char *const TYPE_NAMES[OBJ_TYPE_COUNT] = {
+    [OBJ_BLOCK] = "block", [OBJ_SLOPE] = "slope",
+    [OBJ_SPIKE] = "spike", [OBJ_PORTAL] = "portal",
+    [OBJ_GRAVITY] = "gravity", [OBJ_PAD] = "pad", [OBJ_ORB] = "orb",
+};
+
+const char *obj_type_name(obj_type_t type)
+{
+    return TYPE_NAMES[type];
 }
 
 static int type_from_name(const char *name, obj_type_t *out)
 {
-    static const char *const names[OBJ_TYPE_COUNT] = {
-        [OBJ_BLOCK] = "block", [OBJ_SLOPE] = "slope",
-        [OBJ_SPIKE] = "spike", [OBJ_PORTAL] = "portal",
-        [OBJ_GRAVITY] = "gravity", [OBJ_PAD] = "pad", [OBJ_ORB] = "orb",
-    };
+    const char *const *names = TYPE_NAMES;
 
     for (int i = 0; i < OBJ_TYPE_COUNT; i++)
         if (names[i] != NULL && strcmp(names[i], name) == 0) {
@@ -318,18 +340,24 @@ static void set_flag(const char *text, const char *off, const char *on,
         warn(ctx, "header field takes one of its two words, ignored");
 }
 
-/* The speeds of a speed portal (FEATURES 10.3), written the same way. */
-static bool start_speed(const char *text, level_start_t *st, parse_ctx_t *ctx)
+/* The speeds of a speed portal (FEATURES 10.3): 0.5, 1, 2, 3 or 4. */
+static bool known_speed(const char *text, double *out)
 {
     static const double allowed[] = {0.5, 1.0, 2.0, 3.0, 4.0};
     double v = 0.0;
 
     if (!parse_double(text, &v))
-        return (warn(ctx, "start_speed needs a number, ignored"), true);
+        return false;
     for (size_t i = 0; i < sizeof(allowed) / sizeof(*allowed); i++)
         if (v == allowed[i])
-            return (st->speed_mult = v, true);
-    warn(ctx, "start_speed must be 0.5, 1, 2, 3 or 4, ignored");
+            return (*out = v, true);
+    return false;
+}
+
+static bool start_speed(const char *text, level_start_t *st, parse_ctx_t *ctx)
+{
+    if (!known_speed(text, &st->speed_mult))
+        warn(ctx, "start_speed must be 0.5, 1, 2, 3 or 4, ignored");
     return true;
 }
 
@@ -477,39 +505,104 @@ static int skip_object(char *line)
     char *tok[1];
     obj_type_t type;
 
-    if (split_words(line, tok, 1) < 1 || type_from_name(tok[0], &type) != 0)
+    if (split_words(line, tok, 1) < 1)
         return 1;
-    return 0;
+    return type_from_name(tok[0], &type) != 0;
 }
 
-int level_parse_mem(const char *buf, size_t len, const char *source,
-    object_t **objs, size_t *count, level_header_t *hdr, sim_log_fn log)
-{
-    parse_ctx_t ctx = {log, source, 0, false};
-    char line[1024];
-    char copy[1024];
-    size_t pos = 0;
-    size_t nb = 0;
-    int skipped = 0;
-    int ret = 0;
+typedef struct parse_out {    /* what the caller wants filled, each or NULL */
+    object_t **objs;
+    char ***extras;
+    size_t *count;
+} parse_out_t;
 
-    if (objs != NULL)
-        *objs = sim_xcalloc(count_lines(buf, len), sizeof(object_t));
+/* One line that isn't blank: an object, or else a header field. */
+static int parse_line(char *line, parse_out_t *out, level_header_t *hdr,
+    parse_ctx_t *ctx)
+{
+    char copy[1024];
+    char extra[256] = "";
+    int ret;
+
+    memcpy(copy, line, sizeof(copy));         /* the parser splits in place */
+    if (out->objs == NULL)
+        ret = skip_object(copy);
+    else {
+        ctx->extra = out->extras != NULL ? extra : NULL;
+        ctx->extra_size = sizeof(extra);
+        ret = parse_object(copy, *out->objs + *out->count, ctx);
+    }
+    if (ret == 0 && out->objs != NULL) {
+        if (out->extras != NULL && extra[0] != '\0')
+            (*out->extras)[*out->count] = sim_xstrdup(extra);
+        *out->count += 1;
+    }
+    if (ret > 0)
+        parse_header_line(line, hdr, ctx);
+    return ret;
+}
+
+static int parse_all(const char *buf, size_t len, const char *source,
+    parse_out_t *out, level_header_t *hdr, sim_log_fn log)
+{
+    parse_ctx_t ctx = {.log = log, .source = source};
+    char line[1024];
+    size_t lines = count_lines(buf, len);
+    size_t pos = 0;
+    int skipped = 0;
+
+    if (out->objs != NULL)
+        *out->objs = sim_xcalloc(lines, sizeof(object_t));
+    if (out->extras != NULL)
+        *out->extras = sim_xcalloc(lines, sizeof(char *));
     while (pos < len) {
         pos = next_line(buf, len, pos, line, sizeof(line));
         ctx.lineno += 1;
         strip_comment(line);
         if (is_blank(line))
             continue;
-        memcpy(copy, line, sizeof(copy));      /* parse_object splits in place */
-        ret = objs == NULL ? skip_object(line)
-            : parse_object(line, *objs + nb, &ctx);
-        nb += ret == 0;
-        skipped += ret < 0;
-        if (ret > 0)
-            parse_header_line(copy, hdr, &ctx);
+        skipped += parse_line(line, out, hdr, &ctx) < 0;
     }
+    return skipped;
+}
+
+int level_parse_mem(const char *buf, size_t len, const char *source,
+    object_t **objs, size_t *count, level_header_t *hdr, sim_log_fn log)
+{
+    size_t nb = 0;
+    parse_out_t out = {.objs = objs, .count = &nb};
+    int skipped = parse_all(buf, len, source, &out, hdr, log);
+
     if (count != NULL)
         *count = nb;
     return skipped;
+}
+
+int level_parse_doc(const char *buf, size_t len, const char *source,
+    level_doc_t *doc, level_header_t *hdr, sim_log_fn log)
+{
+    parse_out_t out = {&doc->objs, &doc->extras, &doc->count};
+
+    *doc = (level_doc_t){0};
+    return parse_all(buf, len, source, &out, hdr, log);
+}
+
+void level_doc_free(level_doc_t *doc)
+{
+    for (size_t i = 0; doc->extras != NULL && i < doc->count; i++)
+        free(doc->extras[i]);
+    free(doc->extras);
+    free(doc->objs);
+    *doc = (level_doc_t){0};
+}
+
+/* The loader's own reading of one line: what the editor places is exactly
+** what the game will load. */
+int level_object_from_line(const char *line, object_t *o)
+{
+    parse_ctx_t ctx = {0};
+    char copy[1024];
+
+    snprintf(copy, sizeof(copy), "%s", line);
+    return parse_object(copy, o, &ctx) == 0 ? 0 : -1;
 }

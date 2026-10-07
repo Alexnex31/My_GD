@@ -11,5 +11,6 @@
     #include <stddef.h>
 
 void *sim_xcalloc(size_t n, size_t size);   /* calloc, or write an error and exit(84) */
+char *sim_xstrdup(const char *s);            /* the same promise, for a string */
 
 #endif
