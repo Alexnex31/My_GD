@@ -15,6 +15,8 @@
 #include "sim/modes.h"
 #include "sim/sim.h"
 
+#define ORB_AHEAD_TICKS 12    /* how early an orb starts to matter: 50 ms */
+
 typedef struct decision {
     uint64_t key;             /* sim_physics_hash when it was taken          */
     bool held;                /* the choice: the button until the next one   */
@@ -92,12 +94,38 @@ static void path_grow(bot_t *b)
     b->cap = cap;
 }
 
+/*
+** A live orb the player is over, or reaches within ORB_AHEAD_TICKS: around
+** one, every tick is a choice. An orb wants a fresh hold on the tick of the
+** contact, so "release now, press on it" has to be a run the search can try,
+** and a cube in the air has no other moment to choose in (FEATURES 10.2).
+*/
+static bool near_live_orb(const sim_t *s)
+{
+    const player_t *p = &s->st.player;
+    double half = MODES[p->mode].half;
+    double reach = p->pos.x + half + ORB_AHEAD_TICKS * p->vx;
+
+    for (size_t i = s->st.first_active; i < s->lvl.nb_objects; i++) {
+        const object_t *o = &s->lvl.objects[i];
+
+        if (o->hitbox.aabb.x > reach)
+            return false;                    /* sorted: nothing nearer follows */
+        if (o->type == OBJ_ORB && !is_spent(&s->st, i)
+            && o->hitbox.aabb.x + o->hitbox.aabb.w >= p->pos.x - half)
+            return true;
+    }
+    return false;
+}
+
 /* The cube chooses when it can jump, flying modes every N ticks (6.1). */
 static bool is_decision(const sim_t *s)
 {
     const player_t *p = &s->st.player;
     int every = MODES[p->mode].bot_decision_ticks;
 
+    if (near_live_orb(s))
+        return true;
     if (every > 0)
         return s->st.tick % every == 0;
     return p->can_jump;
