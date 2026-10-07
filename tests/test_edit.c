@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "editor/ed_select.h"
+#include "editor/ed_props.h"
 #include "sim/alloc.h"
 #include "test.h"
 
@@ -33,7 +33,7 @@ static int add(ed_level_t *lv, const char *line)
 /* The level as the editor holds it: ids, order, shapes, kept fields. */
 static char *state(const ed_level_t *lv)
 {
-    size_t cap = 128 * (lv->count + 1);
+    size_t cap = 400 * (lv->count + 1);
     char *s = sim_xcalloc(cap, 1);
     size_t n = 0;
 
@@ -41,9 +41,13 @@ static char *state(const ed_level_t *lv)
         const ed_object_t *o = &lv->objects[i];
 
         n += (size_t)snprintf(s + n, cap - n, "%d %d %.17g %.17g %.17g "
-            "%.17g %.17g %s\n", o->id, (int)o->obj.type, o->obj.rect.x,
-            o->obj.rect.y, o->obj.rotation, o->obj.hitbox.aabb.x,
-            o->obj.hitbox.aabb.y, o->extra != NULL ? o->extra : "");
+            "%.17g %.17g %.17g %.17g %d %d %d %d %d %d %.17g %s\n", o->id,
+            (int)o->obj.type, o->obj.rect.x, o->obj.rect.y, o->obj.rect.w,
+            o->obj.rect.h, o->obj.rotation, o->obj.hitbox.aabb.x,
+            o->obj.hitbox.aabb.y, (int)o->obj.portal_mode,
+            o->obj.portal_gravity, (int)o->obj.launch, (int)o->is_start,
+            (int)o->start.mode, o->start.gravity_dir, o->start.speed_mult,
+            o->extra != NULL ? o->extra : "");
     }
     return s;
 }
@@ -87,7 +91,7 @@ static void test_undo_redo(void)
     ed_gesture(&H);
     before = *ed_find(&lv, b);
     ed_find(&lv, b)->obj.rect.x = 425.0;
-    ed_do_change(&lv, &H, &b, &before.obj, 1);
+    ed_do_change(&lv, &H, &b, &before, 1);
     s[3] = state(&lv);
     CHECK(H.nb_undo == 4);
     CHECK(ed_undo(&lv, &H) && is_state(&lv, s[2]));
@@ -140,7 +144,7 @@ static void test_gestures(void)
 
 static void random_edit(ed_level_t *lv, const ed_entry_t *e, int n)
 {
-    unsigned int what = rnd(10);
+    unsigned int what = rnd(12);
     vec2_t at = {(double)rnd(40) * 25.0, 400.0 + (double)rnd(16) * 25.0};
 
     if (rnd(4) != 0)
@@ -160,6 +164,11 @@ static void random_edit(ed_level_t *lv, const ed_entry_t *e, int n)
         ed_delete_selected(lv, &H);
     if (what == 8)
         ed_duplicate(lv, &H, 50.0);
+    if (what == 10)
+        ed_prop_step(lv, &H, (ed_prop_t)rnd(ED_PROP_COUNT),
+            rnd(2) == 0 ? 1 : -1);
+    if (what == 11)
+        ed_rotate(lv, &H, rnd(2) == 0 ? 90.0 : -90.0, 25.0);
     if (what == 9) {
         ed_clip_t clip = {0};
 

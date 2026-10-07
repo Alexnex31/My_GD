@@ -75,7 +75,7 @@ static void test_open_and_save(void)
     char *saved;
 
     ed_level_from_text(&lv, text, strlen(text), "5");
-    CHECK(lv.count == 3 && lv.nb_starts == 1 && !lv.dirty);
+    CHECK(lv.count == 4 && ed_starts(&lv) == 1 && !lv.dirty);
     CHECK(strcmp(lv.hdr.name, "Mine") == 0);
     saved = ed_level_text(&lv);
     CHECK(strcmp(saved, text) == 0);
@@ -84,7 +84,7 @@ static void test_open_and_save(void)
     CHECK(lv.dirty);
     CHECK(ed_level_save(&lv, "/tmp/990077.gd") == 0 && !lv.dirty);
     CHECK(ed_level_open(&back, "/tmp/990077.gd") == 0);
-    CHECK(back.count == 2 && back.nb_starts == 1 && !back.dirty);
+    CHECK(back.count == 3 && ed_starts(&back) == 1 && !back.dirty);
     CHECK(strcmp(back.id, "990077") == 0);
     ed_level_free(&back);
     CHECK(ed_level_open(&back, "/tmp/990078.gd") != 0);       /* no such file */
@@ -140,12 +140,14 @@ static void test_entries(void)
     object_t o;
     char line[96];
 
-    CHECK(n == 3 + MODE_COUNT + 2 + 4 + 6);
+    CHECK(n == 3 + MODE_COUNT + 2 + 4 + 6 + 1);
     for (int m = 0; m < MODE_COUNT; m++) {
         snprintf(line, sizeof(line), "portal %s", MODES[m].name);
         CHECK(find_entry(e, n, line) != NULL);
     }
     for (int i = 0; i < n; i++) {
+        if (e[i].start)
+            continue;
         pads += e[i].type == OBJ_PAD;
         orbs += e[i].type == OBJ_ORB;
         snprintf(line, sizeof(line), "%s 0 0 2%s%s", obj_type_name(e[i].type),

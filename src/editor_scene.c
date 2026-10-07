@@ -155,6 +155,18 @@ static void block_key(editor_t *ed, sfKeyCode k)
         ed_nudge(&ed->lv, &ed->hist, dx, dy);
 }
 
+/* R turns the selection a quarter, the brackets 15 degrees (11.4). */
+static void turn_key(editor_t *ed, const sfEvent *ev)
+{
+    sfKeyCode k = ev->key.code;
+
+    if (k == sfKeyR)
+        ed_rotate(&ed->lv, &ed->hist, ev->key.shift ? -90.0 : 90.0, ed->grid);
+    if (k == sfKeyLBracket || k == sfKeyRBracket)
+        ed_prop_step(&ed->lv, &ed->hist, ED_PROP_TURN,
+            k == sfKeyRBracket ? 1 : -1);
+}
+
 static void plain_key(editor_t *ed, sfKeyCode k)
 {
     block_key(ed, k);
@@ -197,6 +209,7 @@ static void key_press(editor_t *ed, gd_t *gd, const sfEvent *ev)
         return ctrl_key(ed, gd, ev);
     if (k == sfKeyLeft || k == sfKeyRight || k == sfKeyUp || k == sfKeyDown)
         return arrow_key(ed, ev);
+    turn_key(ed, ev);
     plain_key(ed, k);
 }
 

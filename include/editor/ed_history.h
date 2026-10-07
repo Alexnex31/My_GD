@@ -27,8 +27,8 @@ typedef struct ed_cmd {
     ed_object_t *objs;        /* ADD, REMOVE: the objects, ids and extras     */
     size_t *at;               /* REMOVE: where each was when it left          */
     int *ids;                 /* CHANGE: whose object changed                 */
-    object_t *before;         /* CHANGE: each one whole, so an undo is exact  */
-    object_t *after;
+    ed_object_t *before;      /* CHANGE: each one whole, so an undo is exact  */
+    ed_object_t *after;       /* (never the kept fields: nothing edits them)  */
 } ed_cmd_t;
 
 /*
@@ -49,6 +49,7 @@ void ed_gesture(ed_history_t *h);
 
 int ed_do_add(ed_level_t *lv, ed_history_t *h, const object_t *obj,
     const char *extra);                                   /* its id */
+int ed_do_add_object(ed_level_t *lv, ed_history_t *h, const ed_object_t *o);
 bool ed_do_remove(ed_level_t *lv, ed_history_t *h, int id);
 bool ed_do_place(ed_level_t *lv, ed_history_t *h, const ed_entry_t *e,
     vec2_t at, double grid);
@@ -57,7 +58,7 @@ bool ed_do_place(ed_level_t *lv, ed_history_t *h, const ed_entry_t *e,
 ** it. The command keeps its own copies.
 */
 void ed_do_change(ed_level_t *lv, ed_history_t *h, const int *ids,
-    const object_t *before, size_t count);
+    const ed_object_t *before, size_t count);
 
 bool ed_undo(ed_level_t *lv, ed_history_t *h);            /* false: nothing to */
 bool ed_redo(ed_level_t *lv, ed_history_t *h);

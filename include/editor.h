@@ -9,7 +9,7 @@
     #define GD_EDITOR_H
 
     #include "mygd.h"
-    #include "editor/ed_select.h"
+    #include "editor/ed_props.h"
 
 /* The screen's layout, UI pixels (FEATURES 11.2). */
     #define ED_TOOLBAR_H 80.0f
@@ -92,6 +92,17 @@ void editor_mouse_release(editor_t *ed, gd_t *gd);
 bool editor_mouse_cancel(editor_t *ed);      /* false: nothing to cancel */
 rect_t editor_box(editor_t *ed, gd_t *gd);   /* the selection box, world */
 void editor_notice(editor_t *ed, const char *what);
+
+/* editor_draw.c: shared with the panel */
+void editor_fill(gd_t *gd, editor_t *ed, sfFloatRect r, sfColor c,
+    sfColor outline);
+void editor_label(editor_t *ed, gd_t *gd, const char *s, float x, float y,
+    unsigned int size, sfColor c);
+
+/* editor_panel.c: the selection's properties, over the canvas's corner */
+bool editor_panel_holds(editor_t *ed, sfVector2f at);
+void editor_panel_click(editor_t *ed, sfVector2f at);
+void editor_panel_draw(editor_t *ed, gd_t *gd);
 
 /* editor_canvas.c */
 void editor_apply_camera(editor_t *ed, gd_t *gd);

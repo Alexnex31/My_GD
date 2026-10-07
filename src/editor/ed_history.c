@@ -92,8 +92,9 @@ static void keep_object(ed_cmd_t *c, const ed_object_t *o, size_t at)
         c->objs = grown(c->objs, c->count, c->cap, sizeof(ed_object_t));
         c->at = grown(c->at, c->count, c->cap, sizeof(size_t));
     }
-    c->objs[c->count] = (ed_object_t){.id = o->id, .obj = o->obj,
-        .extra = o->extra != NULL ? sim_xstrdup(o->extra) : NULL};
+    c->objs[c->count] = *o;
+    c->objs[c->count].selected = false;
+    c->objs[c->count].extra = o->extra != NULL ? sim_xstrdup(o->extra) : NULL;
     c->at[c->count] = at;
     c->count += 1;
 }
@@ -101,7 +102,14 @@ static void keep_object(ed_cmd_t *c, const ed_object_t *o, size_t at)
 int ed_do_add(ed_level_t *lv, ed_history_t *h, const object_t *obj,
     const char *extra)
 {
-    int id = ed_add(lv, obj, extra);
+    ed_object_t o = {.obj = *obj, .extra = (char *)extra};
+
+    return ed_do_add_object(lv, h, &o);
+}
+
+int ed_do_add_object(ed_level_t *lv, ed_history_t *h, const ed_object_t *o)
+{
+    int id = ed_add_object(lv, o);
 
     keep_object(record(h, ED_ADD), &lv->objects[lv->count - 1], lv->count - 1);
     return id;
@@ -120,27 +128,27 @@ bool ed_do_remove(ed_level_t *lv, ed_history_t *h, int id)
 bool ed_do_place(ed_level_t *lv, ed_history_t *h, const ed_entry_t *e,
     vec2_t at, double grid)
 {
-    object_t o;
+    ed_object_t o;
 
     if (!ed_place_object(lv, e, at, grid, &o))
         return false;
-    ed_do_add(lv, h, &o, NULL);
+    ed_do_add_object(lv, h, &o);
     return true;
 }
 
 void ed_do_change(ed_level_t *lv, ed_history_t *h, const int *ids,
-    const object_t *before, size_t count)
+    const ed_object_t *before, size_t count)
 {
     ed_cmd_t *c = record(h, ED_CHANGE);
 
     c->count = count;
     c->ids = sim_xcalloc(count + 1, sizeof(int));
-    c->before = sim_xcalloc(count + 1, sizeof(object_t));
-    c->after = sim_xcalloc(count + 1, sizeof(object_t));
+    c->before = sim_xcalloc(count + 1, sizeof(ed_object_t));
+    c->after = sim_xcalloc(count + 1, sizeof(ed_object_t));
     for (size_t i = 0; i < count; i++) {
         c->ids[i] = ids[i];
         c->before[i] = before[i];
-        c->after[i] = ed_find(lv, ids[i])->obj;
+        c->after[i] = *ed_find(lv, ids[i]);
     }
     lv->dirty = true;
 }
@@ -175,8 +183,13 @@ static void apply(ed_level_t *lv, const ed_cmd_t *c, bool forward)
         put_back(lv, c);
     if (c->kind != ED_CHANGE)
         return;
-    for (size_t i = 0; i < c->count; i++)
-        ed_find(lv, c->ids[i])->obj = forward ? c->after[i] : c->before[i];
+    for (size_t i = 0; i < c->count; i++) {
+        const ed_object_t *to = forward ? &c->after[i] : &c->before[i];
+        ed_object_t *o = ed_find(lv, c->ids[i]);
+
+        o->obj = to->obj;
+        o->start = to->start;
+    }
     lv->dirty = true;
 }
 

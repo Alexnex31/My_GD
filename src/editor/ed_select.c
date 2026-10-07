@@ -79,11 +79,11 @@ void ed_grab(ed_level_t *lv, ed_grab_t *g)
     size_t n = ed_selected(lv);
 
     *g = (ed_grab_t){.ids = sim_xcalloc(n + 1, sizeof(int)),
-        .before = sim_xcalloc(n + 1, sizeof(object_t))};
+        .before = sim_xcalloc(n + 1, sizeof(ed_object_t))};
     for (size_t i = 0; i < lv->count; i++)
         if (lv->objects[i].selected) {
             g->ids[g->count] = lv->objects[i].id;
-            g->before[g->count] = lv->objects[i].obj;
+            g->before[g->count] = lv->objects[i];
             g->count += 1;
         }
 }
@@ -103,10 +103,11 @@ void ed_grab_move(ed_level_t *lv, const ed_grab_t *g, double dx, double dy)
 
         if (o == NULL)
             continue;
-        o->obj = g->before[i];
+        o->obj = g->before[i].obj;
+        o->start = g->before[i].start;
         o->obj.rect.x += dx;
         o->obj.rect.y += dy;
-        hitbox_for_object(&o->obj);
+        ed_refresh(o);
     }
 }
 
@@ -116,11 +117,19 @@ void ed_grab_cancel(ed_level_t *lv, ed_grab_t *g)
     release(g);
 }
 
+void ed_grab_commit(ed_level_t *lv, ed_history_t *h, ed_grab_t *g)
+{
+    if (g->count > 0)
+        ed_do_change(lv, h, g->ids, g->before, g->count);
+    release(g);
+}
+
 bool ed_grab_drop(ed_level_t *lv, ed_history_t *h, ed_grab_t *g)
 {
     const ed_object_t *first = g->count > 0 ? ed_find(lv, g->ids[0]) : NULL;
-    bool moved = first != NULL && (first->obj.rect.x != g->before[0].rect.x
-        || first->obj.rect.y != g->before[0].rect.y);
+    bool moved = first != NULL
+        && (first->obj.rect.x != g->before[0].obj.rect.x
+        || first->obj.rect.y != g->before[0].obj.rect.y);
 
     if (moved)
         ed_do_change(lv, h, g->ids, g->before, g->count);
@@ -145,9 +154,8 @@ double ed_snap_delta(double travel, double grid)
 void ed_clip_free(ed_clip_t *clip)
 {
     for (size_t i = 0; i < clip->count; i++)
-        free(clip->extras[i]);
+        free(clip->objs[i].extra);
     free(clip->objs);
-    free(clip->extras);
     *clip = (ed_clip_t){0};
 }
 
@@ -159,17 +167,16 @@ bool ed_copy(const ed_level_t *lv, ed_clip_t *clip)
     if (n == 0)
         return false;
     ed_clip_free(clip);
-    clip->objs = sim_xcalloc(n, sizeof(object_t));
-    clip->extras = sim_xcalloc(n, sizeof(char *));
+    clip->objs = sim_xcalloc(n, sizeof(ed_object_t));
     clip->corner = (vec2_t){INFINITY, INFINITY};
     for (size_t i = 0; i < lv->count; i++) {
         const ed_object_t *o = &lv->objects[i];
 
         if (!o->selected)
             continue;
-        clip->objs[clip->count] = o->obj;
-        clip->extras[clip->count] = o->extra != NULL ? sim_xstrdup(o->extra)
-            : NULL;
+        clip->objs[clip->count] = *o;
+        clip->objs[clip->count].extra = o->extra != NULL
+            ? sim_xstrdup(o->extra) : NULL;
         clip->corner.x = fmin(clip->corner.x, o->obj.rect.x);
         clip->corner.y = fmin(clip->corner.y, o->obj.rect.y);
         clip->count += 1;
@@ -182,12 +189,12 @@ static bool paste_moved(ed_level_t *lv, ed_history_t *h, const ed_clip_t *clip,
 {
     select_every(lv, false);
     for (size_t i = 0; i < clip->count; i++) {
-        object_t o = clip->objs[i];
+        ed_object_t o = clip->objs[i];
 
-        o.rect.x += dx;
-        o.rect.y += dy;
-        hitbox_for_object(&o);
-        ed_do_add(lv, h, &o, clip->extras[i]);
+        o.obj.rect.x += dx;
+        o.obj.rect.y += dy;
+        ed_refresh(&o);
+        ed_do_add_object(lv, h, &o);
         lv->objects[lv->count - 1].selected = true;
     }
     return clip->count > 0;

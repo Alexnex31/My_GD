@@ -36,7 +36,7 @@ static span_t visible(const editor_t *ed)
         ed->cam.y + h};
 }
 
-static void fill(gd_t *gd, editor_t *ed, sfFloatRect r, sfColor c,
+void editor_fill(gd_t *gd, editor_t *ed, sfFloatRect r, sfColor c,
     sfColor outline)
 {
     sfRectangleShape_setPosition(ed->box, (sfVector2f){r.left, r.top});
@@ -99,6 +99,8 @@ static void draw_objects(editor_t *ed, gd_t *gd, span_t v)
         const object_t *o = &ed->lv.objects[i].obj;
         rect_t d = object_drawn_bounds(o);
 
+        if (ed->lv.objects[i].is_start)
+            continue;
         if (d.x > v.right || d.x + d.w < v.left || d.y > v.bottom
             || d.y + d.h < v.top)
             continue;
@@ -153,7 +155,7 @@ static void draw_selection(editor_t *ed, gd_t *gd)
     draw_vertex_array(gd, ed->objects[0], NULL);
     draw_vertex_array(gd, ed->lines, NULL);
     if (ed->mouse == ED_BOXING)
-        fill(gd, ed, (sfFloatRect){(float)box.x, (float)box.y, (float)box.w,
+        editor_fill(gd, ed, (sfFloatRect){(float)box.x, (float)box.y, (float)box.w,
             (float)box.h}, (sfColor){90, 255, 140, 30}, SELECTED);
 }
 
@@ -176,13 +178,25 @@ static void draw_start(editor_t *ed, gd_t *gd, const level_start_t *st,
     draw_sprite(gd, ed->marker, NULL);
 }
 
+/* A start position: the icon it starts as, in a blue frame, so it is never
+** taken for the real start or for a block. */
+static void draw_start_object(editor_t *ed, gd_t *gd, const ed_object_t *o)
+{
+    rect_t r = o->obj.rect;
+
+    draw_start(ed, gd, &o->start, (sfColor){255, 255, 255, 200});
+    editor_fill(gd, ed, (sfFloatRect){(float)r.x + 3.0f, (float)r.y + 3.0f,
+        (float)r.w - 6.0f, (float)r.h - 6.0f}, (sfColor){80, 170, 255, 40},
+        (sfColor){80, 170, 255, 255});
+}
+
 static void draw_canvas(editor_t *ed, gd_t *gd)
 {
     span_t v = visible(ed);
     vec2_t at = editor_mouse_world(ed, gd);
 
     if (v.bottom > GROUND_Y)
-        fill(gd, ed, (sfFloatRect){(float)v.left, (float)GROUND_Y,
+        editor_fill(gd, ed, (sfFloatRect){(float)v.left, (float)GROUND_Y,
             (float)(v.right - v.left), (float)(v.bottom - GROUND_Y)},
             UNDERGROUND, sfTransparent);
     sfVertexArray_clear(ed->lines);
@@ -191,17 +205,18 @@ static void draw_canvas(editor_t *ed, gd_t *gd)
     draw_vertex_array(gd, ed->lines, NULL);
     draw_objects(ed, gd, v);
     draw_start(ed, gd, &ed->lv.hdr.start, (sfColor){255, 255, 255, 150});
-    for (size_t i = 0; i < ed->lv.nb_starts; i++)
-        draw_start(ed, gd, &ed->lv.starts[i], (sfColor){120, 220, 255, 150});
+    for (size_t i = 0; i < ed->lv.count; i++)
+        if (ed->lv.objects[i].is_start)
+            draw_start_object(ed, gd, &ed->lv.objects[i]);
     draw_selection(ed, gd);
     if (editor_mouse_on_canvas(gd) && ed->tool == ED_TOOL_PLACE
         && ed->mouse != ED_PANNING)
-        fill(gd, ed, (sfFloatRect){(float)ed_snap(at.x, ed->grid),
+        editor_fill(gd, ed, (sfFloatRect){(float)ed_snap(at.x, ed->grid),
             (float)ed_snap(at.y, ed->grid), 100.0f, 100.0f},
             (sfColor){255, 255, 255, 25}, (sfColor){255, 255, 255, 160});
 }
 
-static void label(editor_t *ed, gd_t *gd, const char *s, float x, float y,
+void editor_label(editor_t *ed, gd_t *gd, const char *s, float x, float y,
     unsigned int size, sfColor c)
 {
     sfText_setString(ed->text, s);
@@ -216,19 +231,19 @@ static void draw_palette(editor_t *ed, gd_t *gd)
 {
     char row[48];
 
-    fill(gd, ed, (sfFloatRect){0.0f, ED_TOOLBAR_H, ED_PALETTE_W,
+    editor_fill(gd, ed, (sfFloatRect){0.0f, ED_TOOLBAR_H, ED_PALETTE_W,
         VIEW_H - ED_TOOLBAR_H}, PANEL_FILL, sfTransparent);
     for (int i = 0; i < ed->nb_entries; i++) {
         float y = ED_TOOLBAR_H + 10.0f + 40.0f * (float)i;
 
         if (i == ed->entry)
-            fill(gd, ed, (sfFloatRect){6.0f, y, ED_PALETTE_W - 12.0f, 36.0f},
+            editor_fill(gd, ed, (sfFloatRect){6.0f, y, ED_PALETTE_W - 12.0f, 36.0f},
                 PICKED, sfTransparent);
         if (i < 9)
             snprintf(row, sizeof(row), "%d  %s", i + 1, ed->entries[i].label);
         else
             snprintf(row, sizeof(row), "    %s", ed->entries[i].label);
-        label(ed, gd, row, 14.0f, y + 6.0f, 20, sfWhite);
+        editor_label(ed, gd, row, 14.0f, y + 6.0f, 20, sfWhite);
     }
 }
 
@@ -237,30 +252,30 @@ static void draw_toolbar(editor_t *ed, gd_t *gd)
     static const char *const HELP[] = {
         "PLACE (Tab: select)   Left: place   Right: delete   1-9: entry",
         "SELECT (Tab: place)   Click, Shift+click, box   Drag or arrows: "
-        "move   ZQSD: a block   Del   Ctrl+A C V D",
+        "move   ZQSD: a block   R: turn   Del   Ctrl+A C V D",
     };
     char text[320];
 
-    fill(gd, ed, (sfFloatRect){0.0f, 0.0f, VIEW_W, ED_TOOLBAR_H}, PANEL_FILL,
+    editor_fill(gd, ed, (sfFloatRect){0.0f, 0.0f, VIEW_W, ED_TOOLBAR_H}, PANEL_FILL,
         sfTransparent);
     snprintf(text, sizeof(text), "%s%s   -   level %s   -   %zu objects, "
         "%zu selected   -   Grid %.0f   -   Zoom %.0f%%", ed->lv.hdr.name,
         ed->lv.dirty ? " *" : "", ed->lv.id, ed->lv.count,
         ed_selected(&ed->lv), ed->grid, 100.0f / ed->zoom);
-    label(ed, gd, text, 20.0f, 8.0f, 28, sfWhite);
+    editor_label(ed, gd, text, 20.0f, 8.0f, 28, sfWhite);
     snprintf(text, sizeof(text), "%s   Ctrl+Z / Ctrl+Y: undo, redo   Wheel, "
         "Ctrl+wheel, middle: view   G: grid   Ctrl+S: save   Esc",
         HELP[ed->tool]);
-    label(ed, gd, text, 20.0f, 48.0f, 18, (sfColor){180, 190, 210, 255});
+    editor_label(ed, gd, text, 20.0f, 48.0f, 18, (sfColor){180, 190, 210, 255});
     if (ui_now_ms() < ed->notice_until_ms)
-        label(ed, gd, ed->notice, ED_PALETTE_W + 30.0f, VIEW_H - 60.0f, 30,
+        editor_label(ed, gd, ed->notice, ED_PALETTE_W + 30.0f, VIEW_H - 60.0f, 30,
             (sfColor){255, 230, 120, 255});
 }
 
 void editor_draw(editor_t *ed, gd_t *gd)
 {
     sfRenderWindow_setView(gd->w, gd->ui_view);
-    fill(gd, ed, (sfFloatRect){ED_PALETTE_W, ED_TOOLBAR_H, ED_CANVAS_W,
+    editor_fill(gd, ed, (sfFloatRect){ED_PALETTE_W, ED_TOOLBAR_H, ED_CANVAS_W,
         ED_CANVAS_H}, CANVAS, sfTransparent);
     editor_apply_camera(ed, gd);
     sfRenderWindow_setView(gd->w, ed->view);
@@ -268,4 +283,5 @@ void editor_draw(editor_t *ed, gd_t *gd)
     sfRenderWindow_setView(gd->w, gd->ui_view);
     draw_palette(ed, gd);
     draw_toolbar(ed, gd);
+    editor_panel_draw(ed, gd);
 }

@@ -73,14 +73,20 @@ void editor_mouse_press(editor_t *ed, gd_t *gd, const sfEvent *ev)
 {
     sfVector2i px = {ev->mouseButton.x, ev->mouseButton.y};
     sfMouseButton b = ev->mouseButton.button;
+    sfVector2f ui = sfRenderWindow_mapPixelToCoords(gd->w, px, gd->ui_view);
 
-    if (!editor_mouse_on_canvas(gd)) {
+    ed_gesture(&ed->hist);
+    if (editor_panel_holds(ed, ui)) {        /* it is over the canvas */
         if (b == sfMouseLeft)
-            palette_click(ed, sfRenderWindow_mapPixelToCoords(gd->w, px,
-                gd->ui_view));
+            editor_panel_click(ed, ui);
+        ed->measured = false;
         return;
     }
-    ed_gesture(&ed->hist);
+    if (!editor_mouse_on_canvas(gd)) {
+        if (b == sfMouseLeft)
+            palette_click(ed, ui);
+        return;
+    }
     ed->press_px = px;
     if (b == sfMouseMiddle
         || (b == sfMouseLeft && sfKeyboard_isKeyPressed(sfKeySpace)))

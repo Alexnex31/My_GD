@@ -12,6 +12,8 @@
 
 #include "editor/ed_level.h"
 #include "sim/alloc.h"
+#include "sim/constants.h"
+#include "sim/hitbox.h"
 #include "sim/modes.h"
 #include "sim/sim.h"
 
@@ -28,7 +30,6 @@ void ed_level_free(ed_level_t *lv)
     for (size_t i = 0; i < lv->count; i++)
         free(lv->objects[i].extra);
     free(lv->objects);
-    free(lv->starts);
     *lv = (ed_level_t){0};
 }
 
@@ -46,15 +47,55 @@ static void make_room(ed_level_t *lv)
     lv->objects = bigger;
 }
 
-int ed_add(ed_level_t *lv, const object_t *obj, const char *extra)
+/* Everything of an object but its id and whether it is selected. */
+static void copy_into(ed_object_t *dst, const ed_object_t *src, int id)
+{
+    *dst = (ed_object_t){.id = id, .obj = src->obj,
+        .extra = src->extra != NULL ? sim_xstrdup(src->extra) : NULL,
+        .is_start = src->is_start, .start = src->start};
+}
+
+int ed_add_object(ed_level_t *lv, const ed_object_t *src)
 {
     make_room(lv);
-    lv->objects[lv->count] = (ed_object_t){.id = lv->next_id, .obj = *obj,
-        .extra = extra != NULL ? sim_xstrdup(extra) : NULL};
+    copy_into(&lv->objects[lv->count], src, lv->next_id);
     lv->count += 1;
     lv->next_id += 1;
     lv->dirty = true;
     return lv->next_id - 1;
+}
+
+int ed_add(ed_level_t *lv, const object_t *obj, const char *extra)
+{
+    ed_object_t o = {.obj = *obj, .extra = (char *)extra};
+
+    return ed_add_object(lv, &o);
+}
+
+void ed_refresh(ed_object_t *o)
+{
+    hitbox_for_object(&o->obj);
+    if (o->is_start)
+        o->start.pos = (vec2_t){o->obj.rect.x + o->obj.rect.w / 2.0,
+            o->obj.rect.y + o->obj.rect.h / 2.0};
+}
+
+/* Shown and clicked as one cell of 100 px around where the player starts. */
+void ed_start_object(ed_object_t *out, const level_start_t *st)
+{
+    *out = (ed_object_t){.is_start = true, .start = *st};
+    out->obj = (object_t){.type = OBJ_BLOCK, .size = 2,
+        .rect = {st->pos.x - UNIT, st->pos.y - UNIT, 2.0 * UNIT, 2.0 * UNIT}};
+    hitbox_for_object(&out->obj);
+}
+
+size_t ed_starts(const ed_level_t *lv)
+{
+    size_t n = 0;
+
+    for (size_t i = 0; i < lv->count; i++)
+        n += lv->objects[i].is_start;
+    return n;
 }
 
 void ed_insert(ed_level_t *lv, const ed_object_t *o, size_t at)
@@ -63,8 +104,7 @@ void ed_insert(ed_level_t *lv, const ed_object_t *o, size_t at)
     at = at > lv->count ? lv->count : at;
     memmove(&lv->objects[at + 1], &lv->objects[at],
         (lv->count - at) * sizeof(ed_object_t));
-    lv->objects[at] = (ed_object_t){.id = o->id, .obj = o->obj,
-        .extra = o->extra != NULL ? sim_xstrdup(o->extra) : NULL};
+    copy_into(&lv->objects[at], o, o->id);
     lv->count += 1;
     lv->next_id = o->id >= lv->next_id ? o->id + 1 : lv->next_id;
     lv->dirty = true;
@@ -97,6 +137,7 @@ bool ed_remove(ed_level_t *lv, int id)
 void ed_level_from_text(ed_level_t *lv, const char *buf, size_t len,
     const char *id)
 {
+    ed_object_t start;
     level_doc_t doc;
 
     *lv = (ed_level_t){.next_id = 1};
@@ -105,9 +146,10 @@ void ed_level_from_text(ed_level_t *lv, const char *buf, size_t len,
     level_parse_doc(buf, len, id, &doc, &lv->hdr, NULL);
     for (size_t i = 0; i < doc.count; i++)
         ed_add(lv, &doc.objs[i], doc.extras[i]);
-    lv->starts = doc.starts;
-    lv->nb_starts = doc.nb_starts;
-    doc.starts = NULL;
+    for (size_t i = 0; i < doc.nb_starts; i++) {
+        ed_start_object(&start, &doc.starts[i]);
+        ed_add_object(lv, &start);
+    }
     level_doc_free(&doc);
     lv->dirty = false;
 }
@@ -148,19 +190,28 @@ int ed_level_open(ed_level_t *lv, const char *path)
     return 0;
 }
 
-/* Arrays of its own, pointing at nothing of the level's but the extras. */
+/*
+** Arrays of its own, pointing at nothing of the level's but the extras. The
+** start positions leave the objects here: the game never meets one (11.8).
+*/
 void ed_level_doc(const ed_level_t *lv, level_doc_t *doc)
 {
-    *doc = (level_doc_t){.count = lv->count, .nb_starts = lv->nb_starts};
+    *doc = (level_doc_t){0};
     doc->objs = sim_xcalloc(lv->count + 1, sizeof(object_t));
     doc->extras = sim_xcalloc(lv->count + 1, sizeof(char *));
-    doc->starts = sim_xcalloc(lv->nb_starts + 1, sizeof(level_start_t));
+    doc->starts = sim_xcalloc(lv->count + 1, sizeof(level_start_t));
     for (size_t i = 0; i < lv->count; i++) {
-        doc->objs[i] = lv->objects[i].obj;
-        doc->extras[i] = lv->objects[i].extra;
+        const ed_object_t *o = &lv->objects[i];
+
+        if (o->is_start) {
+            doc->starts[doc->nb_starts] = o->start;
+            doc->nb_starts += 1;
+            continue;
+        }
+        doc->objs[doc->count] = o->obj;
+        doc->extras[doc->count] = o->extra;
+        doc->count += 1;
     }
-    if (lv->nb_starts > 0)
-        memcpy(doc->starts, lv->starts, lv->nb_starts * sizeof(level_start_t));
 }
 
 void ed_doc_free(level_doc_t *doc)
@@ -244,8 +295,11 @@ int ed_hit(const ed_level_t *lv, vec2_t at)
     for (size_t i = 0; i < lv->count; i++) {
         const ed_object_t *o = &lv->objects[i];
 
-        if (rect_holds(&o->obj, at)
-            && (top == NULL || drawn_over(&o->obj, &top->obj)))
+        if (!rect_holds(&o->obj, at))
+            continue;
+        if (top == NULL || (o->is_start && !top->is_start)
+            || (o->is_start == top->is_start
+            && drawn_over(&o->obj, &top->obj)))
             top = o;
     }
     return top != NULL ? top->id : -1;
@@ -281,12 +335,19 @@ int ed_entries(ed_entry_t *out, int max)
     for (int k = 0; k < LAUNCH_KIND_COUNT; k++)
         if (LAUNCHES[k].orb_v != 0.0)
             entry(out, &n, max, OBJ_ORB, LAUNCHES[k].name);
+    if (n < max) {
+        out[n] = (ed_entry_t){.start = true, .label = "start position"};
+        n += 1;
+    }
     return n;
 }
 
-static bool same_object(const object_t *a, const object_t *b)
+static bool same_object(const ed_object_t *ea, const ed_object_t *eb)
 {
-    return a->type == b->type && a->rect.x == b->rect.x
+    const object_t *a = &ea->obj;
+    const object_t *b = &eb->obj;
+
+    return ea->is_start == eb->is_start && a->type == b->type && a->rect.x == b->rect.x
         && a->rect.y == b->rect.y && a->rect.w == b->rect.w
         && a->rect.h == b->rect.h && a->rotation == b->rotation
         && a->portal_mode == b->portal_mode
@@ -296,28 +357,33 @@ static bool same_object(const object_t *a, const object_t *b)
 /* The object is made by the loader from its line: what is placed is what
 ** the game will read back. */
 bool ed_place_object(const ed_level_t *lv, const ed_entry_t *e, vec2_t at,
-    double grid, object_t *out)
+    double grid, ed_object_t *out)
 {
+    level_start_t st = {.speed_mult = 1.0, .gravity_dir = 1,
+        .pos = {ed_snap(at.x, grid) + UNIT, ed_snap(at.y, grid) + UNIT}};
     char line[128];
 
+    *out = (ed_object_t){0};
+    if (e->start)
+        ed_start_object(out, &st);
     snprintf(line, sizeof(line), "%s %.10g %.10g 2%s%s",
         obj_type_name(e->type), ed_snap(at.x, grid), ed_snap(at.y, grid),
         e->word != NULL ? " " : "", e->word != NULL ? e->word : "");
-    if (level_object_from_line(line, out) != 0)
+    if (!e->start && level_object_from_line(line, &out->obj) != 0)
         return false;
     for (size_t i = 0; i < lv->count; i++)
-        if (same_object(&lv->objects[i].obj, out))
+        if (same_object(&lv->objects[i], out))
             return false;
     return true;
 }
 
 bool ed_place(ed_level_t *lv, const ed_entry_t *e, vec2_t at, double grid)
 {
-    object_t o;
+    ed_object_t o;
 
     if (!ed_place_object(lv, e, at, grid, &o))
         return false;
-    ed_add(lv, &o, NULL);
+    ed_add_object(lv, &o);
     return true;
 }
 

@@ -27,7 +27,7 @@ bool ed_delete_selected(ed_level_t *lv, ed_history_t *h);
 */
 typedef struct ed_grab {
     int *ids;
-    object_t *before;
+    ed_object_t *before;
     size_t count;
 } ed_grab_t;
 
@@ -35,6 +35,8 @@ void ed_grab(ed_level_t *lv, ed_grab_t *g);
 void ed_grab_move(ed_level_t *lv, const ed_grab_t *g, double dx, double dy);
 bool ed_grab_drop(ed_level_t *lv, ed_history_t *h, ed_grab_t *g);  /* moved? */
 void ed_grab_cancel(ed_level_t *lv, ed_grab_t *g);
+/* Whatever was done to the grabbed objects since is one command. */
+void ed_grab_commit(ed_level_t *lv, ed_history_t *h, ed_grab_t *g);
 /* Grab, move, drop: an arrow key. false with nothing selected. */
 bool ed_nudge(ed_level_t *lv, ed_history_t *h, double dx, double dy);
 
@@ -47,8 +49,7 @@ double ed_snap_delta(double travel, double grid);
 
 /* Copies of the selection, to paste here or in another level. */
 typedef struct ed_clip {
-    object_t *objs;
-    char **extras;
+    ed_object_t *objs;        /* with their kept fields, its own copies */
     size_t count;
     vec2_t corner;            /* the top left of all of them */
 } ed_clip_t;

@@ -24,6 +24,8 @@ typedef struct ed_object {
     object_t obj;             /* the sim's own struct, hitbox included        */
     char *extra;              /* fields nothing here edits, saved unchanged   */
     bool selected;
+    bool is_start;            /* a start position (11.8), not a level object: */
+    level_start_t start;      /* obj is then only the cell it is shown in     */
 } ed_object_t;
 
 typedef struct ed_level {
@@ -32,8 +34,6 @@ typedef struct ed_level {
     ed_object_t *objects;
     size_t count;
     size_t cap;
-    level_start_t *starts;    /* the other start positions, as loaded (11.8)  */
-    size_t nb_starts;
     int next_id;
     bool dirty;               /* changed since it was opened or saved         */
 } ed_level_t;
@@ -41,6 +41,7 @@ typedef struct ed_level {
 /* One thing the palette can place: a type and the word its line needs. */
 typedef struct ed_entry {
     obj_type_t type;
+    bool start;               /* a start position: type and word unused       */
     const char *word;         /* "ship", "up", "yellow"..., or NULL           */
     char label[32];           /* what the palette shows: "portal ship"        */
 } ed_entry_t;
@@ -63,6 +64,14 @@ void ed_doc_free(level_doc_t *doc);
 void ed_level_measure(const ed_level_t *lv, double *end_x, double *kill_y);
 
 int ed_add(ed_level_t *lv, const object_t *obj, const char *extra);  /* its id */
+/* A copy of any editor object, start positions included, under a new id. */
+int ed_add_object(ed_level_t *lv, const ed_object_t *src);
+/* A start position as an editor object: a cell around the player's center. */
+void ed_start_object(ed_object_t *out, const level_start_t *st);
+/* After its rect, turn or kind changed: the hitbox, a start's position. */
+void ed_refresh(ed_object_t *o);
+size_t ed_starts(const ed_level_t *lv);
+
 bool ed_remove(ed_level_t *lv, int id);
 ed_object_t *ed_find(ed_level_t *lv, int id);
 /* Puts an object back where it was, with the id it had: an undo (11.7). */
@@ -82,7 +91,7 @@ int ed_entries(ed_entry_t *out, int max);
 bool ed_place(ed_level_t *lv, const ed_entry_t *e, vec2_t at, double grid);
 /* The object that would be placed, without placing it; false as above. */
 bool ed_place_object(const ed_level_t *lv, const ed_entry_t *e, vec2_t at,
-    double grid, object_t *out);
+    double grid, ed_object_t *out);
 
 /* The id a new level takes: one past the highest of those that exist. */
 void ed_next_id(const char *const *ids, size_t count, char *out, size_t size);
