@@ -190,6 +190,23 @@ static void draw_start_object(editor_t *ed, gd_t *gd, const ed_object_t *o)
         (sfColor){80, 170, 255, 255});
 }
 
+/*
+** Where the last playtest went, until the level is edited: where the jumps
+** were and how close the hazards came (11.9).
+*/
+static void draw_path(editor_t *ed, gd_t *gd)
+{
+    static const sfColor PATH = {255, 230, 120, 255};
+
+    if (ed->trace_len < 2 || ed->trace_edits != ed->hist.edits)
+        return;
+    sfVertexArray_clear(ed->lines);
+    for (size_t i = 1; i < ed->trace_len; i++)
+        line(ed, ed->trace[i - 1].x, ed->trace[i - 1].y, ed->trace[i].x,
+            ed->trace[i].y, PATH);
+    draw_vertex_array(gd, ed->lines, NULL);
+}
+
 static void draw_canvas(editor_t *ed, gd_t *gd)
 {
     span_t v = visible(ed);
@@ -208,6 +225,7 @@ static void draw_canvas(editor_t *ed, gd_t *gd)
     for (size_t i = 0; i < ed->lv.count; i++)
         if (ed->lv.objects[i].is_start)
             draw_start_object(ed, gd, &ed->lv.objects[i]);
+    draw_path(ed, gd);
     draw_selection(ed, gd);
     if (editor_mouse_on_canvas(gd) && ed->tool == ED_TOOL_PLACE
         && ed->mouse != ED_PANNING)
@@ -264,7 +282,7 @@ static void draw_toolbar(editor_t *ed, gd_t *gd)
         ed_selected(&ed->lv), ed->grid, 100.0f / ed->zoom);
     editor_label(ed, gd, text, 20.0f, 8.0f, 28, sfWhite);
     snprintf(text, sizeof(text), "%s   Ctrl+Z / Ctrl+Y: undo, redo   Wheel, "
-        "Ctrl+wheel, middle: view   G: grid   Ctrl+S: save   Esc",
+        "Ctrl+wheel, middle: view   G: grid   Enter: play   Ctrl+S   Esc",
         HELP[ed->tool]);
     editor_label(ed, gd, text, 20.0f, 48.0f, 18, (sfColor){180, 190, 210, 255});
     if (ui_now_ms() < ed->notice_until_ms)
@@ -274,6 +292,8 @@ static void draw_toolbar(editor_t *ed, gd_t *gd)
 
 void editor_draw(editor_t *ed, gd_t *gd)
 {
+    if (ed->play != NULL)
+        return level_frame(gd, ed->play);    /* its ticks, then its picture */
     sfRenderWindow_setView(gd->w, gd->ui_view);
     editor_fill(gd, ed, (sfFloatRect){ED_PALETTE_W, ED_TOOLBAR_H, ED_CANVAS_W,
         ED_CANVAS_H}, CANVAS, sfTransparent);

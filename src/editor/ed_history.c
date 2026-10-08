@@ -65,6 +65,7 @@ static ed_cmd_t *record(ed_history_t *h, ed_cmd_kind_t kind)
     ed_cmd_t *top = h->nb_undo > 0 ? &h->undo[h->nb_undo - 1] : NULL;
 
     clear(h->redo, &h->nb_redo);
+    h->edits += 1;
     if (top != NULL && kind != ED_CHANGE && top->kind == kind
         && top->gesture == h->gesture)
         return top;
@@ -207,10 +208,12 @@ static bool step(ed_level_t *lv, ed_cmd_t *from, size_t *nb_from, ed_cmd_t *to,
 
 bool ed_undo(ed_level_t *lv, ed_history_t *h)
 {
+    h->edits += 1;
     return step(lv, h->undo, &h->nb_undo, h->redo, &h->nb_redo, false);
 }
 
 bool ed_redo(ed_level_t *lv, ed_history_t *h)
 {
+    h->edits += 1;
     return step(lv, h->redo, &h->nb_redo, h->undo, &h->nb_undo, true);
 }

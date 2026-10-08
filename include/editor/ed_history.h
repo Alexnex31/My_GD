@@ -42,6 +42,8 @@ typedef struct ed_history {
     ed_cmd_t redo[ED_HISTORY_MAX];
     size_t nb_redo;
     int gesture;
+    unsigned int edits;       /* goes up at each change: what was computed
+                                 from the level before is then out of date */
 } ed_history_t;
 
 /* A new action of the user's begins: a press, a key. */

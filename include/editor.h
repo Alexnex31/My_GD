@@ -54,6 +54,10 @@ typedef struct editor {
     sfVector2i press_px;          /* where the left button went down         */
     vec2_t press_at;              /* the same, in the world                  */
     int press_id;                 /* the object it went down on              */
+    level_t *play;                /* the playtest, while it runs (11.9)      */
+    vec2_t *trace;                /* where the last playtest went            */
+    size_t trace_len;
+    unsigned int trace_edits;     /* the level's edit count it was made at   */
     sfKeyEvent repeat;            /* the held key that repeats, if any       */
     bool repeating;
     int64_t repeat_at_ms;         /* when it acts again                      */
@@ -103,6 +107,11 @@ void editor_label(editor_t *ed, gd_t *gd, const char *s, float x, float y,
 bool editor_panel_holds(editor_t *ed, sfVector2f at);
 void editor_panel_click(editor_t *ed, sfVector2f at);
 void editor_panel_draw(editor_t *ed, gd_t *gd);
+
+/* editor_play.c: the playtest */
+void editor_playtest(editor_t *ed, gd_t *gd, bool from_start_position);
+void editor_play_events(editor_t *ed, gd_t *gd);
+void editor_play_stop(editor_t *ed, gd_t *gd);
 
 /* editor_canvas.c */
 void editor_apply_camera(editor_t *ed, gd_t *gd);

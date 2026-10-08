@@ -56,6 +56,7 @@ void editor_free(editor_t *ed)
     sfText_destroy(ed->text);
     sfSprite_destroy(ed->marker);
     sfView_destroy(ed->view);
+    free(ed->trace);
     ed_history_free(&ed->hist);
     ed_clip_free(&ed->clip);
     ed_grab_cancel(&ed->lv, &ed->grab);
@@ -167,9 +168,12 @@ static void turn_key(editor_t *ed, const sfEvent *ev)
             k == sfKeyRBracket ? 1 : -1);
 }
 
-static void plain_key(editor_t *ed, sfKeyCode k)
+static void plain_key(editor_t *ed, gd_t *gd, sfKeyCode k)
 {
     block_key(ed, k);
+    if (k == sfKeyReturn)
+        return editor_playtest(ed, gd, sfKeyboard_isKeyPressed(sfKeyLShift)
+            || sfKeyboard_isKeyPressed(sfKeyRShift));
     if (k == sfKeyTab)
         ed->tool = ed->tool == ED_TOOL_PLACE ? ED_TOOL_SELECT : ED_TOOL_PLACE;
     if (k == sfKeyDelete || k == sfKeyBackspace)
@@ -210,7 +214,7 @@ static void key_press(editor_t *ed, gd_t *gd, const sfEvent *ev)
     if (k == sfKeyLeft || k == sfKeyRight || k == sfKeyUp || k == sfKeyDown)
         return arrow_key(ed, ev);
     turn_key(ed, ev);
-    plain_key(ed, k);
+    plain_key(ed, gd, k);
 }
 
 /* The keys worth holding: the moves, and going through the history. */
@@ -246,6 +250,8 @@ static void key_repeat(editor_t *ed, gd_t *gd)
 
 void editor_events(editor_t *ed, gd_t *gd)
 {
+    if (ed->play != NULL)
+        return editor_play_events(ed, gd);
     editor_apply_camera(ed, gd);             /* the mouse is read through it */
     while (poll_event(gd)) {
         const sfEvent *ev = gd->event;
