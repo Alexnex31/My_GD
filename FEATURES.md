@@ -1841,6 +1841,14 @@ Show counts in the toolbar; clicking cycles the camera through the flagged objec
 - **The path:** the player's position every fourth tick of the last attempt, drawn as a line on the canvas until the level is edited (the history counts its edits, undo and redo included).
 - **Checked in a window:** playtests from the start and from start positions, A/E in a playtest and in the game, and the progress file after attempts from start positions (one attempt and a best of 18% recorded, from the real start, while the others reached 49% to 90%).
 
+### 11.13f As built: E6
+
+- **The level's panel** (key L, with nothing selected): the same panel as the selection's, with the level's song settings, a minus and a plus each. Song goes through the library and "none"; Offset by 0.05 s (Shift: 1 s); BPM by 1 (Shift: 10); Beat 1, the song time of the first beat, by 0.01 s (Shift: 0.1 s). They are the header's `music`, `music_offset`, `bpm` and `first_beat`, saved with the level. No text field: the steps reach any value. These settings mark the level changed but are **not in the undo history**, which only holds objects.
+- **Where the song is along the level** (`src/editor/ed_music.c`, pure and tested): time and x are converted with the offset the game itself will use (the level's, or else the song's own) and the level's speed, from the level's start. 11.11 wrote it with `PLAYER_SPAWN_X` and the normal speed; this follows `start_x` and `start_speed` too. Speed portals don't exist yet (10.3) and will have to be walked here when they do.
+- **Beat lines:** with a BPM set, a line at every beat in view, every fourth one brighter, beat 0 at `first_beat`. They move as the offset, the BPM or the first beat change.
+- **Hear it** (key P): the song the level will play, from the time the middle of the canvas is reached at; P again stops it and gives the menus their song back. A pink line shows where the song is in the level, and the canvas turns the page when the line reaches its right edge. It stops at the song's end, when the song is changed, and when a playtest starts.
+- **Tests:** `tests/test_edmusic.c` (time to x and back, with an offset, a start x and a speed; beats in view, both ends counted, none between two beats; each setting's steps, limits and what is saved). Whether the lines fall on the beats **you hear** is for you to check on a song whose BPM you know: it can't be judged without sound.
+
 ### 11.14 Stages
 
 | Stage | Contents | Done when |

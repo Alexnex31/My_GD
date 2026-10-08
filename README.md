@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2) and the first five stages of the level editor (11: open a level or make a new one, place, delete, save, select, move, copy, undo, turn, resize, start positions, playtest) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2) and the first six stages of the level editor (11: open a level or make a new one, place, delete, save, select, move, copy, undo, turn, resize, start positions, playtest, the song and its beat lines) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -114,6 +114,8 @@ Two tools, `Tab` switches between them: **Place** and **Select**.
 | Ctrl+wheel | Zoom around the mouse, 25% to 400% |
 | Middle button, or Space and drag | Pan |
 | G | Grid 50 / 25 |
+| L | The level's panel: its song, offset, BPM and first beat (Shift+click: bigger steps) |
+| P | Hear the level's song from the middle of the canvas; again to stop |
 | Enter | Playtest from the level's start |
 | Shift+Enter | Playtest from a start position: the selected one, or the last one before the middle of the canvas |
 | Ctrl+S | Save |
@@ -125,9 +127,11 @@ With something selected, a panel in the canvas's top right corner shows its prop
 
 **Start positions** are the palette's last entry. They are other places to begin an attempt from, for practice: the level's real start doesn't change, and they aren't obstacles. Selected, the panel sets their gamemode, gravity and speed. In the game and in a playtest, **A** and **E** go to the previous and the next one (the level's start is the first of the list) and begin an attempt there. An attempt from a start position still adds to the attempt counter, but records no best and no completion. A short `<1/2>` shows which one it is.
 
+With a BPM set in the level's panel, the canvas shows a line at every beat of the song, every fourth one brighter. While the song plays (P), a pink line shows where it is in the level and the canvas follows it.
+
 A **playtest** plays the level as it is, saved or not, and records nothing. Escape or a death bring the editor back where the player was (the level's end doesn't stop it: the player runs on), with the path of that attempt drawn as a line until the next edit.
 
-The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects sorted by position, comments and blank lines gone. Music tools, verifying with the bot and the rest are the next stages (`FEATURES.md` 11.14).
+The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects sorted by position, comments and blank lines gone. Verifying with the bot, validation and autosave are the next stage (`FEATURES.md` 11.14).
 
 ## Music
 
