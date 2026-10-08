@@ -17,6 +17,8 @@ struct level_doc;
 int sim_init(sim_t *s, const struct level_doc *doc, const level_header_t *hdr,
     const char *id);
 void sim_free(sim_t *s);
+/* An attempt from one of the level's start positions, or its own (11.8). */
+void sim_reset_at(sim_t *s, const level_start_t *start);
 void sim_reset(sim_t *s);                      /* back to spawn, every object live again */
 void sim_tick(sim_t *s, input_t in);           /* advance one fixed tick */
 float sim_percent(const sim_t *s);

@@ -5,6 +5,7 @@
 ** the simulation's run state: reset, tick, snapshots (3.3, 3.4)
 */
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -44,11 +45,47 @@ static bool starts_on_the_floor(const sim_t *s)
     return p->gravity_dir > 0 && feet == GROUND_Y;
 }
 
-/* Every attempt starts here, the first one like every retry (3.4, 7.2). */
-void sim_reset(sim_t *s)
+/*
+** A start position is somewhere along the level: the run is put at the tick
+** that x is reached at its speed, rounded down, so the player stays on the
+** tick grid and the music knows where it is (FEATURES 11.8).
+*/
+static void place_along(sim_t *s, const level_start_t *start)
 {
     run_state_t *st = &s->st;
-    const level_start_t *start = &s->lvl.hdr.start;
+    double step = PER_TICK(SCROLL_SPEED) * start->speed_mult;
+    double ahead = start->pos.x - s->lvl.hdr.start.pos.x;
+
+    if (ahead <= 0.0)
+        return;
+    st->tick = (long)floor(ahead / step);
+    st->distance = (double)st->tick * step;
+    st->player.pos.x = s->lvl.hdr.start.pos.x + st->distance;
+    st->player.prev_pos = st->player.pos;
+}
+
+/* What the run would have gone through before this start has acted. */
+static void spend_what_is_behind(sim_t *s)
+{
+    const player_t *p = &s->st.player;
+    double back = p->pos.x - MODES[p->mode].half;
+
+    for (size_t i = 0; i < s->lvl.nb_objects; i++) {
+        const object_t *o = &s->lvl.objects[i];
+
+        if (OBJ_CATEGORY[o->type] == CAT_INTERACTIVE
+            && o->hitbox.aabb.x + o->hitbox.aabb.w < back)
+            set_spent(&s->st, i);
+    }
+}
+
+/*
+** An attempt from `start`: the level's own, or one of its start positions.
+** Every attempt starts here, the first one like every retry (3.4, 7.2).
+*/
+void sim_reset_at(sim_t *s, const level_start_t *start)
+{
+    run_state_t *st = &s->st;
 
     st->player = start_player(start);
     st->cam = (camera_t){{0.0, 0.0}};
@@ -59,11 +96,20 @@ void sim_reset(sim_t *s)
     st->first_active = 0;
     st->complete = false;
     memset(st->spent, 0, st->spent_words * sizeof(uint64_t));
+    if (start != &s->lvl.hdr.start) {
+        place_along(s, start);
+        spend_what_is_behind(s);
+    }
     if (MODES[start->mode].corridor_height > 0.0)
         corridor_from_center(s, start->pos.y);
     st->player.grounded = starts_on_the_floor(s);
     st->player.can_jump = st->player.grounded;
     st->cam.pos.y = camera_rest_y(&st->player, &st->bounds);
+}
+
+void sim_reset(sim_t *s)
+{
+    sim_reset_at(s, &s->lvl.hdr.start);
 }
 
 /*
