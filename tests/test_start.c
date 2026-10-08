@@ -233,6 +233,52 @@ static void test_reset_returns_to_the_start(void)
     sim_free(&s);
 }
 
+/*
+** A start position (FEATURES 11.8): the attempt begins along the level, on
+** the tick grid, as that mode, and what it would have gone through has acted.
+*/
+static void test_reset_at(void)
+{
+    const char *text = "start 3000 700 ship up\nstart 6000 820 cube 2\n"
+        "pad 1000 750 2 yellow\nblock 1500 750 2\norb 2000 600 2 pink\n"
+        "orb 4000 600 2 pink\nblock 9000 750 2\n";
+    double step = PER_TICK(SCROLL_SPEED);
+    uint64_t plain;
+    sim_t s;
+    long tick;
+
+    load(&s, text);
+    CHECK(warnings == 0 && s.lvl.nb_starts == 2 && s.lvl.nb_objects == 5);
+    plain = sim_state_hash(&s);
+    sim_reset_at(&s, &s.lvl.hdr.start);
+    CHECK(sim_state_hash(&s) == plain);                /* the level's own */
+    sim_reset_at(&s, &s.lvl.starts[0]);
+    tick = (long)floor((3000.0 - PLAYER_SPAWN_X) / step);
+    CHECK(s.st.tick == tick && s.st.distance == (double)tick * step);
+    CHECK(s.st.player.pos.x == PLAYER_SPAWN_X + s.st.distance);
+    CHECK(s.st.player.pos.x <= 3000.0 && s.st.player.pos.x > 3000.0 - step);
+    CHECK(s.st.player.prev_pos.x == s.st.player.pos.x);
+    CHECK(s.st.player.pos.y == 700.0 && s.st.player.mode == MODE_SHIP);
+    CHECK(s.st.player.gravity_dir == -1 && s.st.bounds.active);
+    CHECK(sim_percent(&s) > 20.0 && !s.st.complete && s.st.player.alive);
+    CHECK(is_spent(&s.st, 0) && is_spent(&s.st, 2));   /* the pad, the orb */
+    CHECK(!is_spent(&s.st, 1) && !is_spent(&s.st, 3)); /* a block; the next orb */
+    sim_tick(&s, (input_t){false, false});
+    CHECK(s.st.tick == tick + 1 && s.st.player.alive);
+    CHECK(fabs(s.st.player.pos.x - (PLAYER_SPAWN_X + (tick + 1) * step)) < 1e-6);
+    sim_reset_at(&s, &s.lvl.starts[1]);                /* faster: fewer ticks */
+    CHECK(s.st.tick == (long)floor((6000.0 - PLAYER_SPAWN_X) / (2.0 * step)));
+    CHECK(s.st.speed_mult == 2.0 && s.st.player.vx == 2.0 * step);
+    CHECK(s.st.player.mode == MODE_CUBE && !s.st.bounds.active);
+    CHECK(is_spent(&s.st, 3));
+    for (int i = 0; i < 2000 && !s.st.complete && s.st.player.alive; i++)
+        sim_tick(&s, (input_t){false, false});
+    CHECK(!s.st.player.alive && s.st.player.pos.x > 8900.0);   /* the far block */
+    sim_reset(&s);                                     /* and back: untouched */
+    CHECK(sim_state_hash(&s) == plain && !is_spent(&s.st, 0));
+    sim_free(&s);
+}
+
 void test_start(void)
 {
     test_defaults();
@@ -243,4 +289,5 @@ void test_start(void)
     test_start_speed();
     test_start_size();
     test_reset_returns_to_the_start();
+    test_reset_at();
 }
