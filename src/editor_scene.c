@@ -174,6 +174,10 @@ static void plain_key(editor_t *ed, gd_t *gd, sfKeyCode k)
     if (k == sfKeyReturn)
         return editor_playtest(ed, gd, sfKeyboard_isKeyPressed(sfKeyLShift)
             || sfKeyboard_isKeyPressed(sfKeyRShift));
+    if (k == sfKeyL)
+        ed->level_panel = !ed->level_panel;
+    if (k == sfKeyP)
+        editor_song_toggle(ed, gd);
     if (k == sfKeyTab)
         ed->tool = ed->tool == ED_TOOL_PLACE ? ED_TOOL_SELECT : ED_TOOL_PLACE;
     if (k == sfKeyDelete || k == sfKeyBackspace)
@@ -252,6 +256,7 @@ void editor_events(editor_t *ed, gd_t *gd)
 {
     if (ed->play != NULL)
         return editor_play_events(ed, gd);
+    editor_song_follow(ed, gd);
     editor_apply_camera(ed, gd);             /* the mouse is read through it */
     while (poll_event(gd)) {
         const sfEvent *ev = gd->event;

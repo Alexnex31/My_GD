@@ -18,26 +18,73 @@
 static const sfColor PANEL = {18, 20, 32, 240};
 static const sfColor BUTTON_FILL = {60, 110, 200, 255};
 
-/* The title, then one row per property something selected has. */
+/*
+** The panel is the selection's properties, or with nothing selected and L
+** pressed, the level's own: its song and its beat (11.11). Row k of either:
+*/
+static bool on_level(const editor_t *ed)
+{
+    return ed_selected(&ed->lv) == 0;
+}
+
+static bool row_applies(const editor_t *ed, int k)
+{
+    if (on_level(ed))
+        return k < ED_SONG_PROP_COUNT;
+    return k < ED_PROP_COUNT && ed_prop_applies(&ed->lv, (ed_prop_t)k);
+}
+
+static void row_text(editor_t *ed, gd_t *gd, int k, const char **name,
+    char *value, size_t size)
+{
+    if (on_level(ed)) {
+        *name = ed_song_prop_name((ed_song_prop_t)k);
+        return ed_song_prop_text(&ed->lv, &gd->library, (ed_song_prop_t)k,
+            value, size);
+    }
+    *name = ed_prop_name((ed_prop_t)k);
+    ed_prop_text(&ed->lv, (ed_prop_t)k, value, size);
+}
+
+/* Shift makes a level's step ten or twenty times bigger: 120 BPM is far. */
+static void row_step(editor_t *ed, gd_t *gd, int k, int dir)
+{
+    bool big = sfKeyboard_isKeyPressed(sfKeyLShift)
+        || sfKeyboard_isKeyPressed(sfKeyRShift);
+
+    if (!on_level(ed)) {
+        ed_prop_step(&ed->lv, &ed->hist, (ed_prop_t)k, dir);
+        return;
+    }
+    if (ed_song_prop_step(&ed->lv, &gd->library, (ed_song_prop_t)k, dir, big)
+        && k == ED_SONG_FILE)
+        editor_song_stop(ed, gd);            /* it was another song */
+}
+
+    #define MAX_ROWS ((int)ED_PROP_COUNT > (int)ED_SONG_PROP_COUNT \
+        ? (int)ED_PROP_COUNT : (int)ED_SONG_PROP_COUNT)
+
+/* The title, then one row per property that applies. */
 static int rows(const editor_t *ed)
 {
     int n = 1;
 
-    for (int p = 0; p < ED_PROP_COUNT; p++)
-        n += ed_prop_applies(&ed->lv, (ed_prop_t)p);
+    for (int k = 0; k < MAX_ROWS; k++)
+        n += row_applies(ed, k);
     return n;
 }
 
-bool editor_panel_holds(editor_t *ed, sfVector2f at)
+bool editor_panel_holds(editor_t *ed, gd_t *gd, sfVector2f at)
 {
-    if (ed_selected(&ed->lv) == 0)
+    (void)gd;
+    if (on_level(ed) && !ed->level_panel)
         return false;
     return at.x >= PANEL_X && at.x < PANEL_X + PANEL_W && at.y >= PANEL_Y
         && at.y < PANEL_Y + ROW_H * (float)rows(ed) + 10.0f;
 }
 
-/* The minus and the plus of the row clicked: one step, one command. */
-void editor_panel_click(editor_t *ed, sfVector2f at)
+/* The minus and the plus of the row clicked: one step. */
+void editor_panel_click(editor_t *ed, gd_t *gd, sfVector2f at)
 {
     int row = (int)((at.y - PANEL_Y) / ROW_H);
     int dir = 0;
@@ -47,13 +94,11 @@ void editor_panel_click(editor_t *ed, sfVector2f at)
         dir = -1;
     if (at.x >= PLUS_X && at.x < PLUS_X + BUTTON)
         dir = 1;
-    if (dir == 0)
-        return;
-    for (int p = 0; p < ED_PROP_COUNT; p++) {
-        if (!ed_prop_applies(&ed->lv, (ed_prop_t)p))
+    for (int k = 0; k < MAX_ROWS && dir != 0; k++) {
+        if (!row_applies(ed, k))
             continue;
         if (n == row)
-            ed_prop_step(&ed->lv, &ed->hist, (ed_prop_t)p, dir);
+            return row_step(ed, gd, k, dir);
         n += 1;
     }
 }
@@ -67,7 +112,9 @@ static void title(editor_t *ed, char *out, size_t size)
     for (size_t i = 0; i < ed->lv.count; i++)
         if (ed->lv.objects[i].selected)
             one = &ed->lv.objects[i];
-    if (n != 1)
+    if (n == 0)
+        snprintf(out, size, "The level   (Shift: bigger steps)");
+    else if (n != 1)
         snprintf(out, size, "%zu selected", n);
     else if (one->is_start)
         snprintf(out, size, "start position   %.10g  %.10g",
@@ -77,12 +124,13 @@ static void title(editor_t *ed, char *out, size_t size)
             one->obj.rect.x, one->obj.rect.y);
 }
 
-static void draw_row(editor_t *ed, gd_t *gd, ed_prop_t p, float y)
+static void draw_row(editor_t *ed, gd_t *gd, int k, float y)
 {
+    const char *name = "";
     char value[64];
 
-    ed_prop_text(&ed->lv, p, value, sizeof(value));
-    editor_label(ed, gd, ed_prop_name(p), PANEL_X + 14.0f, y + 10.0f, 22,
+    row_text(ed, gd, k, &name, value, sizeof(value));
+    editor_label(ed, gd, name, PANEL_X + 14.0f, y + 10.0f, 22,
         (sfColor){180, 190, 210, 255});
     editor_fill(gd, ed, (sfFloatRect){MINUS_X, y + 5.0f, BUTTON, BUTTON},
         BUTTON_FILL, sfTransparent);
@@ -99,16 +147,16 @@ void editor_panel_draw(editor_t *ed, gd_t *gd)
     char text[96];
     float y = PANEL_Y + ROW_H;
 
-    if (ed_selected(&ed->lv) == 0)
+    if (on_level(ed) && !ed->level_panel)
         return;
     editor_fill(gd, ed, (sfFloatRect){PANEL_X, PANEL_Y, PANEL_W,
         ROW_H * (float)rows(ed) + 10.0f}, PANEL, (sfColor){90, 255, 140, 255});
     title(ed, text, sizeof(text));
     editor_label(ed, gd, text, PANEL_X + 14.0f, PANEL_Y + 12.0f, 22, sfWhite);
-    for (int p = 0; p < ED_PROP_COUNT; p++) {
-        if (!ed_prop_applies(&ed->lv, (ed_prop_t)p))
+    for (int k = 0; k < MAX_ROWS; k++) {
+        if (!row_applies(ed, k))
             continue;
-        draw_row(ed, gd, (ed_prop_t)p, y);
+        draw_row(ed, gd, k, y);
         y += ROW_H;
     }
 }

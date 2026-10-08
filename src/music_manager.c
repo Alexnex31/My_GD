@@ -136,6 +136,18 @@ void music_menu(gd_t *gd)
 }
 
 /* The song picker's 10 s from the song's own start (4.6). */
+double music_position(const music_manager_t *m)
+{
+    if (m->current == NULL)
+        return 0.0;
+    return (double)sfTime_asSeconds(sfMusic_getPlayingOffset(m->current));
+}
+
+bool music_is_playing(const music_manager_t *m)
+{
+    return m->current != NULL && sfMusic_getStatus(m->current) == sfPlaying;
+}
+
 void music_preview(gd_t *gd, const song_t *s)
 {
     music_manager_t *m = &gd->music;

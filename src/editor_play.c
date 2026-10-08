@@ -50,6 +50,7 @@ void editor_playtest(editor_t *ed, gd_t *gd, bool from_start_position)
     if (from_start_position && at == 0)
         return editor_notice(ed, "No start position: the palette's last "
             "entry places one");
+    ed->song_on = false;                     /* the playtest has the music */
     ed_level_doc(&ed->lv, &doc);
     ed->play = level_start_doc(gd, &doc, &ed->lv.hdr, ed->lv.id, at);
     ed_doc_free(&doc);

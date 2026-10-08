@@ -94,6 +94,8 @@ bool music_probe(const char *path, float *duration);
 int music_load(music_manager_t *m, const char *file);
 void music_play_from(music_manager_t *m, double seconds);
 void music_stop(music_manager_t *m);
+double music_position(const music_manager_t *m);   /* seconds into the song */
+bool music_is_playing(const music_manager_t *m);
 void music_set_loop(music_manager_t *m, bool loop);
 void music_set_volume(music_manager_t *m, int volume);
 void music_free(music_manager_t *m);

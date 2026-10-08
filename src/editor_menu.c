@@ -148,6 +148,7 @@ void keyboard_events_editor_menu(editor_m_t **editor_m, gd_t *gd)
         editor_events(m->ed, gd);
         if (!m->ed->leave || !sfRenderWindow_isOpen(gd->w))
             return;
+        editor_song_stop(m->ed, gd);
         editor_free(m->ed);                  /* back to the list, as it is now */
         m->ed = NULL;
         build_rows(m);

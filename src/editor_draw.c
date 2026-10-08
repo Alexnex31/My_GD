@@ -47,7 +47,7 @@ void editor_fill(gd_t *gd, editor_t *ed, sfFloatRect r, sfColor c,
     draw_rect(gd, ed->box);
 }
 
-static void line(editor_t *ed, double x0, double y0, double x1, double y1,
+void editor_line(editor_t *ed, double x0, double y0, double x1, double y1,
     sfColor c)
 {
     sfVertexArray_append(ed->lines, (sfVertex){{(float)x0, (float)y0}, c,
@@ -68,10 +68,10 @@ static void grid_lines(editor_t *ed, span_t v)
     while (step / ed->zoom < 12.0)
         step *= 2.0;
     for (double x = floor(v.left / step) * step; x <= v.right; x += step)
-        line(ed, x, v.top, x, v.bottom,
+        editor_line(ed, x, v.top, x, v.bottom,
             fmod(fabs(x), 200.0) == 0.0 ? GRID_STRONG : GRID);
     for (double y = floor(v.top / step) * step; y <= v.bottom; y += step)
-        line(ed, v.left, y, v.right, y,
+        editor_line(ed, v.left, y, v.right, y,
             fmod(fabs(y - GROUND_Y), 200.0) == 0.0 ? GRID_STRONG : GRID);
 }
 
@@ -82,9 +82,9 @@ static void limit_lines(editor_t *ed, span_t v)
         ed_level_measure(&ed->lv, &ed->end_x, &ed->kill_y);
         ed->measured = true;
     }
-    line(ed, v.left, GROUND_Y, v.right, GROUND_Y, GROUND_LINE);
-    line(ed, ed->end_x, v.top, ed->end_x, v.bottom, END_LINE);
-    line(ed, v.left, ed->kill_y, v.right, ed->kill_y, KILL_LINE);
+    editor_line(ed, v.left, GROUND_Y, v.right, GROUND_Y, GROUND_LINE);
+    editor_line(ed, ed->end_x, v.top, ed->end_x, v.bottom, END_LINE);
+    editor_line(ed, v.left, ed->kill_y, v.right, ed->kill_y, KILL_LINE);
 }
 
 /* The game's own vertices for each object in view, layer by layer (11.4). */
@@ -126,7 +126,7 @@ static void outline(editor_t *ed, const object_t *o)
             * sin(rad), c.y + (p[i].x - c.x) * sin(rad) + (p[i].y - c.y)
             * cos(rad)};
     for (int i = 0; i < 4; i++)
-        line(ed, p[i].x, p[i].y, p[(i + 1) % 4].x, p[(i + 1) % 4].y, SELECTED);
+        editor_line(ed, p[i].x, p[i].y, p[(i + 1) % 4].x, p[(i + 1) % 4].y, SELECTED);
 }
 
 /* Its shape again, plain green and see-through, so it shows at any zoom. */
@@ -202,7 +202,7 @@ static void draw_path(editor_t *ed, gd_t *gd)
         return;
     sfVertexArray_clear(ed->lines);
     for (size_t i = 1; i < ed->trace_len; i++)
-        line(ed, ed->trace[i - 1].x, ed->trace[i - 1].y, ed->trace[i].x,
+        editor_line(ed, ed->trace[i - 1].x, ed->trace[i - 1].y, ed->trace[i].x,
             ed->trace[i].y, PATH);
     draw_vertex_array(gd, ed->lines, NULL);
 }
@@ -219,6 +219,7 @@ static void draw_canvas(editor_t *ed, gd_t *gd)
     sfVertexArray_clear(ed->lines);
     grid_lines(ed, v);
     limit_lines(ed, v);
+    editor_song_lines(ed, gd, v.left, v.right, v.top, v.bottom);
     draw_vertex_array(gd, ed->lines, NULL);
     draw_objects(ed, gd, v);
     draw_start(ed, gd, &ed->lv.hdr.start, (sfColor){255, 255, 255, 150});
@@ -282,7 +283,7 @@ static void draw_toolbar(editor_t *ed, gd_t *gd)
         ed_selected(&ed->lv), ed->grid, 100.0f / ed->zoom);
     editor_label(ed, gd, text, 20.0f, 8.0f, 28, sfWhite);
     snprintf(text, sizeof(text), "%s   Ctrl+Z / Ctrl+Y: undo, redo   Wheel, "
-        "Ctrl+wheel, middle: view   G: grid   Enter: play   Ctrl+S   Esc",
+        "Ctrl+wheel: view   G: grid   L: song   P: hear it   Enter: play   Ctrl+S",
         HELP[ed->tool]);
     editor_label(ed, gd, text, 20.0f, 48.0f, 18, (sfColor){180, 190, 210, 255});
     if (ui_now_ms() < ed->notice_until_ms)

@@ -10,6 +10,7 @@
 
     #include "mygd.h"
     #include "editor/ed_props.h"
+    #include "editor/ed_music.h"
 
 /* The screen's layout, UI pixels (FEATURES 11.2). */
     #define ED_TOOLBAR_H 80.0f
@@ -54,6 +55,8 @@ typedef struct editor {
     sfVector2i press_px;          /* where the left button went down         */
     vec2_t press_at;              /* the same, in the world                  */
     int press_id;                 /* the object it went down on              */
+    bool level_panel;             /* L: the level's song and beat (11.11)    */
+    bool song_on;                 /* P: its song plays from the canvas       */
     level_t *play;                /* the playtest, while it runs (11.9)      */
     vec2_t *trace;                /* where the last playtest went            */
     size_t trace_len;
@@ -104,9 +107,18 @@ void editor_label(editor_t *ed, gd_t *gd, const char *s, float x, float y,
     unsigned int size, sfColor c);
 
 /* editor_panel.c: the selection's properties, over the canvas's corner */
-bool editor_panel_holds(editor_t *ed, sfVector2f at);
-void editor_panel_click(editor_t *ed, sfVector2f at);
+bool editor_panel_holds(editor_t *ed, gd_t *gd, sfVector2f at);
+void editor_panel_click(editor_t *ed, gd_t *gd, sfVector2f at);
 void editor_panel_draw(editor_t *ed, gd_t *gd);
+
+/* editor_song.c: the level's song over the canvas */
+void editor_song_toggle(editor_t *ed, gd_t *gd);
+void editor_song_stop(editor_t *ed, gd_t *gd);
+void editor_song_follow(editor_t *ed, gd_t *gd);
+void editor_song_lines(editor_t *ed, gd_t *gd, double left, double right,
+    double top, double bottom);
+void editor_line(editor_t *ed, double x0, double y0, double x1, double y1,
+    sfColor c);
 
 /* editor_play.c: the playtest */
 void editor_playtest(editor_t *ed, gd_t *gd, bool from_start_position);

@@ -76,9 +76,9 @@ void editor_mouse_press(editor_t *ed, gd_t *gd, const sfEvent *ev)
     sfVector2f ui = sfRenderWindow_mapPixelToCoords(gd->w, px, gd->ui_view);
 
     ed_gesture(&ed->hist);
-    if (editor_panel_holds(ed, ui)) {        /* it is over the canvas */
+    if (editor_panel_holds(ed, gd, ui)) {    /* it is over the canvas */
         if (b == sfMouseLeft)
-            editor_panel_click(ed, ui);
+            editor_panel_click(ed, gd, ui);
         ed->measured = false;
         return;
     }
