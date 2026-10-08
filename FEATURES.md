@@ -1832,6 +1832,15 @@ Show counts in the toolbar; clicking cycles the camera through the flagged objec
 - **Not built:** typing an exact value (angle, coordinates) in the panel, and resize handles on the canvas. The panel's steps and the arrow keys cover both for now.
 - **Tests:** `tests/test_props.c` (start positions placed, moved, duplicated, undone, saved, absent from the played level; which rows apply and their text; each property's steps and limits; turning one object and a piece) and the random undo test of `tests/test_edit.c` now also steps properties and turns.
 
+### 11.13e As built: E5
+
+- **`sim_reset_at(sim, start)`** (`src/sim/sim.c`, tested in `tests/test_start.c`) begins an attempt at a start position: the run is put at the tick that x is reached at the start's speed, rounded down, so the player is on the tick grid (at most one tick's travel before the x asked for) and the percentage and the music know where they are. The mode, gravity and speed are the start's; a corridor mode opens its corridor around it; interactive objects wholly behind it are spent. `sim_reset` is `sim_reset_at` with the level's own start, and gives bit for bit what it gave before.
+- **In the game**, A and E go to the previous and the next entry of the list (the level's start, then its start positions in the file's order, going round) and begin an attempt there at once. An attempt from a start position is an attempt: it adds to the attempt counter and the text in the world still reads "Attempt n". It records no best and no completion, and the end screen then says so ("End reached", "From a start position: it doesn't count") instead of "Level complete, 100%". A short notice shows which start it is, `<1/2>` for the first of two, `<0/2>` for the level's own. The song starts where that x is in it.
+- **Playtest** (`src/editor_play.c`): Enter plays the level as it is now, saved or not, from its start; Shift+Enter from a start position: the selected one, or else the last one at or before the middle of the canvas, or else the first. It is the game's own level scene (`level_start_doc`, `level_frame`), built from the editor's document, so it can't differ from the game. Nothing is recorded. A and E work in it too; the restart key restarts.
+- **Leaving it:** Escape or a death (after the usual explosion) go back to the editor, with the canvas centered where the player was and a notice ("died at 43%"). Reaching the level's end ends nothing, unlike 11.9's step 6: the player runs on past it, at 100%, until it dies or Escape is pressed.
+- **The path:** the player's position every fourth tick of the last attempt, drawn as a line on the canvas until the level is edited (the history counts its edits, undo and redo included).
+- **Checked in a window:** playtests from the start and from start positions, A/E in a playtest and in the game, and the progress file after attempts from start positions (one attempt and a best of 18% recorded, from the real start, while the others reached 49% to 90%).
+
 ### 11.14 Stages
 
 | Stage | Contents | Done when |
