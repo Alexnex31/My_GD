@@ -244,6 +244,8 @@ static void playing_key(level_t **level, gd_t *gd, sfKeyCode key)
         return go_back_playing_level_list(gd, level);
     if (key == sfKeyF3)
         gd->debug_overlay = !gd->debug_overlay;
+    if (key == sfKeyA || key == sfKeyE)      /* the start positions (11.8) */
+        level_change_start(*level, gd, key == sfKeyE ? 1 : -1);
 }
 
 void keyboard_events_playing(level_t **level, gd_t *gd)

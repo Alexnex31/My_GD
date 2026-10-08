@@ -78,6 +78,14 @@ typedef struct level {
     song_choice_t song;           /* what plays, from where (FEATURES 4.4)    */
     sfText *notice_text;          /* "Song missing", for a few seconds        */
     float notice_left;
+    int start_at;                 /* 0: the level's start; k: its k-th start
+                                     position, an attempt that doesn't count
+                                     (FEATURES 11.8)                           */
+    bool playtest;                /* run by the editor: nothing is saved (11.9) */
+    bool playtest_over;           /* died or finished: back to the editor      */
+    vec2_t *path;                 /* playtest: where the player went           */
+    size_t path_len;
+    size_t path_cap;
     trail_t trail;                /* the wave's path, corners only (FEATURES 8.5) */
     sfVertexArray *trail_va;      /* its strip, built again each frame         */
 } level_t;
@@ -86,6 +94,13 @@ typedef struct level {
 void handle_playing(gd_t *gd, level_t **level);
 void level_step(level_t *lv, gd_t *gd, input_t in);
 level_t *level_start(gd_t *gd, const char *id);
+/* The editor's playtest: a level that is no file, from start `start_at`. */
+level_t *level_start_doc(gd_t *gd, const level_doc_t *doc,
+    const level_header_t *hdr, const char *id, int start_at);
+void level_frame(gd_t *gd, level_t *lv);     /* the frame's ticks, then render */
+/* A (-1) and E (+1): the next start position, and an attempt from it. */
+void level_change_start(level_t *lv, gd_t *gd, int dir);
+const level_start_t *level_current_start(const level_t *lv);
 void level_free(level_t *lv, gd_t *gd);
 void level_render(gd_t *gd, level_t *lv);
 

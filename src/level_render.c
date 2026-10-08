@@ -278,7 +278,7 @@ static void render_attempt(gd_t *gd, level_t *lv)
     if (!gd->settings.show_attempts)
         return;
     sfText_setPosition(lv->attempt_text,
-        (sfVector2f){(float)lv->sim.lvl.hdr.start.pos.x + 400.0f, 400.0f});
+        (sfVector2f){(float)level_current_start(lv)->pos.x + 400.0f, 400.0f});
     draw_text(gd, lv->attempt_text);
 }
 

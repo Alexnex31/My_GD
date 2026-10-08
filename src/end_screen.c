@@ -43,14 +43,14 @@ static sfText *end_text(gd_t *gd, const char *string, unsigned int size,
 }
 
 /*
-** The numbers shown are the session's plus the store's, so they match what
-** leaving the level will write (6.2).
+** The attempts shown are this session's: how many it took this time. The
+** store keeps the total, and the level list shows it (6.2).
 */
 end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd)
 {
     end_level_screen_t *es = sim_xcalloc(1, sizeof(end_level_screen_t));
-    const progress_entry_t *pe = progress_find(&gd->progress, level->id);
     const song_t *song = level->song.song;
+    bool counts = level_current_start(level) == &level->sim.lvl.hdr.start;
     char attempts[100];
     char credit[200];
 
@@ -59,13 +59,14 @@ end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd)
         sfSprite_setTexture(es->background, gd->res->end_level_background,
             sfTrue);
     snprintf(attempts, sizeof(attempts), "Attempts: %d",
-        level->stats.attempts + (pe == NULL ? 0 : pe->attempts));
-    es->title_text = end_text(gd, "LEVEL COMPLETE!", 80,
-        (sfVector2f){600.0f, 200.0f});
+        level->stats.attempts);
+    es->title_text = end_text(gd, counts ? "LEVEL COMPLETE!"
+        : "END REACHED", 80, (sfVector2f){600.0f, 200.0f});
     es->attempts_text = end_text(gd, attempts, 50,
         (sfVector2f){700.0f, 400.0f});
-    es->percent_text = end_text(gd, "Completion: 100%", 50,
-        (sfVector2f){680.0f, 500.0f});
+    es->percent_text = end_text(gd, counts ? "Completion: 100%"
+        : "From a start position: it doesn't count", 50,
+        (sfVector2f){counts ? 680.0f : 420.0f, 500.0f});   /* (11.8) */
     if (song != NULL)                        /* CC BY wants the credit (4.11) */
         snprintf(credit, sizeof(credit), "Song: %s \xe2\x80\x94 %s (%s)",
             song->title, song->artist, song->license);

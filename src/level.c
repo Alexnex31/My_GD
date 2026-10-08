@@ -12,12 +12,29 @@ static void log_level_warning(const char *msg)
     dprintf(2, "my_gd: %s\n", msg);
 }
 
+const level_start_t *level_current_start(const level_t *lv)
+{
+    if (lv->start_at <= 0 || (size_t)lv->start_at > lv->sim.lvl.nb_starts)
+        return &lv->sim.lvl.hdr.start;
+    return &lv->sim.lvl.starts[lv->start_at - 1];
+}
+
+/*
+** A best or a completion is on record only from the level's own start, in
+** the game. An attempt is an attempt wherever it began (11.8).
+*/
+static bool run_counts(const level_t *lv)
+{
+    return !lv->playtest && level_current_start(lv) == &lv->sim.lvl.hdr.start;
+}
+
+/* A playtest counts its own, on screen only: nothing of it is saved. */
 void level_count_attempt(level_t *lv)
 {
     char text[64];
 
     lv->stats.attempts += 1;
-    lv->stats.dirty = true;
+    lv->stats.dirty = lv->stats.dirty || !lv->playtest;
     if (lv->attempt_text == NULL)
         return;                              /* the first one, before the text */
     snprintf(text, sizeof(text), "Attempt %d", lv->stats.attempts);
@@ -28,7 +45,7 @@ void level_record_best(level_t *lv)
 {
     float pct = sim_percent(&lv->sim);
 
-    if (pct <= lv->stats.best)
+    if (pct <= lv->stats.best || !run_counts(lv))
         return;
     lv->stats.best = pct;
     lv->stats.dirty = true;
@@ -101,9 +118,11 @@ static void level_music_start(level_t *lv, gd_t *gd)
     gd->music.level_offset = lv->song.offset;
     music_set_loop(&gd->music, lv->song.offset + level_duration(&lv->sim.lvl)
         > lv->song.song->duration);          /* better a loop than silence (4.9) */
-    music_play_from(&gd->music, music_expected(lv->song.offset, 0,
-        gd->music.audio_offset));
+    music_play_from(&gd->music, music_expected(lv->song.offset,
+        lv->sim.st.tick, gd->music.audio_offset));
 }
+
+static level_t *level_setup(level_t *lv, gd_t *gd, const char *id);
 
 level_t *level_start(gd_t *gd, const char *id)
 {
@@ -116,6 +135,24 @@ level_t *level_start(gd_t *gd, const char *id)
         free(lv);
         return NULL;
     }
+    return level_setup(lv, gd, id);
+}
+
+level_t *level_start_doc(gd_t *gd, const level_doc_t *doc,
+    const level_header_t *hdr, const char *id, int start_at)
+{
+    level_t *lv = sim_xcalloc(1, sizeof(level_t));
+
+    sim_init(&lv->sim, doc, hdr, id);
+    lv->playtest = true;
+    lv->start_at = start_at;
+    sim_reset_at(&lv->sim, level_current_start(lv));
+    return level_setup(lv, gd, id);
+}
+
+/* Everything the scene draws with, then the first attempt. */
+static level_t *level_setup(level_t *lv, gd_t *gd, const char *id)
+{
     snprintf(lv->id, sizeof(lv->id), "%s", id);
     lv->file_hash = lv->sim.lvl.file_hash;   /* the file loaded, read once */
     lv->state = LEVEL_PLAYING;
@@ -188,6 +225,7 @@ void level_free(level_t *lv, gd_t *gd)
     level_free_chunks(lv);
     sfSprite_destroy(lv->flash_sprite);
     free(lv->seen_spent);
+    free(lv->path);
     sfSprite_destroy(lv->player_sprite);
     sfVertexArray_destroy(lv->trail_va);
     sfSprite_destroy(lv->ground_sprite);
@@ -218,7 +256,8 @@ void level_on_death(level_t *lv, gd_t *gd)
 
 void level_respawn(level_t *lv, gd_t *gd)
 {
-    sim_reset(&lv->sim);
+    sim_reset_at(&lv->sim, level_current_start(lv));
+    lv->path_len = 0;                        /* a playtest's line: one attempt */
     trail_reset(&lv->trail, &lv->sim.st.player);
     lv->state = LEVEL_PLAYING;
     lv->fade_left = 0.0f;
@@ -229,9 +268,30 @@ void level_respawn(level_t *lv, gd_t *gd)
     lv->accumulator = 0;
     lv->last_frame_us = input_now_us(gd);
     level_count_attempt(lv);
-    if (lv->song.song != NULL)               /* from tick 0's position (4.8) */
-        music_play_from(&gd->music, music_expected(lv->song.offset, 0,
-            gd->music.audio_offset));
+    if (lv->song.song != NULL)               /* where this start is in it (4.8) */
+        music_play_from(&gd->music, music_expected(lv->song.offset,
+            lv->sim.st.tick, gd->music.audio_offset));
+}
+
+/*
+** The list is the level's own start, then its start positions in the
+** file's order, and it goes round. The attempt under way ends as a restart
+** does: its percentage counts if it was one that counts.
+*/
+void level_change_start(level_t *lv, gd_t *gd, int dir)
+{
+    int n = (int)lv->sim.lvl.nb_starts + 1;
+    char text[128];
+
+    if (n == 1 || lv->state == LEVEL_COMPLETE)
+        return;
+    if (lv->state == LEVEL_PLAYING)
+        level_record_best(lv);
+    lv->start_at = (lv->start_at + dir + n) % n;
+    level_respawn(lv, gd);
+    snprintf(text, sizeof(text), "<%d/%d>", lv->start_at, n - 1);
+    sfText_setUnicodeString(lv->notice_text, utf8_to_utf32(text));
+    lv->notice_left = 3.0f;
 }
 
 /* A voluntary death: the percentage counts, but no delay and no explosion. */
@@ -251,18 +311,41 @@ void level_on_complete(level_t *lv, gd_t *gd)
         lv->end_screen = create_end_level_screen(lv, gd);
 }
 
+/* Every fourth tick of a playtest: the line the editor draws (11.9). */
+static void remember_position(level_t *lv)
+{
+    vec2_t *bigger;
+
+    if (lv->path_len == lv->path_cap) {
+        lv->path_cap = lv->path_cap == 0 ? 1024 : lv->path_cap * 2;
+        bigger = sim_xcalloc(lv->path_cap, sizeof(vec2_t));
+        if (lv->path_len > 0)
+            memcpy(bigger, lv->path, lv->path_len * sizeof(vec2_t));
+        free(lv->path);
+        lv->path = bigger;
+    }
+    lv->path[lv->path_len] = lv->sim.st.player.pos;
+    lv->path_len += 1;
+}
+
 void level_step(level_t *lv, gd_t *gd, input_t in)
 {
     if (lv->state == LEVEL_DYING) {
         lv->death_ticks -= 1;
-        if (lv->death_ticks <= 0)
+        if (lv->death_ticks <= 0 && lv->playtest)
+            lv->playtest_over = true;        /* the editor shows where (11.9) */
+        else if (lv->death_ticks <= 0)
             level_respawn(lv, gd);
         return;
     }
-    if (lv->state != LEVEL_PLAYING)
+    if (lv->state != LEVEL_PLAYING || lv->playtest_over)
         return;
     sim_tick(&lv->sim, in);
+    if (lv->playtest && lv->sim.st.tick % 4 == 0)
+        remember_position(lv);
     trail_after_tick(&lv->trail, &lv->sim.st.player);
+    if (lv->playtest)
+        lv->sim.st.complete = false;         /* its end ends nothing (11.9) */
     if (!lv->sim.st.player.alive)
         level_on_death(lv, gd);
     else if (lv->sim.st.complete)
@@ -279,8 +362,6 @@ void level_step(level_t *lv, gd_t *gd, input_t in)
 void handle_playing(gd_t *gd, level_t **level)
 {
     level_t *lv = NULL;
-    int64_t now = 0;
-    int64_t frame_us = 0;
 
     if (*level == NULL)
         *level = level_start(gd, gd->selected_id);
@@ -292,7 +373,14 @@ void handle_playing(gd_t *gd, level_t **level)
     keyboard_events_playing(level, gd);
     if (*level == NULL || !sfRenderWindow_isOpen(gd->w))
         return;                              /* the scene changed */
-    lv = *level;                             /* Retry replaced the level */
+    level_frame(gd, *level);                 /* Retry replaced the level */
+}
+
+void level_frame(gd_t *gd, level_t *lv)
+{
+    int64_t now = 0;
+    int64_t frame_us = 0;
+
     now = input_now_us(gd);
     frame_us = now - lv->last_frame_us;
     lv->last_frame_us = now;
