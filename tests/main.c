@@ -33,6 +33,7 @@ int main(void)
     test_edit();
     test_props();
     test_edmusic();
+    test_edcheck();
     test_progress();
     test_input();
     test_settings();

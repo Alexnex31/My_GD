@@ -30,6 +30,7 @@ void test_editor(void);
 void test_edit(void);
 void test_props(void);
 void test_edmusic(void);
+void test_edcheck(void);
 void test_progress(void);
 void test_input(void);
 void test_settings(void);
