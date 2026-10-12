@@ -38,6 +38,26 @@ static bool replays(sim_t *s, const bot_result_t *r)
     return s->st.complete;
 }
 
+/*
+** The furthest run of a search that found no path: replayed, it is alive up
+** to its last tick and ends at the percentage the result gives.
+*/
+static bool reaches(sim_t *s, const bot_result_t *r)
+{
+    bool prev = false;
+
+    if (r->inputs == NULL || r->ticks <= 0)
+        return false;
+    sim_reset(s);
+    for (long t = 0; t < r->ticks; t++) {
+        if (!s->st.player.alive || s->st.complete)
+            return false;
+        sim_tick(s, (input_t){r->inputs[t], r->inputs[t] && !prev});
+        prev = r->inputs[t];
+    }
+    return sim_percent(s) == r->furthest;
+}
+
 static void test_empty_level(void)
 {
     sim_t s;
@@ -64,8 +84,10 @@ static void test_spike_needs_a_jump(void)
     CHECK(replays(&s, &r));
     bot_result_free(&r);
     r = bot_solve(&s, 1);                      /* the cap: one run, it dies */
-    CHECK(r.verdict == BOT_GAVE_UP && r.attempts == 1 && r.inputs == NULL);
+    CHECK(r.verdict == BOT_GAVE_UP && r.attempts == 1);
     CHECK(r.furthest > 0.0f && r.furthest < 100.0f);
+    CHECK(reaches(&s, &r));
+    bot_result_free(&r);
     sim_free(&s);
 }
 
@@ -77,9 +99,55 @@ static void test_wall_too_tall(void)
 
     load(&s, "block 1500 550 2 w=2 h=6\n");
     r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_NO_PATH && r.inputs == NULL);
+    CHECK(r.verdict == BOT_NO_PATH);
     CHECK(r.furthest > 0.0f && r.furthest < 100.0f);
+    CHECK(reaches(&s, &r));
+    CHECK(s.st.player.pos.x > 1300.0 && s.st.player.pos.x < 1500.0);
+    bot_result_free(&r);
     sim_free(&s);
+}
+
+static bool same_result(const bot_result_t *a, const bot_result_t *b)
+{
+    return a->verdict == b->verdict && a->attempts == b->attempts
+        && a->furthest == b->furthest && a->ticks == b->ticks
+        && memcmp(a->inputs, b->inputs, (size_t)a->ticks * sizeof(bool)) == 0;
+}
+
+/*
+** A few runs at a time gives what one call gives, whatever the size of the
+** steps, and says what it has so far in between (FEATURES 11.10).
+*/
+static void test_in_steps(void)
+{
+    static const char *const LEVELS[] = {
+        "spike 1500 750 2\nspike 2600 750 2\nspike 3300 750 2\n",
+        "block 1500 550 2 w=2 h=6\n",
+        "start_gamemode ship\nblock 1500 550 2 w=2 h=6\n"};
+    sim_t s;
+
+    for (int i = 0; i < 3; i++) {
+        bot_result_t whole;
+        bot_result_t stepped;
+        bot_search_t *b;
+        long steps = 0;
+
+        load(&s, LEVELS[i]);
+        whole = bot_solve(&s, 50);
+        b = bot_begin(&s);
+        CHECK(bot_progress(b)->attempts == 0);
+        while (!bot_step(b, 3, 50)) {
+            steps += 1;
+            CHECK(bot_progress(b)->attempts == 3 * steps);
+        }
+        CHECK(bot_step(b, 3, 50));                 /* over stays over */
+        stepped = bot_end(b);
+        CHECK(same_result(&whole, &stepped));
+        CHECK(s.st.tick == 0);
+        bot_result_free(&whole);
+        bot_result_free(&stepped);
+        sim_free(&s);
+    }
 }
 
 /* The same wall, for a ship: it decides every 12 ticks and flies over. */
@@ -335,6 +403,7 @@ void test_bot(void)
     test_empty_level();
     test_spike_needs_a_jump();
     test_wall_too_tall();
+    test_in_steps();
     test_ship_flies_over();
     test_gravity_portals();
     test_ufo_level();

@@ -24,8 +24,11 @@ typedef struct decision {
     sim_snapshot_t snap;      /* the run state it was taken in               */
 } decision_t;
 
-typedef struct bot {
+typedef struct bot_search {
     sim_t *s;
+    bot_result_t r;           /* so far: the attempts, the furthest run      */
+    bool resume;              /* the next run starts on a decision made      */
+    bool over;
     decision_t *path;         /* the current run's decisions, oldest first   */
     size_t depth;
     size_t cap;               /* decisions allocated, each with its snapshot */
@@ -34,7 +37,9 @@ typedef struct bot {
     size_t dead_count;
     bool held;                /* the button the next tick gets               */
     bool was_held;            /* the button the last tick got                */
-} bot_t;
+} bot_search_t;
+
+typedef bot_search_t bot_t;
 
 /* The memo's slot for a hash: 0 marks an empty one, so 0 is stored as 1. */
 static size_t dead_slot(const uint64_t *set, size_t cap, uint64_t *key)
@@ -194,9 +199,10 @@ static bool backtrack(bot_t *b)
     return true;
 }
 
-/* The found run, tick by tick: each decision holds until the next one. */
+/* The run that just ended, tick by tick: each decision holds until the next. */
 static void record_inputs(const bot_t *b, bot_result_t *r)
 {
+    free(r->inputs);
     r->ticks = b->s->st.tick;
     r->inputs = sim_xcalloc(r->ticks + 1, sizeof(bool));
     for (size_t i = 0; i < b->depth; i++) {
@@ -208,43 +214,74 @@ static void record_inputs(const bot_t *b, bot_result_t *r)
     }
 }
 
-static void bot_free(bot_t *b)
+bot_search_t *bot_begin(sim_t *s)
 {
+    bot_t *b = sim_xcalloc(1, sizeof(bot_t));
+
+    b->s = s;
+    b->dead_cap = 1024;
+    b->dead = sim_xcalloc(b->dead_cap, sizeof(uint64_t));
+    b->r.verdict = BOT_GAVE_UP;
+    b->r.furthest = -1.0f;
+    sim_reset(s);
+    return b;
+}
+
+/*
+** One run, then back to the next decision to try. The furthest run so far
+** is kept tick by tick: with no path, it is the one worth looking at.
+*/
+static void one_attempt(bot_t *b, long max_attempts)
+{
+    bool done = run(b, b->resume);
+    float percent = sim_percent(b->s);
+
+    b->r.attempts += 1;
+    if (done || percent > b->r.furthest) {
+        b->r.furthest = percent;
+        record_inputs(b, &b->r);
+    }
+    b->resume = true;
+    if (done)
+        b->r.verdict = BOT_FOUND;
+    else if (!backtrack(b))
+        b->r.verdict = BOT_NO_PATH;
+    b->over = done || b->r.verdict == BOT_NO_PATH
+        || b->r.attempts >= max_attempts;
+}
+
+bool bot_step(bot_search_t *b, long attempts, long max_attempts)
+{
+    for (long i = 0; i < attempts && !b->over; i++)
+        one_attempt(b, max_attempts);
+    return b->over;
+}
+
+const bot_result_t *bot_progress(const bot_search_t *b)
+{
+    return &b->r;
+}
+
+bot_result_t bot_end(bot_search_t *b)
+{
+    bot_result_t r = b->r;
+
     for (size_t i = 0; i < b->cap; i++)
         sim_snapshot_free(&b->path[i].snap);
     free(b->path);
     free(b->dead);
+    sim_reset(b->s);
+    free(b);
+    r.furthest = fmaxf(r.furthest, 0.0f);
+    return r;
 }
 
 bot_result_t bot_solve(sim_t *s, long max_attempts)
 {
-    bot_t b = {.s = s, .dead_cap = 1024};
-    bot_result_t r = {.verdict = BOT_GAVE_UP};
-    bool resume = false;
+    bot_search_t *b = bot_begin(s);
 
-    b.dead = sim_xcalloc(b.dead_cap, sizeof(uint64_t));
-    sim_reset(s);
-    for (;;) {
-        bool done = run(&b, resume);
-
-        r.attempts += 1;
-        r.furthest = fmaxf(r.furthest, sim_percent(s));
-        if (done) {
-            r.verdict = BOT_FOUND;
-            record_inputs(&b, &r);
-            break;
-        }
-        if (!backtrack(&b)) {
-            r.verdict = BOT_NO_PATH;
-            break;
-        }
-        if (r.attempts >= max_attempts)
-            break;
-        resume = true;
-    }
-    bot_free(&b);
-    sim_reset(s);
-    return r;
+    bot_step(b, max_attempts, max_attempts);
+    return bot_end(b);
 }
 
 void bot_result_free(bot_result_t *r)
