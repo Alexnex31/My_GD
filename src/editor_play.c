@@ -50,6 +50,7 @@ void editor_playtest(editor_t *ed, gd_t *gd, bool from_start_position)
     if (from_start_position && at == 0)
         return editor_notice(ed, "No start position: the palette's last "
             "entry places one");
+    editor_autosave(ed, true);               /* before every playtest (11.12) */
     ed->song_on = false;                     /* the playtest has the music */
     ed_level_doc(&ed->lv, &doc);
     ed->play = level_start_doc(gd, &doc, &ed->lv.hdr, ed->lv.id, at);
@@ -71,6 +72,8 @@ void editor_play_stop(editor_t *ed, gd_t *gd)
     ed->trace = lv->path;
     ed->trace_len = lv->path_len;
     ed->trace_edits = ed->hist.edits;
+    ed->trace_bot = false;
+    ed->trace_stopped = false;
     lv->path = NULL;
     ed->cam = lv->state == LEVEL_DYING ? lv->death_pos : lv->sim.st.player.pos;
     if (lv->state == LEVEL_DYING) {
@@ -101,7 +104,7 @@ void editor_play_events(editor_t *ed, gd_t *gd)
 
         if (ev->type == sfEvtClosed) {
             editor_play_stop(ed, gd);
-            return close_window(gd->w);
+            return editor_close(ed, gd);
         }
         if (ev->type == sfEvtGainedFocus)
             ed->play->last_frame_us = input_now_us(gd);

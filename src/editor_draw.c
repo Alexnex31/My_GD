@@ -78,10 +78,6 @@ static void grid_lines(editor_t *ed, span_t v)
 /* The ground, where the level ends, and the flipped player's kill ceiling. */
 static void limit_lines(editor_t *ed, span_t v)
 {
-    if (!ed->measured) {
-        ed_level_measure(&ed->lv, &ed->end_x, &ed->kill_y);
-        ed->measured = true;
-    }
     editor_line(ed, v.left, GROUND_Y, v.right, GROUND_Y, GROUND_LINE);
     editor_line(ed, ed->end_x, v.top, ed->end_x, v.bottom, END_LINE);
     editor_line(ed, v.left, ed->kill_y, v.right, ed->kill_y, KILL_LINE);
@@ -197,13 +193,24 @@ static void draw_start_object(editor_t *ed, gd_t *gd, const ed_object_t *o)
 static void draw_path(editor_t *ed, gd_t *gd)
 {
     static const sfColor PATH = {255, 230, 120, 255};
+    static const sfColor BOT_PATH = {110, 220, 255, 255};
+    static const sfColor STOPPED = {255, 70, 70, 255};
+    vec2_t end;
 
     if (ed->trace_len < 2 || ed->trace_edits != ed->hist.edits)
         return;
     sfVertexArray_clear(ed->lines);
     for (size_t i = 1; i < ed->trace_len; i++)
         editor_line(ed, ed->trace[i - 1].x, ed->trace[i - 1].y, ed->trace[i].x,
-            ed->trace[i].y, PATH);
+            ed->trace[i].y, ed->trace_bot ? BOT_PATH : PATH);
+    end = ed->trace[ed->trace_len - 1];
+    if (ed->trace_stopped) {                 /* the bot got no further (11.10) */
+        editor_line(ed, end.x - 45.0, end.y - 45.0, end.x + 45.0, end.y + 45.0,
+            STOPPED);
+        editor_line(ed, end.x - 45.0, end.y + 45.0, end.x + 45.0, end.y - 45.0,
+            STOPPED);
+        editor_line(ed, end.x, end.y - 400.0, end.x, end.y + 400.0, STOPPED);
+    }
     draw_vertex_array(gd, ed->lines, NULL);
 }
 
@@ -212,6 +219,7 @@ static void draw_canvas(editor_t *ed, gd_t *gd)
     span_t v = visible(ed);
     vec2_t at = editor_mouse_world(ed, gd);
 
+    editor_measure(ed, gd);
     if (v.bottom > GROUND_Y)
         editor_fill(gd, ed, (sfFloatRect){(float)v.left, (float)GROUND_Y,
             (float)(v.right - v.left), (float)(v.bottom - GROUND_Y)},
@@ -283,11 +291,13 @@ static void draw_toolbar(editor_t *ed, gd_t *gd)
         ed_selected(&ed->lv), ed->grid, 100.0f / ed->zoom);
     editor_label(ed, gd, text, 20.0f, 8.0f, 28, sfWhite);
     snprintf(text, sizeof(text), "%s   Ctrl+Z / Ctrl+Y: undo, redo   Wheel, "
-        "Ctrl+wheel: view   G: grid   L: song   P: hear it   Enter: play   Ctrl+S",
+        "Ctrl+wheel: view   G: grid   L: song   P: hear it   Enter: play   "
+        "V: verify   Ctrl+S",
         HELP[ed->tool]);
     editor_label(ed, gd, text, 20.0f, 48.0f, 18, (sfColor){180, 190, 210, 255});
     if (ui_now_ms() < ed->notice_until_ms)
-        editor_label(ed, gd, ed->notice, ED_PALETTE_W + 30.0f, VIEW_H - 60.0f, 30,
+        editor_label(ed, gd, ed->notice, ED_PALETTE_W + 30.0f,
+            ED_STATUS_Y - 60.0f, 30,
             (sfColor){255, 230, 120, 255});
 }
 
@@ -304,5 +314,7 @@ void editor_draw(editor_t *ed, gd_t *gd)
     sfRenderWindow_setView(gd->w, gd->ui_view);
     draw_palette(ed, gd);
     draw_toolbar(ed, gd);
+    editor_status_draw(ed, gd);
     editor_panel_draw(ed, gd);
+    editor_dialog_draw(ed, gd);
 }

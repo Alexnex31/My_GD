@@ -82,6 +82,11 @@ void editor_mouse_press(editor_t *ed, gd_t *gd, const sfEvent *ev)
         ed->measured = false;
         return;
     }
+    if (editor_status_holds(ui)) {           /* so is the strip */
+        if (b == sfMouseLeft)
+            editor_next_issue(ed);
+        return;
+    }
     if (!editor_mouse_on_canvas(gd)) {
         if (b == sfMouseLeft)
             palette_click(ed, ui);

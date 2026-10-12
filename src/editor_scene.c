@@ -42,6 +42,11 @@ editor_t *editor_open(gd_t *gd, const char *id, const char *new_name)
     ed->text = sfText_create();
     sfText_setFont(ed->text, gd->main_font);
     ed->marker = sfSprite_create();
+    ed->issue_at = -1;
+    ed->autosave_at_ms = ui_now_ms() + ED_AUTOSAVE_EVERY_MS;
+    if (ed_autosave_pending(ED_AUTOSAVE_DIR, ed->lv.id, ed->path,
+        &ed->restore_when))
+        editor_dialog_open(ed, ED_DIALOG_RESTORE);
     return ed;
 }
 
@@ -57,6 +62,8 @@ void editor_free(editor_t *ed)
     sfSprite_destroy(ed->marker);
     sfView_destroy(ed->view);
     free(ed->trace);
+    ed_verify_free(&ed->verify);
+    ed_report_free(&ed->report);
     ed_history_free(&ed->hist);
     ed_clip_free(&ed->clip);
     ed_grab_cancel(&ed->lv, &ed->grab);
@@ -64,22 +71,32 @@ void editor_free(editor_t *ed)
     free(ed);
 }
 
-static void save(editor_t *ed)
+/* A saved level needs no autosave: it would only be offered back (11.12). */
+bool editor_save(editor_t *ed)
 {
-    if (ed_level_save(&ed->lv, ed->path) != 0)
-        return editor_notice(ed, "Could not save the level");
-    ed->warned = false;
+    if (ed_level_save(&ed->lv, ed->path) != 0) {
+        editor_notice(ed, "Could not save the level");
+        return false;
+    }
+    ed_autosave_remove(ED_AUTOSAVE_DIR, ed->lv.id);
     editor_notice(ed, "Saved");
+    return true;
 }
 
-/* Escape with unsaved changes warns once; the second one leaves (11.12). */
+/* Leaving with unsaved changes asks first (11.12). */
 static void leave(editor_t *ed)
 {
-    if (ed->lv.dirty && !ed->warned) {
-        ed->warned = true;
-        return editor_notice(ed, "Unsaved changes: Ctrl+S saves, Escape again leaves");
-    }
+    if (ed->lv.dirty)
+        return editor_dialog_open(ed, ED_DIALOG_LEAVE);
     ed->leave = true;
+}
+
+/* The window's cross asks nothing: what wasn't saved is in the autosave,
+** and is offered back the next time the level is opened. */
+void editor_close(editor_t *ed, gd_t *gd)
+{
+    editor_autosave(ed, true);
+    close_window(gd->w);
 }
 
 /* The wheel scrolls along the level; with Ctrl it zooms (11.3). */
@@ -108,7 +125,7 @@ static void ctrl_key(editor_t *ed, gd_t *gd, const sfEvent *ev)
     bool redo = k == sfKeyY || (k == sfKeyZ && ev->key.shift);
 
     if (k == sfKeyS)
-        return save(ed);
+        return (void)editor_save(ed);
     if (redo && !ed_redo(&ed->lv, &ed->hist))
         editor_notice(ed, "Nothing to redo");
     if (k == sfKeyZ && !ev->key.shift && !ed_undo(&ed->lv, &ed->hist))
@@ -178,6 +195,10 @@ static void plain_key(editor_t *ed, gd_t *gd, sfKeyCode k)
         ed->level_panel = !ed->level_panel;
     if (k == sfKeyP)
         editor_song_toggle(ed, gd);
+    if (k == sfKeyV)
+        editor_verify_start(ed);
+    if (k == sfKeyN)
+        editor_next_issue(ed);
     if (k == sfKeyTab)
         ed->tool = ed->tool == ED_TOOL_PLACE ? ED_TOOL_SELECT : ED_TOOL_PLACE;
     if (k == sfKeyDelete || k == sfKeyBackspace)
@@ -256,13 +277,18 @@ void editor_events(editor_t *ed, gd_t *gd)
 {
     if (ed->play != NULL)
         return editor_play_events(ed, gd);
+    if (ed->dialog != ED_DIALOG_NONE)
+        return editor_dialog_events(ed, gd);
+    if (ed_verify_running(&ed->verify))
+        return editor_verify_events(ed, gd);
+    editor_autosave(ed, false);
     editor_song_follow(ed, gd);
     editor_apply_camera(ed, gd);             /* the mouse is read through it */
     while (poll_event(gd)) {
         const sfEvent *ev = gd->event;
 
         if (ev->type == sfEvtClosed)
-            return close_window(gd->w);
+            return editor_close(ed, gd);
         if (ev->type == sfEvtKeyPressed) {
             key_press(ed, gd, ev);
             ed->repeat = ev->key;

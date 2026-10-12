@@ -39,7 +39,7 @@ bool editor_mouse_on_canvas(gd_t *gd)
     sfVector2f at = sfRenderWindow_mapPixelToCoords(gd->w, px, gd->ui_view);
 
     return at.x >= ED_PALETTE_W && at.x < VIEW_W && at.y >= ED_TOOLBAR_H
-        && at.y < VIEW_H;
+        && at.y < ED_STATUS_Y;
 }
 
 /* Around the mouse: the world point under the cursor stays under it (11.3). */
