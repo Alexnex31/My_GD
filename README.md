@@ -2,7 +2,7 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2) and the first six stages of the level editor (11: open a level or make a new one, place, delete, save, select, move, copy, undo, turn, resize, start positions, playtest, the song and its beat lines) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2) and the level editor (11: open a level or make a new one, place, delete, save, select, move, copy, undo, turn, resize, start positions, playtest, the song and its beat lines, verify with the bot, warnings, autosave) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
@@ -118,8 +118,10 @@ Two tools, `Tab` switches between them: **Place** and **Select**.
 | P | Hear the level's song from the middle of the canvas; again to stop |
 | Enter | Playtest from the level's start |
 | Shift+Enter | Playtest from a start position: the selected one, or the last one before the middle of the canvas |
+| V | Verify: the bot looks for a way through the level (Escape stops it) |
+| N, or a click on the strip at the bottom | Go to the next object that looks wrong |
 | Ctrl+S | Save |
-| Escape | Cancel a drag, then drop the selection, then leave (warns once if there are unsaved changes) |
+| Escape | Cancel a drag, then drop the selection, then leave (asks to save, discard or cancel if there are unsaved changes) |
 
 Holding a move key, Ctrl+Z or Ctrl+Y repeats it.
 
@@ -131,7 +133,13 @@ With a BPM set in the level's panel, the canvas shows a line at every beat of th
 
 A **playtest** plays the level as it is, saved or not, and records nothing. Escape or a death bring the editor back where the player was (the level's end doesn't stop it: the player runs on), with the path of that attempt drawn as a line until the next edit.
 
-The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects sorted by position, comments and blank lines gone. Verifying with the bot, validation and autosave are the next stage (`FEATURES.md` 11.14).
+The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects sorted by position, comments and blank lines gone.
+
+**Verify** (V) runs the bot on the level as it is. It answers "found a path", "found no path: furthest 58%" or "undecided", and draws its run as a blue line; with no path, a red cross marks where it got no further and the canvas goes there. It is information only: the bot's search is coarser than a player's and can miss a path, so nothing is ever blocked by it.
+
+The **strip** along the bottom of the canvas counts what looks wrong: warnings (the same object twice in the same place, objects below the ground or behind the start, a face steeper than 50 degrees that looks up) and hints (a spike inside a block, a last portal that isn't a cube portal). It also shows the level's length against its song's, and the bot's last answer.
+
+The editor **autosaves** to `save/editor_autosave/` every minute while there are unsaved changes, before each playtest, and when the window is closed. It never writes over the level's file. Opening a level that has a newer autosave asks whether to restore it.
 
 ## Music
 
