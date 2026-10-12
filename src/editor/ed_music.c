@@ -56,6 +56,23 @@ bool ed_beats_between(const ed_level_t *lv, const library_t *lib, double left,
     return *last >= *first;
 }
 
+double ed_level_seconds(const ed_level_t *lv, double end_x)
+{
+    return (end_x - lv->hdr.start.pos.x) / speed(lv);
+}
+
+double ed_song_short_by(const ed_level_t *lv, const library_t *lib,
+    double end_x)
+{
+    song_choice_t c = music_choose(lib, NULL, &lv->hdr, SONG_LEVEL);
+    double over;
+
+    if (c.song == NULL)
+        return 0.0;
+    over = c.offset + ed_level_seconds(lv, end_x) - c.song->duration;
+    return over > 0.0 ? over : 0.0;
+}
+
 const char *ed_song_prop_name(ed_song_prop_t p)
 {
     static const char *const NAMES[ED_SONG_PROP_COUNT] = {"Song", "Offset",

@@ -25,6 +25,15 @@ bool ed_beats_between(const ed_level_t *lv, const library_t *lib, double left,
     double right, long *first, long *last);
 double ed_beat_x(const ed_level_t *lv, const library_t *lib, long k);
 
+/* How long the level lasts, from its start to `end_x`, at its speed. */
+double ed_level_seconds(const ed_level_t *lv, double end_x);
+/*
+** Seconds of level left when its song is over (FEATURES 4.9): the song then
+** loops. 0 when the song is long enough, or when the level has none.
+*/
+double ed_song_short_by(const ed_level_t *lv, const library_t *lib,
+    double end_x);
+
 /* What the level's own panel shows and changes: its song and its beat. */
 typedef enum ed_song_prop {
     ED_SONG_FILE,             /* through the library, and "none"              */
