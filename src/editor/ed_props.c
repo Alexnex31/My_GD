@@ -158,6 +158,10 @@ static void step_one(ed_object_t *o, ed_prop_t p, int dir)
         o->start.gravity_dir = -o->start.gravity_dir;
     if (p == ED_PROP_SPEED)
         step_speed(o, dir);
+    if (o->obj.type == OBJ_SAW && !o->is_start && p == ED_PROP_W)
+        o->obj.rect.h = o->obj.rect.w;       /* a saw stays round: its hitbox */
+    if (o->obj.type == OBJ_SAW && !o->is_start && p == ED_PROP_H)
+        o->obj.rect.w = o->obj.rect.h;       /* is a disc (10.6) */
     ed_refresh(o);
 }
 

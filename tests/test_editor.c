@@ -140,7 +140,8 @@ static void test_entries(void)
     object_t o;
     char line[96];
 
-    CHECK(n == 3 + MODE_COUNT + 2 + 4 + 6 + 1);
+    CHECK(n == 3 + MODE_COUNT + 2 + 1 + 4 + 6 + 1);
+    CHECK(find_entry(e, n, "saw") != NULL);
     for (int m = 0; m < MODE_COUNT; m++) {
         snprintf(line, sizeof(line), "portal %s", MODES[m].name);
         CHECK(find_entry(e, n, line) != NULL);

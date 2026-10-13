@@ -329,6 +329,7 @@ int ed_entries(ed_entry_t *out, int max)
         entry(out, &n, max, OBJ_PORTAL, MODES[m].name);
     entry(out, &n, max, OBJ_GRAVITY, "up");
     entry(out, &n, max, OBJ_GRAVITY, "down");
+    entry(out, &n, max, OBJ_SAW, NULL);
     for (int k = 0; k < LAUNCH_KIND_COUNT; k++)
         if (LAUNCHES[k].pad_v != 0.0)
             entry(out, &n, max, OBJ_PAD, LAUNCHES[k].name);
