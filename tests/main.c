@@ -29,6 +29,7 @@ int main(void)
     test_pads();
     test_orbs();
     test_saw();
+    test_speed();
     test_doc();
     test_editor();
     test_edit();
