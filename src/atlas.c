@@ -12,6 +12,8 @@
 
 #define DRAWN_PLATE "#plate"      /* not files: shapes made in drawn_image */
 #define DRAWN_ORB "#orb"
+#define DRAWN_SAW "#saw"
+#define SAW_TEETH 10
 #define DRAWN_SIZE 64
 
 static const char *const ATLAS_FILES[OBJ_TYPE_COUNT] = {
@@ -22,6 +24,7 @@ static const char *const ATLAS_FILES[OBJ_TYPE_COUNT] = {
     [OBJ_GRAVITY] = "res/cube_portal.png",
     [OBJ_PAD] = DRAWN_PLATE,                 /* no image yet: drawn here in */
     [OBJ_ORB] = DRAWN_ORB,                   /* white, tinted by its colour */
+    [OBJ_SAW] = DRAWN_SAW,
 };
 
 /*
@@ -46,14 +49,46 @@ static void copy_with_padding(sfImage *dst, const sfImage *src, unsigned int x,
 }
 
 /*
+** A saw's stand-in: a grey disc as wide as its hitbox (SAW_RADIUS of the
+** image's width), teeth from there to the image's edge, a dark hub. The
+** teeth lean, so its spin can be seen.
+*/
+static sfImage *drawn_saw(void)
+{
+    sfImage *im = sfImage_createFromColor(DRAWN_SIZE, DRAWN_SIZE,
+        sfTransparent);
+    float mid = (DRAWN_SIZE - 1) / 2.0f;
+    float body = 2.0f * (float)SAW_RADIUS;
+
+    for (unsigned int y = 0; y < DRAWN_SIZE; y++)
+        for (unsigned int x = 0; x < DRAWN_SIZE; x++) {
+            float r = hypotf((float)x - mid, (float)y - mid) / mid;
+            float turn = atan2f((float)y - mid, (float)x - mid)
+                * SAW_TEETH / (2.0f * (float)M_PI);
+            float tooth = body + (1.0f - body) * (1.0f - (turn - floorf(turn)));
+
+            if (r < 0.22f)
+                sfImage_setPixel(im, x, y, (sfColor){40, 44, 60, 255});
+            else if (r < body)
+                sfImage_setPixel(im, x, y, (sfColor){200, 205, 215, 255});
+            else if (r < tooth)
+                sfImage_setPixel(im, x, y, (sfColor){150, 155, 170, 255});
+        }
+    return im;
+}
+
+/*
 ** The stand-ins for objects that have no image yet, white so the object's
 ** colour is exactly its tint: a plain plate, and a ring around a dot.
 */
 static sfImage *drawn_image(const char *name)
 {
-    sfImage *im = sfImage_createFromColor(DRAWN_SIZE, DRAWN_SIZE, sfWhite);
+    sfImage *im = NULL;
     float mid = (DRAWN_SIZE - 1) / 2.0f;
 
+    if (strcmp(name, DRAWN_SAW) == 0)
+        return drawn_saw();
+    im = sfImage_createFromColor(DRAWN_SIZE, DRAWN_SIZE, sfWhite);
     if (strcmp(name, DRAWN_PLATE) == 0)
         return im;
     for (unsigned int y = 0; y < DRAWN_SIZE; y++)

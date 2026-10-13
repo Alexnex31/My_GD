@@ -9,7 +9,7 @@
 #include "sim/modes.h"
 
 #define SHAPE_SQUARE (sfColor){255, 60, 60, 255}      /* the rigid square */
-#define SHAPE_CIRCLE (sfColor){255, 160, 0, 255}      /* the circle       */
+#define PLAYER_CIRCLE (sfColor){255, 160, 0, 255}      /* the circle       */
 #define SHAPE_INNER  (sfColor){80, 140, 255, 255}     /* the inner box    */
 #define ZONE_ON      (sfColor){255, 255, 255, 200}
 #define ZONE_OFF     (sfColor){255, 255, 255, 70}
@@ -66,7 +66,7 @@ static void draw_player_shapes(sfVertexArray *va, const level_t *lv)
     double y_line = 0.0;
 
     box(va, p->pos, m->half, SHAPE_SQUARE);
-    circle(va, p->pos, m->half, SHAPE_CIRCLE);
+    circle(va, p->pos, m->half, PLAYER_CIRCLE);
     box(va, p->pos, m->inner_half, SHAPE_INNER);
     sim_jump_zone(&lv->sim, &zone, &y_line);
     rect_outline(va, zone, p->can_jump ? ZONE_ON : ZONE_OFF);
@@ -100,6 +100,8 @@ static void draw_hitboxes(sfVertexArray *va, const level_t *lv, float cam_x)
             continue;
         for (int v = 0; v < h->nverts; v++)
             line(va, h->verts[v], h->verts[(v + 1) % h->nverts], col);
+        if (h->kind == SHAPE_CIRCLE)         /* a saw's disc */
+            circle(va, h->center, h->radius, col);
     }
 }
 

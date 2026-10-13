@@ -53,6 +53,7 @@ typedef struct level {
     level_stats_t stats;
     render_chunk_t *chunks;       /* the level's static geometry (9.2)        */
     size_t nb_chunks;
+    sfVertexArray *spinning;      /* the saws in view, turned each frame      */
     sfSprite *player_sprite;
     sfSprite *ground_sprite;
     sfSprite *background_sprite;  /* parallax, in the UI view (9.3)           */

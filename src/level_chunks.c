@@ -10,6 +10,13 @@
 #include "sim/modes.h"
 
 #define VERTS_PER_OBJECT 6        /* two triangles; a slope's second is empty */
+#define SAW_SPIN 1.5              /* degrees per tick: one turn a second    */
+
+/* What turns on screen can't live in a static buffer: drawn each frame. */
+static bool spins(const object_t *o)
+{
+    return o->type == OBJ_SAW;
+}
 
 static draw_layer_t layer_of(const object_t *o)
 {
@@ -124,7 +131,8 @@ static void count_objects(level_t *lv, size_t *counts)
     for (size_t i = 0; i < lv->sim.lvl.nb_objects; i++) {
         const object_t *o = &lv->sim.lvl.objects[i];
 
-        counts[chunk_index(o) * LAYER_COUNT + layer_of(o)] += 1;
+        if (!spins(o))
+            counts[chunk_index(o) * LAYER_COUNT + layer_of(o)] += 1;
     }
 }
 
@@ -145,6 +153,8 @@ static void build_vertices(level_t *lv, gd_t *gd, size_t *counts,
         const object_t *o = &lv->sim.lvl.objects[i];
         size_t k = chunk_index(o) * LAYER_COUNT + layer_of(o);
 
+        if (spins(o))
+            continue;
         append_object(buf[k] + filled[k] * VERTS_PER_OBJECT, o,
             gd->atlas_rect[o->type], object_color(o));
         filled[k] += 1;
@@ -193,6 +203,8 @@ void level_build_chunks(level_t *lv, gd_t *gd)
 
         right = fmax(right, d.x + d.w);
     }
+    lv->spinning = sfVertexArray_create();
+    sfVertexArray_setPrimitiveType(lv->spinning, sfTriangles);
     lv->nb_chunks = (size_t)(right / CHUNK_W) + 1;
     lv->chunks = sim_xcalloc(lv->nb_chunks, sizeof(render_chunk_t));
     for (size_t c = 0; c < lv->nb_chunks; c++)
@@ -221,9 +233,41 @@ void level_free_chunks(level_t *lv)
             if (lv->chunks[c].array[l] != NULL)
                 sfVertexArray_destroy(lv->chunks[c].array[l]);
         }
+    if (lv->spinning != NULL)
+        sfVertexArray_destroy(lv->spinning);
+    lv->spinning = NULL;
     free(lv->chunks);
     lv->chunks = NULL;
     lv->nb_chunks = 0;
+}
+
+/*
+** The saws in view, each turned by how long the attempt has run. Decoration
+** only: the sim's disc doesn't turn, and never reads this (FEATURES 10.6).
+*/
+static void render_spinning(gd_t *gd, level_t *lv, float cam_x,
+    sfRenderStates *rs)
+{
+    const level_data_t *lvl = &lv->sim.lvl;
+    double turn = fmod((double)lv->sim.st.tick * SAW_SPIN, 360.0);
+    sfVertex six[VERTS_PER_OBJECT];
+
+    sfVertexArray_clear(lv->spinning);
+    for (size_t i = 0; i < lvl->nb_objects; i++) {
+        object_t o = lvl->objects[i];
+        rect_t d = object_drawn_bounds(&o);
+
+        if (o.hitbox.aabb.x > cam_x + VIEW_W)
+            break;                           /* sorted by x: none further is in */
+        if (!spins(&o) || d.x + d.w < cam_x)
+            continue;
+        o.rotation += turn;
+        append_object(six, &o, gd->atlas_rect[o.type], object_color(&o));
+        for (int k = 0; k < VERTS_PER_OBJECT; k++)
+            sfVertexArray_append(lv->spinning, six[k]);
+    }
+    if (sfVertexArray_getVertexCount(lv->spinning) > 0)
+        draw_vertex_array(gd, lv->spinning, rs);
 }
 
 /* Layer by layer, only the chunks the view touches: a few draw calls (9.0). */
@@ -231,7 +275,9 @@ void render_objects(gd_t *gd, level_t *lv, float cam_x)
 {
     sfRenderStates rs = {sfBlendAlpha, sfTransform_Identity, gd->atlas, NULL};
 
-    for (int l = 0; l < LAYER_COUNT; l++)
+    for (int l = 0; l < LAYER_COUNT; l++) {
+        if (l == LAYER_HAZARD + 1)
+            render_spinning(gd, lv, cam_x, &rs);
         for (size_t c = 0; c < lv->nb_chunks; c++) {
             render_chunk_t *ch = &lv->chunks[c];
 
@@ -242,4 +288,7 @@ void render_objects(gd_t *gd, level_t *lv, float cam_x)
             else if (ch->array[l] != NULL)
                 draw_vertex_array(gd, ch->array[l], &rs);
         }
+    }
+    if (LAYER_HAZARD + 1 == LAYER_COUNT)
+        render_spinning(gd, lv, cam_x, &rs);
 }
