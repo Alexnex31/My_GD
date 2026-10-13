@@ -28,6 +28,7 @@ int main(void)
     test_mirror();
     test_pads();
     test_orbs();
+    test_saw();
     test_doc();
     test_editor();
     test_edit();

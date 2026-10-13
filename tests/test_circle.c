@@ -167,6 +167,14 @@ static void test_saw_disc(void)
         - 0.36534) < 1e-4);
     /* already touching it */
     CHECK(sweep_box_disc(c, R, d, (vec2_t){920.0, 750.0}, 42.0) == 0.0);
+    /* a corner already in it, and the move takes it out: still a touch */
+    CHECK(sweep_box_disc(c, R, (vec2_t){-200.0, 0.0}, (vec2_t){970.0, 820.0},
+        42.0) == 0.0);
+    CHECK(sweep_box_disc(c, R, (vec2_t){0.0, 0.0}, (vec2_t){970.0, 820.0},
+        42.0) == 0.0);
+    /* the same disc just off the corner, not moving: nothing */
+    CHECK(sweep_box_disc(c, R, (vec2_t){0.0, 0.0}, (vec2_t){980.0, 830.0},
+        42.0) == INFINITY);
 }
 
 void test_circle(void)

@@ -25,6 +25,7 @@ void test_ball(void);
 void test_mirror(void);
 void test_pads(void);
 void test_orbs(void);
+void test_saw(void);
 void test_doc(void);
 void test_editor(void);
 void test_edit(void);
