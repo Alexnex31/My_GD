@@ -234,6 +234,10 @@ void hitbox_for_object(object_t *o)
         hitbox_build_poly(&o->hitbox, v, 3, r, o->rotation);
         return;
     }
+    if (o->type == OBJ_SAW) {                /* a disc: turning it changes nothing */
+        hitbox_build_circle(&o->hitbox, r, SAW_RADIUS * r.w);
+        return;
+    }
     rect_corners(object_local_box(o), v);
     hitbox_build_poly(&o->hitbox, v, 4, o->rect, o->rotation);
 }

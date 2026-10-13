@@ -168,6 +168,9 @@ static double leg_death_time(sim_t *s, vec2_t d)
         if (OBJ_CATEGORY[o->type] == CAT_NEUTRAL)
             t = sweep_box_touch(p->pos, mode_neutral_kill_half(m), d,
                 &o->hitbox);
+        else if (o->hitbox.kind == SHAPE_CIRCLE)         /* a saw (G.10) */
+            t = sweep_box_disc(p->pos, m->half, d, o->hitbox.center,
+                o->hitbox.radius);
         else if (OBJ_CATEGORY[o->type] == CAT_HARM)
             t = sweep_box_touch(p->pos, m->half, d, &o->hitbox);
         else

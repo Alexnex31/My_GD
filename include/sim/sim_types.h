@@ -30,7 +30,8 @@ typedef enum obj_type {
     OBJ_GRAVITY,              /* interactive: a gravity portal (FEATURES 9.4) */
     OBJ_PAD,                  /* interactive: launches on touch (FEATURES 10.1) */
     OBJ_ORB,                  /* interactive: launches on a fresh hold (10.2)  */
-    /* later: OBJ_SAW (harm), OBJ_SPEED (FEATURES 10) */
+    OBJ_SAW,                  /* harm: a disc (FEATURES 10.6)                  */
+    /* later: OBJ_SPEED (FEATURES 10) */
     OBJ_TYPE_COUNT
 } obj_type_t;
 

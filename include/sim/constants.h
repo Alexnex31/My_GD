@@ -24,6 +24,9 @@
     #define SPIKE_BOX_Y         0.25
     #define SPIKE_BOX_W         0.26
     #define SPIKE_BOX_H         0.43
+    /* A saw's hitbox is a disc a little inside its teeth, forgiving like the
+       spike's: this share of the rect's width, around its center (10.6). */
+    #define SAW_RADIUS          0.42
     /* A portal's hitbox, measured in the real game: 1.2 blocks wide, 2.8 tall,
        around the center of the cell the level gives it (4.2, 7.2). */
     #define PORTAL_BOX_W        1.2

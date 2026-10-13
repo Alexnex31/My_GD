@@ -401,7 +401,7 @@ double sweep_box_disc(vec2_t c, double h, vec2_t d, vec2_t center, double r)
     double a = dot(d, d);
     double best = fmin(rect_entry(q, v, h + r, h), rect_entry(q, v, h, h + r));
 
-    for (int i = 0; a > 0.0 && i < 4; i++) {
+    for (int i = 0; i < 4; i++) {
         vec2_t k = {i < 2 ? -h : h, i % 2 == 0 ? -h : h};
         vec2_t f = vsub(q, k);
         double b = dot(f, d);
@@ -409,7 +409,9 @@ double sweep_box_disc(vec2_t c, double h, vec2_t d, vec2_t center, double r)
         double disc = b * b - a * cc;
         double t;
 
-        if (disc < 0.0)
+        if (cc < 0.0)
+            return 0.0;                      /* a corner is already in the disc */
+        if (a <= 0.0 || disc < 0.0)
             continue;
         t = (b - sqrt(disc)) / a;
         if (t >= 0.0 && t <= 1.0 && t < best)

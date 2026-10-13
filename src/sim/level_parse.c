@@ -172,6 +172,7 @@ static const char *const TYPE_NAMES[OBJ_TYPE_COUNT] = {
     [OBJ_BLOCK] = "block", [OBJ_SLOPE] = "slope",
     [OBJ_SPIKE] = "spike", [OBJ_PORTAL] = "portal",
     [OBJ_GRAVITY] = "gravity", [OBJ_PAD] = "pad", [OBJ_ORB] = "orb",
+    [OBJ_SAW] = "saw",
 };
 
 const char *obj_type_name(obj_type_t type)
