@@ -13,6 +13,7 @@
 #define DRAWN_PLATE "#plate"      /* not files: shapes made in drawn_image */
 #define DRAWN_ORB "#orb"
 #define DRAWN_SAW "#saw"
+#define DRAWN_SPEED "#speed"
 #define SAW_TEETH 10
 #define DRAWN_SIZE 64
 
@@ -25,6 +26,7 @@ static const char *const ATLAS_FILES[OBJ_TYPE_COUNT] = {
     [OBJ_PAD] = DRAWN_PLATE,                 /* no image yet: drawn here in */
     [OBJ_ORB] = DRAWN_ORB,                   /* white, tinted by its colour */
     [OBJ_SAW] = DRAWN_SAW,
+    [OBJ_SPEED] = DRAWN_SPEED,               /* white, tinted by its speed */
 };
 
 /*
@@ -78,6 +80,27 @@ static sfImage *drawn_saw(void)
 }
 
 /*
+** A speed portal's stand-in: three arrowheads pointing right, one above the
+** other, white so the portal's colour is its tint.
+*/
+static sfImage *drawn_speed(void)
+{
+    sfImage *im = sfImage_createFromColor(DRAWN_SIZE, DRAWN_SIZE,
+        sfTransparent);
+
+    for (unsigned int y = 0; y < DRAWN_SIZE; y++)
+        for (unsigned int x = 0; x < DRAWN_SIZE; x++) {
+            float u = (float)x / (DRAWN_SIZE - 1);
+            float v = fmodf((float)y / DRAWN_SIZE * 3.0f, 1.0f);
+            float edge = 0.75f - fabsf(v - 0.5f) * 1.2f;   /* the arrow's tip */
+
+            if (u < edge && u > edge - 0.38f)
+                sfImage_setPixel(im, x, y, sfWhite);
+        }
+    return im;
+}
+
+/*
 ** The stand-ins for objects that have no image yet, white so the object's
 ** colour is exactly its tint: a plain plate, and a ring around a dot.
 */
@@ -88,6 +111,8 @@ static sfImage *drawn_image(const char *name)
 
     if (strcmp(name, DRAWN_SAW) == 0)
         return drawn_saw();
+    if (strcmp(name, DRAWN_SPEED) == 0)
+        return drawn_speed();
     im = sfImage_createFromColor(DRAWN_SIZE, DRAWN_SIZE, sfWhite);
     if (strcmp(name, DRAWN_PLATE) == 0)
         return im;

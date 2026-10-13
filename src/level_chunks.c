@@ -8,6 +8,7 @@
 #include "mygd.h"
 #include "sim/hitbox.h"
 #include "sim/modes.h"
+#include "sim/speed.h"
 
 #define VERTS_PER_OBJECT 6        /* two triangles; a slope's second is empty */
 #define SAW_SPIN 1.5              /* degrees per tick: one turn a second    */
@@ -46,6 +47,19 @@ static const sfColor LAUNCH_COLORS[LAUNCH_KIND_COUNT] = {
     [LAUNCH_BLACK] = {70, 70, 70, 255},
 };
 
+/* A speed portal's colour, slowest first: GD's (FEATURES 10.3). */
+static sfColor speed_color(double name)
+{
+    static const sfColor COLORS[SPEED_COUNT] = {{255, 150, 40, 255},
+        {60, 150, 255, 255}, {60, 220, 90, 255}, {255, 120, 220, 255},
+        {255, 60, 60, 255}};
+
+    for (int i = 0; i < SPEED_COUNT; i++)
+        if (SPEED_NAMES[i] == name)
+            return COLORS[i];
+    return sfWhite;
+}
+
 /*
 ** A mode portal has its mode's colour; a gravity portal is yellow when it
 ** sends the player up and blue when it brings it back down, as in GD.
@@ -57,6 +71,8 @@ static sfColor object_color(const object_t *o)
             : (sfColor){60, 120, 255, 255};
     if (o->type == OBJ_PAD || o->type == OBJ_ORB)
         return LAUNCH_COLORS[o->launch];
+    if (o->type == OBJ_SPEED)
+        return speed_color(o->speed);
     if (o->type != OBJ_PORTAL)
         return sfWhite;
     return PORTAL_COLORS[o->portal_mode];

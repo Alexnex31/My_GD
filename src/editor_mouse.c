@@ -21,10 +21,10 @@ rect_t editor_box(editor_t *ed, gd_t *gd)
         fabs(at.x - ed->press_at.x), fabs(at.y - ed->press_at.y)};
 }
 
-/* The palette is a column of rows, 40 px each, under the toolbar. */
+/* The palette is a column of rows under the toolbar. */
 static void palette_click(editor_t *ed, sfVector2f at)
 {
-    int row = (int)((at.y - ED_TOOLBAR_H - 10.0f) / 40.0f);
+    int row = (int)((at.y - ED_TOOLBAR_H - 10.0f) / ED_PALETTE_ROW);
 
     if (at.x < ED_PALETTE_W && at.y >= ED_TOOLBAR_H + 10.0f && row >= 0
         && row < ed->nb_entries) {

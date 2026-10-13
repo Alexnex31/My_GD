@@ -261,16 +261,16 @@ static void draw_palette(editor_t *ed, gd_t *gd)
     editor_fill(gd, ed, (sfFloatRect){0.0f, ED_TOOLBAR_H, ED_PALETTE_W,
         VIEW_H - ED_TOOLBAR_H}, PANEL_FILL, sfTransparent);
     for (int i = 0; i < ed->nb_entries; i++) {
-        float y = ED_TOOLBAR_H + 10.0f + 40.0f * (float)i;
+        float y = ED_TOOLBAR_H + 10.0f + ED_PALETTE_ROW * (float)i;
 
         if (i == ed->entry)
-            editor_fill(gd, ed, (sfFloatRect){6.0f, y, ED_PALETTE_W - 12.0f, 36.0f},
-                PICKED, sfTransparent);
+            editor_fill(gd, ed, (sfFloatRect){6.0f, y, ED_PALETTE_W - 12.0f,
+                ED_PALETTE_ROW - 3.0f}, PICKED, sfTransparent);
         if (i < 9)
             snprintf(row, sizeof(row), "%d  %s", i + 1, ed->entries[i].label);
         else
             snprintf(row, sizeof(row), "    %s", ed->entries[i].label);
-        editor_label(ed, gd, row, 14.0f, y + 6.0f, 20, sfWhite);
+        editor_label(ed, gd, row, 14.0f, y + 3.0f, 19, sfWhite);
     }
 }
 

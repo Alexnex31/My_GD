@@ -20,6 +20,7 @@
     #define ED_PALETTE_W 220.0f
     #define ED_CANVAS_W (VIEW_W - ED_PALETTE_W)
     #define ED_CANVAS_H (VIEW_H - ED_TOOLBAR_H)
+    #define ED_PALETTE_ROW 30.0f  /* one entry: they all have to fit         */
     #define ED_STATUS_H 40.0f     /* the strip along the canvas's bottom     */
     #define ED_STATUS_Y (VIEW_H - ED_STATUS_H)
     #define ED_VERIFY_FRAME_MS 10 /* the bot's share of a frame (11.10)      */
