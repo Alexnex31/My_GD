@@ -1468,7 +1468,7 @@ Consequences:
 
 | Mode | Behavior | Implementation notes |
 |---|---|---|
-| Robot | Hold to jump higher: while held after takeoff, gravity is reduced for up to ~0.25 s | `boost_ticks` counter in `player_t`; `integrate` uses `g × 0.3` while `held && boost_ticks > 0` |
+| Robot | Hold to jump higher: from takeoff it rises at 45° for as long as the button is held, up to a time limit, then falls normally | `boost_ticks` counter in `player_t`; while `held && boost_ticks > 0` the rise speed is `vx` and gravity isn't applied; after that, the mode's ordinary gravity |
 | Swing | Ship-like flight; each press flips gravity | Ship integration with `gravity_dir`; ball-style flip on `pressed` |
 | Spider | Press teleports to the opposite surface and flips gravity | Needs a vertical raycast among nearby blocks, corridor and ground to find the landing surface; set `pos.y` directly |
 
@@ -1477,6 +1477,16 @@ Consequences:
 `saw x y size [rot=...]`: a **harm** object (PLAN 3.0) with a **circle** hitbox: center at the rect's center, radius `0.42 × w` (a little inside the sprite's teeth, forgiving like spikes). Any contact kills. Rotation doesn't change a circle, but the sprite can spin as decoration (game layer).
 
 The sweep is written out in PLAN Appendix G.10: the two slabs and the four corner discs, with the quadratic and which root to keep. Any hit in the move's range kills. It's a `SHAPE_CIRCLE` branch in the harm sweep; everything else (broadphase, rotation, containment counting as contact) already applies.
+
+### 10.6b As built (saws)
+
+- **`saw x y size`** is a harm object whose hitbox is a disc (`SHAPE_CIRCLE`): the rect's center, radius `SAW_RADIUS` (0.42) of the rect's **width**, 42 px at size 2. `rot=` is read and kept but changes nothing in the simulation.
+- **One branch in the death test** (`leg_death_time`, `src/sim/move.c`): a disc is swept with `sweep_box_disc` (PLAN G.10) against the rigid square, as a spike is. Nothing else in the tick knows about discs: the broadphase reads its bounds like any object's.
+- **A corner already inside the disc at the start of a move is a touch** (`t = 0`), which G.10 asks for and the sweep didn't do for its four corner discs. No run could show it before: no level had a disc.
+- **Round in the editor:** a saw's Width and Height steps change both, since a saw drawn as an oval would still kill as a disc of its width. A file can still give `w=` and `h=` that differ; the disc then follows `w`.
+- **The game layer:** no image yet. `src/atlas.c` draws a stand-in, a grey disc as wide as the hitbox with leaning teeth out to the cell's edge. In a level it turns once a second, from the run's tick count; saws are drawn each frame instead of from the static buffers (`render_spinning`, `src/level_chunks.c`). The editor shows it still. The F3 overlay draws the disc.
+- **Not checked by the editor's warnings:** a saw inside a block says nothing (only spikes are tested for that).
+- **Tests:** `tests/test_saw.c` (the disc from each form of the line; death on the exact tick the square's side reaches it; a small saw at the fastest start speed; a hanging saw that only touches the cube's top and one half a pixel lower; a disc whose box the cube enters well before the disc itself; a saw jumped, a column of saws that isn't, a ship between pairs; placed, resized and undone in the editor), the corner-inside cases in `tests/test_circle.c`, and `levels/16.gd`, which the bot solves.
 
 ### 10.7 Order
 

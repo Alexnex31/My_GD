@@ -2,11 +2,11 @@
 
 A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affiliated with RobTop Games.
 
-> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2) and the level editor (11: open a level or make a new one, place, delete, save, select, move, copy, undo, turn, resize, start positions, playtest, the song and its beat lines, verify with the bot, warnings, autosave) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
+> **Status: playable rewrite.** The deterministic simulation of `PLAN.md` runs the game: Steps 1 to 8 of its Appendix H are in (geometry, loader, the tick with slopes, steps and the jump zone, portals and corridors, the game layer with death, respawn, progress and the F3 overlay, then the bot). Of `FEATURES.md`, the input (1: a thread polls the jump buttons every millisecond, and a press counts in the 240 Hz tick it happened in, whatever the frame rate) the settings store (2: `save/settings.txt`), the widget toolkit (3), music selection (4: a library in `music/`, per-level songs and overrides, sync) the options screen (5), the gamemode framework (6: one table row and one file per mode, gravity portals), the UFO (7), the wave with its trail (8) the ball (9, with tests that play every corridor mode upside down) jump pads and orbs (10.1, 10.2), saws (10.6) and the level editor (11: open a level or make a new one, place, delete, save, select, move, copy, undo, turn, resize, start positions, playtest, the song and its beat lines, verify with the bot, warnings, autosave) are in; the rest is next. Anything marked *planned* below doesn't exist yet.
 
 ## What it is
 
-The player runs right at a constant speed and only ever presses one button. Blocks and slopes carry it, spikes kill it, portals change what it is (cube, ship, UFO, wave, ball), pads and orbs throw it. Everything else is level design.
+The player runs right at a constant speed and only ever presses one button. Blocks and slopes carry it, spikes and saws kill it, portals change what it is (cube, ship, UFO, wave, ball), pads and orbs throw it. Everything else is level design.
 
 Under the hood it's split in two:
 
@@ -125,7 +125,7 @@ Two tools, `Tab` switches between them: **Place** and **Select**.
 
 Holding a move key, Ctrl+Z or Ctrl+Y repeats it.
 
-With something selected, a panel in the canvas's top right corner shows its properties, each with a minus and a plus: turn (15 degrees), width and height (grid units), kind (a portal's mode, a pad's or an orb's colour, a gravity portal's direction).
+With something selected, a panel in the canvas's top right corner shows its properties, each with a minus and a plus: turn (15 degrees), width and height (grid units), kind (a portal's mode, a pad's or an orb's colour, a gravity portal's direction). A saw stays round: its width and height change together.
 
 **Start positions** are the palette's last entry. They are other places to begin an attempt from, for practice: the level's real start doesn't change, and they aren't obstacles. Selected, the panel sets their gamemode, gravity and speed. In the game and in a playtest, **A** and **E** go to the previous and the next one (the level's start is the first of the list) and begin an attempt there. An attempt from a start position still adds to the attempt counter, but records no best and no completion. A short `<1/2>` shows which one it is.
 
@@ -177,17 +177,18 @@ portal 2100 750 2 ship
 gravity 4000 750 2 up         # gravity portal: the player falls upward
 pad 4500 750 2 yellow         # jump pad: launches on touch
 orb 5000 500 2 pink           # jump orb: launches on a click while touching it
+saw 5500 750 2                # saw: a disc that kills on any contact
 ```
 
 - **Header**: any line whose first word isn't an object type, written `key <value>`. `name`, `author`, `music`, `music_offset`, `bpm` and `first_beat` describe the level; the optional `start_gamemode`, `start_speed`, `start_size`, `start_gravity`, `start_x` and `start_y` say where and how an attempt begins. Unknown keys are ignored with a warning, so the file still loads.
-- **Body**: `type x y size [word] [key=value ...]`, with types `block`, `slope`, `spike`, `portal` (whose word is the gamemode: `cube`, `ship`, `ufo`, `wave`, `ball`) `gravity` (a gravity portal, whose word is `up` or `down`), `start` (another place to begin an attempt for practice, `start x y mode [up|down] [speed]`: no size, no hitbox, and the real start stays the header's), `pad` (a jump pad: `yellow`, `pink`, `red` or `blue`) and `orb` (a jump orb, clicked while touching it: `yellow`, `pink`, `red`, `blue`, `green` or `black`).
+- **Body**: `type x y size [word] [key=value ...]`, with types `block`, `slope`, `spike`, `saw` (a disc, 0.42 of its width in radius), `portal` (whose word is the gamemode: `cube`, `ship`, `ufo`, `wave`, `ball`) `gravity` (a gravity portal, whose word is `up` or `down`), `start` (another place to begin an attempt for practice, `start x y mode [up|down] [speed]`: no size, no hitbox, and the real start stays the header's), `pad` (a jump pad: `yellow`, `pink`, `red` or `blue`) and `orb` (a jump orb, clicked while touching it: `yellow`, `pink`, `red`, `blue`, `green` or `black`).
 - `x` and `y` are the object's top-left corner in world pixels, `y` grows downward and the ground's surface is at `y = 850`.
 - `size` is in grid units of 50 px, so `size 2` is the 100 x 100 block that matches the player. `w=` and `h=` override it per axis, `rot=` turns the object by any angle.
 - Sizes must be at least 1: a zero or negative size rejects the line, naming the file and the line.
 - `x`, `y` and the object's width and height must stay within 10 000 000 px (over two hours of level): beyond that the line is rejected the same way.
 - **Your progress is never written into a level file.** Attempts and bests live in `save/progress.txt`, keyed by the level's id, so editing or sharing a level never touches your records. A level gets a line there once you've played it, and a best below 100% is never saved as 100.
 
-The full grammar, including the planned `pad`, `orb`, `saw`, `speed`, `mini` and `gravity` objects, is in `PLAN.md` 7.2 and `FEATURES.md` 12.
+The full grammar, including the planned `speed` and `mini` objects, is in `PLAN.md` 7.2 and `FEATURES.md` 12.
 
 ## Layout
 
