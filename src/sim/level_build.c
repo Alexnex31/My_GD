@@ -15,6 +15,7 @@
 #include "sim/level.h"
 #include "sim/modes.h"
 #include "sim/sim.h"
+#include "sim/speed.h"
 
 /* By hitbox left edge, then by source line: the same order on every libc. */
 static int cmp_object(const void *a, const void *b)
@@ -43,6 +44,10 @@ void level_finalize(level_data_t *lvl)
         right = fmax(right, box.x + box.w);
         top = fmin(top, box.y);
     }
+    speed_map_free(&lvl->speeds);
+    for (size_t i = 0; i < lvl->nb_objects; i++)
+        speed_map_add(&lvl->speeds, &lvl->objects[i]);
+    speed_map_sort(&lvl->speeds);
     lvl->end_shift = 100.0;              /* an empty level is legal, and short */
     if (lvl->nb_objects > 0)
         lvl->end_shift = fmax(right + LEVEL_END_PADDING
@@ -57,7 +62,7 @@ void level_header_defaults(level_header_t *hdr, const char *id)
     snprintf(hdr->name, sizeof(hdr->name), "%s", id);
     hdr->start = (level_start_t){
         .pos = {PLAYER_SPAWN_X, PLAYER_SPAWN_Y}, .mode = MODE_CUBE,
-        .speed_mult = 1.0, .gravity_dir = 1};
+        .speed = 1.0, .gravity_dir = 1};
 }
 
 /* The level is in s->lvl: sort it, measure it, and stand at its start. */
@@ -212,6 +217,7 @@ void sim_free(sim_t *s)
 {
     free(s->lvl.objects);
     free(s->lvl.starts);
+    speed_map_free(&s->lvl.speeds);
     free(s->st.spent);
     memset(s, 0, sizeof(*s));
 }

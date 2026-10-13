@@ -16,6 +16,7 @@
 #include "music/library.h"
 #include "sim/alloc.h"
 #include "sim/constants.h"
+#include "sim/speed.h"
 
 #define LINE_LEN 512
 #define MSG_LEN 1200
@@ -284,8 +285,8 @@ float music_volume_curve(int volume)
 
 double level_duration(const level_data_t *lvl)
 {
-    double mult = lvl->hdr.start.speed_mult > 0.0 ? lvl->hdr.start.speed_mult
-        : 1.0;
+    const level_start_t *start = &lvl->hdr.start;
 
-    return lvl->end_shift / (SCROLL_SPEED * mult);
+    return speed_map_ticks(&lvl->speeds, start, start->pos.x + lvl->end_shift)
+        / TICK_RATE;
 }

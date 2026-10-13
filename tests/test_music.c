@@ -181,10 +181,11 @@ static void test_sync_and_volume(void)
     CHECK(music_volume_curve(50) == 25.0f);       /* sounds like half (4.7) */
     CHECK(music_volume_curve(0) == 0.0f && music_volume_curve(150) == 100.0f);
     lvl.end_shift = SCROLL_SPEED * 12.0;
-    lvl.hdr.start.speed_mult = 1.0;
+    lvl.hdr.start.speed = 1.0;
     CHECK(fabs(level_duration(&lvl) - 12.0) < 1e-9);
-    lvl.hdr.start.speed_mult = 2.0;
-    CHECK(fabs(level_duration(&lvl) - 6.0) < 1e-9);
+    lvl.hdr.start.speed = 4.0;                    /* 1920 px/s (FEATURES 10.3) */
+    CHECK(fabs(level_duration(&lvl) - 12.0 * SPEED_NORMAL / SPEED_XFAST)
+        < 1e-9);
 }
 
 static void clean(void)

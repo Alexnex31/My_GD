@@ -31,7 +31,7 @@ typedef enum obj_type {
     OBJ_PAD,                  /* interactive: launches on touch (FEATURES 10.1) */
     OBJ_ORB,                  /* interactive: launches on a fresh hold (10.2)  */
     OBJ_SAW,                  /* harm: a disc (FEATURES 10.6)                  */
-    /* later: OBJ_SPEED (FEATURES 10) */
+    OBJ_SPEED,                /* interactive: a speed portal (FEATURES 10.3)   */
     OBJ_TYPE_COUNT
 } obj_type_t;
 
@@ -86,13 +86,15 @@ typedef struct object {       /* level data: never modified after load */
     gamemode_t portal_mode;   /* OBJ_PORTAL only                                */
     int portal_gravity;       /* OBJ_GRAVITY only: +1 down, -1 up               */
     launch_kind_t launch;     /* OBJ_PAD, OBJ_ORB: its colour                   */
+    double speed;             /* OBJ_SPEED only: its name, 0.5 to 4 (10.3)      */
     int line;                 /* source line, for messages and stable sort      */
 } object_t;
 
 typedef struct level_start {  /* where and how an attempt starts (7.2) */
     vec2_t pos;               /* start_x, start_y: the player's center           */
     gamemode_t mode;          /* start_gamemode                                  */
-    double speed_mult;        /* start_speed: 0.5, 1, 2, 3 or 4                  */
+    double speed;             /* start_speed: GD's name for it, 0.5, 1, 2, 3 or 4:
+                                 a name, not a ratio (FEATURES 10.3)             */
     int gravity_dir;          /* start_gravity: +1 normal, -1 flipped            */
     bool mini;                /* start_size: needs the mini scale (FEATURES 10.4) */
 } level_start_t;
@@ -107,6 +109,23 @@ typedef struct level_header { /* the level file's header fields (7.2) */
     level_start_t start;
 } level_header_t;
 
+/*
+** Where a run changes speed, for what needs the time an x is reached at
+** (sim/speed.h): the player's center when it takes the portal, the portal's
+** far side, and the px per tick from there on.
+*/
+typedef struct speed_change {
+    double x;
+    double right;
+    double step;
+} speed_change_t;
+
+typedef struct speed_map {
+    speed_change_t *at;       /* sorted by x once speed_map_sort has run */
+    size_t n;
+    size_t cap;
+} speed_map_t;
+
 typedef struct level_data {   /* immutable after sim_load */
     object_t *objects;        /* contiguous, sorted by hitbox.aabb.x (then line) */
     size_t nb_objects;
@@ -116,6 +135,7 @@ typedef struct level_data {   /* immutable after sim_load */
     level_start_t *starts;     /* the level's other start positions, in file order:
                                   practice only, never a completion (FEATURES 11.8) */
     size_t nb_starts;
+    speed_map_t speeds;        /* its speed portals, in x order (FEATURES 10.3)   */
     int skipped_lines;         /* object lines the loader dropped (7.4)           */
     uint64_t file_hash;        /* fnv1a of the bytes loaded: the version (6.4)    */
     char id[24];               /* the file's digits, e.g. "10280" (7.2)           */
@@ -163,7 +183,8 @@ typedef struct ship_bounds {
 typedef struct run_state {    /* everything an attempt changes */
     long tick;
     double distance;          /* px scrolled since spawn (3.2)  */
-    double speed_mult;        /* 1 until speed portals          */
+    double speed_mult;        /* the speed over the normal one: set by the start
+                                 and by speed portals (10.3)   */
     player_t player;
     camera_t cam;
     ship_bounds_t bounds;

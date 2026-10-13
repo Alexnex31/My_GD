@@ -18,6 +18,7 @@ const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT] = {
     [OBJ_PAD] = CAT_INTERACTIVE,
     [OBJ_ORB] = CAT_INTERACTIVE,
     [OBJ_SAW] = CAT_HARM,
+    [OBJ_SPEED] = CAT_INTERACTIVE,
 };
 
 /*

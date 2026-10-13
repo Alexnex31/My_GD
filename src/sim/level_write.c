@@ -14,6 +14,7 @@
 #include "sim/alloc.h"
 #include "sim/level.h"
 #include "sim/modes.h"
+#include "sim/speed.h"
 
 typedef struct text_buf {
     char *text;
@@ -69,8 +70,8 @@ static void put_header(text_buf_t *b, const level_header_t *h)
         put(b, "start_gamemode %s\n", MODES[st->mode].name);
     if (st->gravity_dir < 0)
         put(b, "start_gravity flipped\n");
-    if (st->speed_mult != 1.0)
-        put(b, "start_speed %.10g\n", st->speed_mult);
+    if (st->speed != 1.0)
+        put(b, "start_speed %.10g\n", st->speed);
     if (st->mini)
         put(b, "start_size mini\n");
 }
@@ -82,8 +83,8 @@ static void put_starts(text_buf_t *b, const level_doc_t *doc)
 
         put(b, "start %.10g %.10g %s%s", st->pos.x, st->pos.y,
             MODES[st->mode].name, st->gravity_dir < 0 ? " up" : "");
-        if (st->speed_mult != 1.0)
-            put(b, " %.10g", st->speed_mult);
+        if (st->speed != 1.0)
+            put(b, " %.10g", st->speed);
         put(b, "\n");
     }
 }
@@ -91,7 +92,8 @@ static void put_starts(text_buf_t *b, const level_doc_t *doc)
 /* A portal's rect is derived from its cell when the line gives no w or h. */
 static bool is_portal_shaped(const object_t *o)
 {
-    return o->type == OBJ_PORTAL || o->type == OBJ_GRAVITY;
+    return o->type == OBJ_PORTAL || o->type == OBJ_GRAVITY
+        || o->type == OBJ_SPEED;
 }
 
 /* The width or height a line without w= or h= gives this object (4.2). */
@@ -130,6 +132,8 @@ static const char *object_word(const object_t *o)
         return o->portal_gravity < 0 ? "up" : "down";
     if (o->type == OBJ_PAD || o->type == OBJ_ORB)
         return LAUNCHES[o->launch].name;
+    if (o->type == OBJ_SPEED)
+        return speed_word(o->speed);
     return NULL;
 }
 

@@ -124,7 +124,7 @@ static void test_start_lines(void)
     CHECK(lv.objects[1].is_start && lv.objects[1].start.mode == MODE_SHIP);
     CHECK(lv.objects[1].start.gravity_dir == -1);
     CHECK(lv.objects[1].obj.rect.x == 850.0 && lv.objects[1].obj.rect.w == 100.0);
-    CHECK(lv.objects[2].start.speed_mult == 2.0);
+    CHECK(lv.objects[2].start.speed == 2.0);
     CHECK(saves_as(&lv, text));
     ed_remove(&lv, lv.objects[1].id);
     CHECK(saves_as(&lv, "name S\nstart 400 800 ball 2\n\nblock 100 750 2\n"));
@@ -250,11 +250,11 @@ static void test_start_props(void)
     CHECK(ed_prop_step(&lv, &H, ED_PROP_GRAVITY, 1));
     CHECK(st->start.gravity_dir == -1);
     CHECK(ed_prop_step(&lv, &H, ED_PROP_SPEED, -1));
-    CHECK(st->start.speed_mult == 0.5);
+    CHECK(st->start.speed == 0.5);
     CHECK(!ed_prop_step(&lv, &H, ED_PROP_SPEED, -1) && H.nb_undo == 3);
     for (int i = 0; i < 4; i++)
         CHECK(ed_prop_step(&lv, &H, ED_PROP_SPEED, 1));
-    CHECK(st->start.speed_mult == 4.0);
+    CHECK(st->start.speed == 4.0);
     CHECK(!ed_prop_step(&lv, &H, ED_PROP_SPEED, 1));
     CHECK(!ed_prop_step(&lv, &H, ED_PROP_TURN, 1));    /* nothing to turn */
     CHECK(st->start.pos.x == 900.0 && st->start.pos.y == 300.0);

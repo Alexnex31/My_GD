@@ -117,7 +117,7 @@ static void test_any_speed(void)
 
     load(&s, WAVE MID "start_speed 2\n" FAR);
     run(&s, 20, HELD);
-    CHECK(s.st.player.vx == 2.0 * VX);
+    CHECK(s.st.player.vx == PER_TICK(SPEED_FAST));
     CHECK(s.st.player.vy == s.st.player.vx);
     CHECK(fabs((400.0 - s.st.player.pos.y)
         - (s.st.player.pos.x - PLAYER_SPAWN_X)) < 1e-9);

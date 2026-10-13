@@ -43,10 +43,10 @@ static void test_starts(void)
     CHECK(doc.count == 1 && doc.nb_starts == 3);
     CHECK(doc.starts[0].pos.x == 2000.0 && doc.starts[0].pos.y == 300.0);
     CHECK(doc.starts[0].mode == MODE_SHIP && doc.starts[0].gravity_dir == 1);
-    CHECK(doc.starts[0].speed_mult == 1.0);
+    CHECK(doc.starts[0].speed == 1.0);
     CHECK(doc.starts[1].mode == MODE_BALL && doc.starts[1].gravity_dir == -1);
-    CHECK(doc.starts[1].speed_mult == 2.0);
-    CHECK(doc.starts[2].mode == MODE_WAVE && doc.starts[2].speed_mult == 0.5);
+    CHECK(doc.starts[1].speed == 2.0);
+    CHECK(doc.starts[2].mode == MODE_WAVE && doc.starts[2].speed == 0.5);
     CHECK(hdr.start.pos.x == PLAYER_SPAWN_X && hdr.start.mode == MODE_CUBE);
     level_doc_free(&doc);
     CHECK(parse("start 2000 300\nstart 2000 300 spider\nstart x 300 cube\n"

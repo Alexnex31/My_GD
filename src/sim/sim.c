@@ -13,6 +13,7 @@
 #include "sim/internal.h"
 #include "sim/modes.h"
 #include "sim/sim.h"
+#include "sim/speed.h"
 
 /* The player the level's start_ fields describe (7.2). */
 static player_t start_player(const level_start_t *start)
@@ -20,7 +21,7 @@ static player_t start_player(const level_start_t *start)
     return (player_t){
         .pos = start->pos,
         .prev_pos = start->pos,
-        .vx = PER_TICK(SCROLL_SPEED) * start->speed_mult,
+        .vx = speed_step(start->speed),
         .gravity_dir = start->gravity_dir,
         .mode = start->mode,
         .hold = HOLD_FRESH,              /* a hold carried into the attempt is fresh */
@@ -47,20 +48,22 @@ static bool starts_on_the_floor(const sim_t *s)
 
 /*
 ** A start position is somewhere along the level: the run is put at the tick
-** that x is reached at its speed, rounded down, so the player stays on the
-** tick grid and the music knows where it is (FEATURES 11.8).
+** a run from the level's own start reaches that x at, through the level's
+** speed portals, rounded down, so the player stays on the tick grid and the
+** music knows where it is (FEATURES 11.8, 10.3).
 */
 static void place_along(sim_t *s, const level_start_t *start)
 {
+    const level_start_t *own = &s->lvl.hdr.start;
     run_state_t *st = &s->st;
-    double step = PER_TICK(SCROLL_SPEED) * start->speed_mult;
-    double ahead = start->pos.x - s->lvl.hdr.start.pos.x;
 
-    if (ahead <= 0.0)
+    if (start->pos.x <= own->pos.x)
         return;
-    st->tick = (long)floor(ahead / step);
-    st->distance = (double)st->tick * step;
-    st->player.pos.x = s->lvl.hdr.start.pos.x + st->distance;
+    st->tick = (long)floor(speed_map_ticks(&s->lvl.speeds, own,
+        start->pos.x));
+    st->distance = speed_map_x(&s->lvl.speeds, own, (double)st->tick)
+        - own->pos.x;
+    st->player.pos.x = own->pos.x + st->distance;
     st->player.prev_pos = st->player.pos;
 }
 
@@ -92,7 +95,7 @@ void sim_reset_at(sim_t *s, const level_start_t *start)
     st->bounds = (ship_bounds_t){0};
     st->tick = 0;
     st->distance = 0.0;
-    st->speed_mult = start->speed_mult;
+    st->speed_mult = speed_px_per_s(start->speed) / SPEED_NORMAL;
     st->first_active = 0;
     st->complete = false;
     memset(st->spent, 0, st->spent_words * sizeof(uint64_t));

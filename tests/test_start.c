@@ -184,13 +184,15 @@ static void test_start_speed(void)
 
     load(&s, "start_speed 4\nblock 5000 700 2\n");
     CHECK(warnings == 0);
-    CHECK(s.st.speed_mult == 4.0);
-    CHECK(s.st.player.vx == PER_TICK(SCROLL_SPEED) * 4.0);
+    CHECK(s.lvl.hdr.start.speed == 4.0);               /* its name, kept */
+    CHECK(s.st.speed_mult == SPEED_XFAST / SPEED_NORMAL);  /* 1.849, not 4 */
+    CHECK(s.st.player.vx == 8.0);                      /* 1920 px/s */
     sim_tick(&s, (input_t){false, false});
-    CHECK(fabs(s.st.distance - PER_TICK(SCROLL_SPEED) * 4.0) < 1e-9);
+    CHECK(s.st.distance == 8.0);
     sim_free(&s);
     load(&s, "start_speed 0.5\nblock 5000 700 2\n");
-    CHECK(s.st.speed_mult == 0.5);
+    CHECK(s.st.speed_mult == SPEED_SLOW / SPEED_NORMAL);
+    CHECK(s.st.player.vx == PER_TICK(SPEED_SLOW));
     sim_free(&s);
     load(&s, "start_speed 7\nblock 5000 700 2\n");            /* not a GD speed */
     CHECK(warnings == 1);
@@ -266,9 +268,10 @@ static void test_reset_at(void)
     sim_tick(&s, (input_t){false, false});
     CHECK(s.st.tick == tick + 1 && s.st.player.alive);
     CHECK(fabs(s.st.player.pos.x - (PLAYER_SPAWN_X + (tick + 1) * step)) < 1e-6);
-    sim_reset_at(&s, &s.lvl.starts[1]);                /* faster: fewer ticks */
-    CHECK(s.st.tick == (long)floor((6000.0 - PLAYER_SPAWN_X) / (2.0 * step)));
-    CHECK(s.st.speed_mult == 2.0 && s.st.player.vx == 2.0 * step);
+    sim_reset_at(&s, &s.lvl.starts[1]);    /* faster from there, not before */
+    CHECK(s.st.tick == (long)floor((6000.0 - PLAYER_SPAWN_X) / step));
+    CHECK(s.st.speed_mult == SPEED_FAST / SPEED_NORMAL);
+    CHECK(s.st.player.vx == PER_TICK(SPEED_FAST));
     CHECK(s.st.player.mode == MODE_CUBE && !s.st.bounds.active);
     CHECK(is_spent(&s.st, 3));
     for (int i = 0; i < 2000 && !s.st.complete && s.st.player.alive; i++)

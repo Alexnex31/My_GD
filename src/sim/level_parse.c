@@ -16,6 +16,7 @@
 #include "sim/hitbox.h"
 #include "sim/level.h"
 #include "sim/modes.h"
+#include "sim/speed.h"
 
 #define MAX_TOKENS 16
 
@@ -118,7 +119,8 @@ static void portal_shape(object_t *o, bool given_w, bool given_h)
     double block = o->size * UNIT;            /* the cell as written: 1 block */
     vec2_t center = {o->rect.x + block / 2.0, o->rect.y + block / 2.0};
 
-    if (o->type != OBJ_PORTAL && o->type != OBJ_GRAVITY)
+    if (o->type != OBJ_PORTAL && o->type != OBJ_GRAVITY
+        && o->type != OBJ_SPEED)
         return;
     if (!given_w) {                          /* derived: centered on the cell */
         o->rect.w = block * PORTAL_BOX_W;
@@ -172,7 +174,7 @@ static const char *const TYPE_NAMES[OBJ_TYPE_COUNT] = {
     [OBJ_BLOCK] = "block", [OBJ_SLOPE] = "slope",
     [OBJ_SPIKE] = "spike", [OBJ_PORTAL] = "portal",
     [OBJ_GRAVITY] = "gravity", [OBJ_PAD] = "pad", [OBJ_ORB] = "orb",
-    [OBJ_SAW] = "saw",
+    [OBJ_SAW] = "saw", [OBJ_SPEED] = "speed",
 };
 
 const char *obj_type_name(obj_type_t type)
@@ -224,6 +226,28 @@ static int launch_word(object_t *o, const char *word, parse_ctx_t *ctx)
     return 0;
 }
 
+/* The speeds of a speed portal (FEATURES 10.3): 0.5, 1, 2, 3 or 4. */
+static bool known_speed(const char *text, double *out)
+{
+    double v = 0.0;
+
+    if (!parse_double(text, &v) || !speed_is_known(v))
+        return false;
+    *out = v;
+    return true;
+}
+
+/* A speed portal's word: one of GD's five speeds, by its name (10.3). */
+static int speed_word_of(object_t *o, const char *word, parse_ctx_t *ctx)
+{
+    if (word == NULL || !known_speed(word, &o->speed)) {
+        warn(ctx, "speed needs 0.5, 1, 2, 3 or 4, line skipped");
+        return -1;
+    }
+    hitbox_for_object(o);
+    return 0;
+}
+
 /* The extra word (portals need a mode, 5.5), then the hitbox. */
 static int object_init(object_t *o, const char *word, parse_ctx_t *ctx)
 {
@@ -233,6 +257,8 @@ static int object_init(object_t *o, const char *word, parse_ctx_t *ctx)
         return gravity_word(o, word, ctx);
     if (o->type == OBJ_PAD || o->type == OBJ_ORB)
         return launch_word(o, word, ctx);
+    if (o->type == OBJ_SPEED)
+        return speed_word_of(o, word, ctx);
     if (o->type == OBJ_PORTAL) {
         mode = word == NULL ? -1 : mode_from_name(word);
         if (mode < 0) {
@@ -341,23 +367,10 @@ static void set_flag(const char *text, const char *off, const char *on,
         warn(ctx, "header field takes one of its two words, ignored");
 }
 
-/* The speeds of a speed portal (FEATURES 10.3): 0.5, 1, 2, 3 or 4. */
-static bool known_speed(const char *text, double *out)
-{
-    static const double allowed[] = {0.5, 1.0, 2.0, 3.0, 4.0};
-    double v = 0.0;
-
-    if (!parse_double(text, &v))
-        return false;
-    for (size_t i = 0; i < sizeof(allowed) / sizeof(*allowed); i++)
-        if (v == allowed[i])
-            return (*out = v, true);
-    return false;
-}
 
 static bool start_speed(const char *text, level_start_t *st, parse_ctx_t *ctx)
 {
-    if (!known_speed(text, &st->speed_mult))
+    if (!known_speed(text, &st->speed))
         warn(ctx, "start_speed must be 0.5, 1, 2, 3 or 4, ignored");
     return true;
 }
@@ -376,7 +389,7 @@ static int parse_start(char *line, level_start_t *st, parse_ctx_t *ctx)
 
     if (n < 1 || strcmp(tok[0], "start") != 0)
         return 1;
-    *st = (level_start_t){.speed_mult = 1.0, .gravity_dir = 1};
+    *st = (level_start_t){.speed = 1.0, .gravity_dir = 1};
     if (n < 4 || mode < 0 || !parse_double(tok[1], &st->pos.x)
         || !parse_double(tok[2], &st->pos.y)
         || fabs(st->pos.x) > LEVEL_COORD_MAX
@@ -390,7 +403,7 @@ static int parse_start(char *line, level_start_t *st, parse_ctx_t *ctx)
         st->gravity_dir = strcmp(tok[next], "up") == 0 ? -1 : 1;
         next += 1;
     }
-    if (next < n && known_speed(tok[next], &st->speed_mult))
+    if (next < n && known_speed(tok[next], &st->speed))
         next += 1;
     if (next < n) {
         warn(ctx, "start takes up or down, then a speed, line skipped");

@@ -64,7 +64,7 @@ static void test_clean(void)
     add(&lv, "block 5000 600 2 rot=45");         /* 45 degrees: a slope */
     add(&lv, "block 5400 600 2 rot=90");
     ed_start_object(&start, &(level_start_t){.pos = {100.0, 2000.0},
-        .speed_mult = 1.0, .gravity_dir = 1});
+        .speed = 1.0, .gravity_dir = 1});
     ed_add_object(&lv, &start);                  /* underground, behind */
     ed_add_object(&lv, &start);                  /* and twice */
     ed_check(&lv, &r);
@@ -304,6 +304,7 @@ static void test_song_length(void)
     library_t lib = {songs, 2};
     ed_level_t lv;
     double end = PLAYER_SPAWN_X + 12.0 * SCROLL_SPEED;
+    double fast = 12.0 * SPEED_NORMAL / SPEED_XFAST;         /* 6.49 s */
 
     ed_level_new(&lv, "1");
     CHECK(fabs(ed_level_seconds(&lv, end) - 12.0) < 1e-9);
@@ -312,10 +313,10 @@ static void test_song_length(void)
     CHECK(fabs(ed_song_short_by(&lv, &lib, end) - 2.0) < 1e-6);
     lv.hdr.music_offset = 3.0;                               /* less song left */
     CHECK(fabs(ed_song_short_by(&lv, &lib, end) - 5.0) < 1e-6);
-    lv.hdr.start.speed_mult = 2.0;                           /* a 6 s level */
-    CHECK(fabs(ed_level_seconds(&lv, end) - 6.0) < 1e-9);
+    lv.hdr.start.speed = 4.0;                                /* a shorter level */
+    CHECK(fabs(ed_level_seconds(&lv, end) - fast) < 1e-9);
     CHECK(ed_song_short_by(&lv, &lib, end) == 0.0);
-    lv.hdr.start.speed_mult = 1.0;
+    lv.hdr.start.speed = 1.0;
     lv.hdr.music_offset = 0.0;
     snprintf(lv.hdr.music, sizeof(lv.hdr.music), "b.ogg");   /* its own offset */
     CHECK(fabs(ed_song_short_by(&lv, &lib, end) - 7.0) < 1e-6);

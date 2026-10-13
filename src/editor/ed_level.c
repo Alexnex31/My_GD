@@ -16,6 +16,7 @@
 #include "sim/hitbox.h"
 #include "sim/modes.h"
 #include "sim/sim.h"
+#include "sim/speed.h"
 
 void ed_level_new(ed_level_t *lv, const char *id)
 {
@@ -330,6 +331,8 @@ int ed_entries(ed_entry_t *out, int max)
     entry(out, &n, max, OBJ_GRAVITY, "up");
     entry(out, &n, max, OBJ_GRAVITY, "down");
     entry(out, &n, max, OBJ_SAW, NULL);
+    for (int k = 0; k < SPEED_COUNT; k++)
+        entry(out, &n, max, OBJ_SPEED, speed_word(SPEED_NAMES[k]));
     for (int k = 0; k < LAUNCH_KIND_COUNT; k++)
         if (LAUNCHES[k].pad_v != 0.0)
             entry(out, &n, max, OBJ_PAD, LAUNCHES[k].name);
@@ -360,7 +363,7 @@ static bool same_object(const ed_object_t *ea, const ed_object_t *eb)
 bool ed_place_object(const ed_level_t *lv, const ed_entry_t *e, vec2_t at,
     double grid, ed_object_t *out)
 {
-    level_start_t st = {.speed_mult = 1.0, .gravity_dir = 1,
+    level_start_t st = {.speed = 1.0, .gravity_dir = 1,
         .pos = {ed_snap(at.x, grid) + UNIT, ed_snap(at.y, grid) + UNIT}};
     char line[128];
 

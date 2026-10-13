@@ -45,10 +45,9 @@ static void test_time_and_x(void)
     CHECK(ed_time_at_x(&lv, &LIB, PLAYER_SPAWN_X) == 2.0);
     CHECK(fabs(ed_x_at_time(&lv, &LIB, 5.0) - (PLAYER_SPAWN_X
         + 3.0 * SCROLL_SPEED)) < 1e-9);
-    lv.hdr.start.speed_mult = 2.0;                     /* twice as far a second */
+    lv.hdr.start.speed = 2.0;                     /* GD's "fast": 1291.4 px/s */
     lv.hdr.start.pos.x = 1000.0;
-    CHECK(fabs(ed_x_at_time(&lv, &LIB, 3.0) - (1000.0 + 2.0 * SCROLL_SPEED))
-        < 1e-9);
+    CHECK(fabs(ed_x_at_time(&lv, &LIB, 3.0) - (1000.0 + SPEED_FAST)) < 1e-9);
     CHECK(fabs(ed_time_at_x(&lv, &LIB, ed_x_at_time(&lv, &LIB, 7.25)) - 7.25)
         < 1e-9);
     ed_level_free(&lv);

@@ -12,11 +12,15 @@
 #include "editor/ed_props.h"
 #include "sim/constants.h"
 #include "sim/modes.h"
+#include "sim/speed.h"
 
     #define TURN_STEP 15.0
 
-static const double SPEEDS[] = {0.5, 1.0, 2.0, 3.0, 4.0};
-    #define NB_SPEEDS ((int)(sizeof(SPEEDS) / sizeof(SPEEDS[0])))
+/* A start position's speed, or a speed portal's: the same five names. */
+static double *speed_of(ed_object_t *o)
+{
+    return o->is_start ? &o->start.speed : &o->obj.speed;
+}
 
 const char *ed_prop_name(ed_prop_t p)
 {
@@ -37,7 +41,9 @@ static bool has(const ed_object_t *o, ed_prop_t p)
 {
     if (p == ED_PROP_KIND)
         return has_kind(o);
-    if (p == ED_PROP_GRAVITY || p == ED_PROP_SPEED)
+    if (p == ED_PROP_SPEED)
+        return o->is_start || o->obj.type == OBJ_SPEED;
+    if (p == ED_PROP_GRAVITY)
         return o->is_start;
     return !o->is_start;
 }
@@ -66,7 +72,7 @@ static void text_of(const ed_object_t *o, ed_prop_t p, char *out, size_t size)
     if (p == ED_PROP_GRAVITY)
         snprintf(out, size, "%s", o->start.gravity_dir < 0 ? "up" : "down");
     if (p == ED_PROP_SPEED)
-        snprintf(out, size, "x%.10g", o->start.speed_mult);
+        snprintf(out, size, "x%s", speed_word(*speed_of((ed_object_t *)o)));
 }
 
 bool ed_prop_applies(const ed_level_t *lv, ed_prop_t p)
@@ -135,12 +141,12 @@ static void step_speed(ed_object_t *o, int dir)
 {
     int at = 1;
 
-    for (int i = 0; i < NB_SPEEDS; i++)
-        if (SPEEDS[i] == o->start.speed_mult)
+    for (int i = 0; i < SPEED_COUNT; i++)
+        if (SPEED_NAMES[i] == *speed_of(o))
             at = i;
     at += dir;
-    at = at < 0 ? 0 : (at >= NB_SPEEDS ? NB_SPEEDS - 1 : at);
-    o->start.speed_mult = SPEEDS[at];
+    at = at < 0 ? 0 : (at >= SPEED_COUNT ? SPEED_COUNT - 1 : at);
+    *speed_of(o) = SPEED_NAMES[at];
 }
 
 /* A size never goes under one grid unit; the top left corner stays. */
@@ -174,7 +180,7 @@ static bool same(const ed_object_t *a, const ed_object_t *b)
         && a->obj.portal_gravity == b->obj.portal_gravity
         && a->obj.launch == b->obj.launch && a->start.mode == b->start.mode
         && a->start.gravity_dir == b->start.gravity_dir
-        && a->start.speed_mult == b->start.speed_mult;
+        && a->start.speed == b->start.speed && a->obj.speed == b->obj.speed;
 }
 
 /* One command if any grabbed object is no longer what it was. */

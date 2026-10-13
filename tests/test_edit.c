@@ -46,7 +46,7 @@ static char *state(const ed_level_t *lv)
             o->obj.rect.h, o->obj.rotation, o->obj.hitbox.aabb.x,
             o->obj.hitbox.aabb.y, (int)o->obj.portal_mode,
             o->obj.portal_gravity, (int)o->obj.launch, (int)o->is_start,
-            (int)o->start.mode, o->start.gravity_dir, o->start.speed_mult,
+            (int)o->start.mode, o->start.gravity_dir, o->start.speed,
             o->extra != NULL ? o->extra : "");
     }
     return s;

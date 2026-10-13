@@ -10,6 +10,7 @@
 
 #include "sim/internal.h"
 #include "sim/modes.h"
+#include "sim/speed.h"
 #include "sim/sweep.h"
 
 static bool already_listed(const sim_t *s, size_t i)
@@ -129,6 +130,17 @@ static void enter_gravity(sim_t *s, const object_t *o)
 }
 
 /*
+** A speed portal sets how fast the player goes right, until the next one
+** (FEATURES 10.3). Nothing else does: the heights of jumps don't change,
+** only the ground they cover.
+*/
+static void enter_speed(sim_t *s, const object_t *o)
+{
+    s->st.player.vx = speed_step(o->speed);
+    s->st.speed_mult = speed_px_per_s(o->speed) / SPEED_NORMAL;
+}
+
+/*
 ** A pad or an orb sets the rise speed to its own, whatever the player was
 ** doing: the same launch every time, and no mode's cap cuts it (3.4). Blue
 ** and green flip the gravity first, and their speed is in the new gravity:
@@ -162,6 +174,8 @@ static void interactive_act(sim_t *s, const object_t *o)
         enter_portal(s, o);
     if (o->type == OBJ_GRAVITY)
         enter_gravity(s, o);
+    if (o->type == OBJ_SPEED)
+        enter_speed(s, o);
     if (o->type == OBJ_PAD || o->type == OBJ_ORB)
         launch(s, o);
 }

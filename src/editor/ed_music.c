@@ -11,6 +11,7 @@
 
 #include "editor/ed_music.h"
 #include "sim/constants.h"
+#include "sim/speed.h"
 
 /* The offset the game will start the level's song at (4.4). */
 double ed_song_offset(const ed_level_t *lv, const library_t *lib)
@@ -18,19 +19,45 @@ double ed_song_offset(const ed_level_t *lv, const library_t *lib)
     return music_choose(lib, NULL, &lv->hdr, SONG_LEVEL).offset;
 }
 
-static double speed(const ed_level_t *lv)
+/*
+** The level's speed portals, in x order: time along the level isn't one
+** division once the speed changes (FEATURES 10.3). Built at each call from
+** the objects as they are now; the caller frees it.
+*/
+static speed_map_t speeds_of(const ed_level_t *lv)
 {
-    return SCROLL_SPEED * lv->hdr.start.speed_mult;
+    speed_map_t m = {0};
+
+    for (size_t i = 0; i < lv->count; i++)
+        if (!lv->objects[i].is_start)
+            speed_map_add(&m, &lv->objects[i].obj);
+    speed_map_sort(&m);
+    return m;
+}
+
+/* Seconds from the level's start to x, taking every speed portal. */
+static double seconds_to(const ed_level_t *lv, double x)
+{
+    speed_map_t m = speeds_of(lv);
+    double ticks = speed_map_ticks(&m, &lv->hdr.start, x);
+
+    speed_map_free(&m);
+    return ticks / TICK_RATE;
 }
 
 double ed_time_at_x(const ed_level_t *lv, const library_t *lib, double x)
 {
-    return ed_song_offset(lv, lib) + (x - lv->hdr.start.pos.x) / speed(lv);
+    return ed_song_offset(lv, lib) + seconds_to(lv, x);
 }
 
 double ed_x_at_time(const ed_level_t *lv, const library_t *lib, double t)
 {
-    return lv->hdr.start.pos.x + (t - ed_song_offset(lv, lib)) * speed(lv);
+    speed_map_t m = speeds_of(lv);
+    double x = speed_map_x(&m, &lv->hdr.start,
+        (t - ed_song_offset(lv, lib)) * TICK_RATE);
+
+    speed_map_free(&m);
+    return x;
 }
 
 double ed_beat_x(const ed_level_t *lv, const library_t *lib, long k)
@@ -58,7 +85,7 @@ bool ed_beats_between(const ed_level_t *lv, const library_t *lib, double left,
 
 double ed_level_seconds(const ed_level_t *lv, double end_x)
 {
-    return (end_x - lv->hdr.start.pos.x) / speed(lv);
+    return seconds_to(lv, end_x);
 }
 
 double ed_song_short_by(const ed_level_t *lv, const library_t *lib,
