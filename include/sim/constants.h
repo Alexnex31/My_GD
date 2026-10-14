@@ -63,6 +63,12 @@
     #define CUBE_GRAVITY        (0.876 * A_UNIT)   /* 9449.3 px/s^2                      */
     #define CUBE_JUMP_V         (1.9522 * V_UNIT)  /* 2027.6 px/s: GD's 1.94 raised so the
                                                     measured apex is its 2.1333 blocks (11.1) */
+    /* The robot rises at the normal scroll speed, so at 45 degrees there, for
+       as long as the button is held: 68 ticks at most, 0.283 s. With the fall
+       that follows, a full hold reaches 349.2 px, the nearest a whole number
+       of ticks gets to GD's 3.5111 blocks (69 gives 353.5; FEATURES 6.9). */
+    #define ROBOT_RISE_V        (1.0 * V_UNIT)
+    #define ROBOT_BOOST_TICKS   68
     #define CUBE_MAX_FALL       (2.6 * V_UNIT)     /* 2700.4 px/s                        */
     #define CUBE_JUMP_TICKS     102      /* a jump on flat ground, press to landing        */
     #define CUBE_SPIN           (180.0 * TICK_RATE / CUBE_JUMP_TICKS)   /* 423.5 deg/s: the icon

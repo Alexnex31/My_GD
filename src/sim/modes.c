@@ -66,6 +66,11 @@ const mode_ops_t MODES[MODE_COUNT] = {
         .corridor_height = 800.0,
         .apply_input = ball_input, .apply_forces = player_apply_gravity,
         .update_rotation = ball_rotation},
+    [MODE_ROBOT] = {.name = "robot", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
+        .gravity = PER_TICK2(CUBE_GRAVITY),
+        .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
+        .apply_input = robot_input, .apply_forces = robot_forces,
+        .update_rotation = robot_rotation},
 };
 
 /*

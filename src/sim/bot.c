@@ -16,6 +16,7 @@
 #include "sim/sim.h"
 
 #define ORB_AHEAD_TICKS 12    /* how early an orb starts to matter: 50 ms */
+#define ROBOT_BOT_TICKS 8     /* a rising robot may let go this often      */
 
 typedef struct decision {
     uint64_t key;             /* sim_physics_hash when it was taken          */
@@ -133,6 +134,8 @@ static bool is_decision(const sim_t *s)
         return true;
     if (every > 0)
         return s->st.tick % every == 0;
+    if (p->boost_ticks > 0)                  /* a robot rising: let go, or not */
+        return p->boost_ticks % ROBOT_BOT_TICKS == 0;
     return p->can_jump;
 }
 

@@ -111,6 +111,7 @@ static void stay_above_the_ground(player_t *p)
 static void enter_portal(sim_t *s, const object_t *o)
 {
     s->st.player.mode = o->portal_mode;
+    s->st.player.boost_ticks = 0;            /* a robot's rise doesn't outlive it */
     if (MODES[o->portal_mode].corridor_height > 0.0)
         corridor_from_center(s, o->rect.y + o->rect.h / 2.0);
     else
@@ -154,6 +155,7 @@ static void launch(sim_t *s, const object_t *o)
     if (LAUNCHES[o->launch].flips)
         player_flip_gravity(p);
     p->vy = PER_TICK(launch_speed(o) * V_UNIT);
+    p->boost_ticks = 0;
     p->grounded = false;
     p->can_jump = false;
     if (o->type == OBJ_ORB)

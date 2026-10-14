@@ -44,7 +44,7 @@ typedef enum launch_kind {    /* the colours of pads and orbs (FEATURES 10.1, 10
 typedef enum obj_category { CAT_NEUTRAL, CAT_HARM, CAT_INTERACTIVE } obj_category_t;
 extern const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT];
 
-typedef enum gamemode { MODE_CUBE, MODE_SHIP, MODE_UFO, MODE_WAVE, MODE_BALL, MODE_COUNT } gamemode_t;
+typedef enum gamemode { MODE_CUBE, MODE_SHIP, MODE_UFO, MODE_WAVE, MODE_BALL, MODE_ROBOT, MODE_COUNT } gamemode_t;
 
 typedef enum hold_state {     /* 3.4: GD's buffered clicks and orb locking */
     HOLD_NONE,                /* button up                                 */
@@ -156,6 +156,7 @@ typedef struct player {
     vec2_t support_normal;    /* that surface's normal (the icon lies along it) */
     float rotation;           /* the icon's angle, degrees, cosmetic (9.4)      */
     hold_state_t hold;        /* HOLD_NONE, HOLD_FRESH, HOLD_USED (3.4)         */
+    int boost_ticks;          /* the robot's rise: ticks of it left (10.5)      */
     bool alive;
 } player_t;
 

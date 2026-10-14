@@ -40,6 +40,7 @@ void player_flip_gravity(player_t *p)
 {
     p->gravity_dir = -p->gravity_dir;
     p->vy = -p->vy;
+    p->boost_ticks = 0;                      /* a robot's rise ends there */
     p->grounded = false;
     p->can_jump = false;
 }
