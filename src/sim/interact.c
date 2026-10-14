@@ -28,7 +28,7 @@ static bool already_listed(const sim_t *s, size_t i)
 void leg_touches(sim_t *s, vec2_t d, double t_end)
 {
     const player_t *p = &s->st.player;
-    double half = MODES[p->mode].half;
+    double half = player_mode(p)->half;
     double t;
 
     for (size_t k = 0; k < s->nb_cand; k++) {
@@ -69,8 +69,8 @@ static int touch_cmp(const void *a, const void *b)
 void corridor_from_center(sim_t *s, double center)
 {
     const player_t *p = &s->st.player;
-    double height = MODES[p->mode].corridor_height;
-    double half = MODES[p->mode].half;
+    double height = player_mode(p)->corridor_height;
+    double half = player_mode(p)->half;
     double top = center - height / 2.0;
     ship_bounds_t *b = &s->st.bounds;
 
@@ -96,7 +96,7 @@ void corridor_from_center(sim_t *s, double center)
 */
 static void stay_above_the_ground(player_t *p)
 {
-    double lowest = GROUND_Y - MODES[p->mode].half;
+    double lowest = GROUND_Y - player_mode(p)->half;
 
     if (p->pos.y > lowest)
         p->pos.y = lowest;
@@ -203,7 +203,7 @@ static void touch_interactive(sim_t *s, size_t i)
 input_t activate_orbs(sim_t *s, input_t in)
 {
     const player_t *p = &s->st.player;
-    double half = MODES[p->mode].half;
+    double half = player_mode(p)->half;
 
     if (p->hold != HOLD_FRESH)
         return in;

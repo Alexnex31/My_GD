@@ -17,6 +17,11 @@ typedef struct mode_ops {
     double gravity;            /* px/tick^2                                          */
     double max_fall;           /* px/tick, fall speed cap                            */
     double head_restitution;   /* ceiling hit: < 0 dies, else share of vy bounced back */
+    double jump_v;             /* px/tick: the cube's jump, the UFO's hop, the ball's
+                                  push off a surface, the robot's rise          */
+    double thrust;             /* px/tick^2, the ship's, up to its max_fall      */
+    int rise_ticks;            /* the robot's longest rise (10.5)               */
+    double slope;              /* the wave's climb per px it goes right (8)     */
     double corridor_height;   /* the corridor this mode's portal opens, px; 0: none (5.2) */
     bool neutral_kills;       /* any contact with a neutral object kills (the wave);
                                  the ground and corridor surfaces don't            */
@@ -28,6 +33,9 @@ typedef struct mode_ops {
 } mode_ops_t;
 
 extern const mode_ops_t MODES[MODE_COUNT];
+
+/* The row the player's physics reads: its mode's, at its size. */
+const mode_ops_t *player_mode(const player_t *p);
 
 /*
 ** What a colour does, as a pad and as an orb, in GD's velocity units

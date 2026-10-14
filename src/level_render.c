@@ -223,7 +223,7 @@ static void setup_player_sprite(gd_t *gd, level_t *lv)
     };
     sfTexture *tex = icons[p->mode];
     sfVector2u size = sfTexture_getSize(tex);
-    double side = fmax(2.0 * MODES[p->mode].half, ICON_MIN_SIDE);
+    double side = fmax(2.0 * player_mode(p)->half, ICON_MIN_SIDE);
 
     sfSprite_setTexture(lv->player_sprite, tex, sfTrue);
     sfSprite_setOrigin(lv->player_sprite,

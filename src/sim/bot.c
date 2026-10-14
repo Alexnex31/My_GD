@@ -109,7 +109,7 @@ static void path_grow(bot_t *b)
 static bool near_live_orb(const sim_t *s)
 {
     const player_t *p = &s->st.player;
-    double half = MODES[p->mode].half;
+    double half = player_mode(p)->half;
     double reach = p->pos.x + half + ORB_AHEAD_TICKS * p->vx;
 
     for (size_t i = s->st.first_active; i < s->lvl.nb_objects; i++) {
@@ -128,7 +128,7 @@ static bool near_live_orb(const sim_t *s)
 static bool is_decision(const sim_t *s)
 {
     const player_t *p = &s->st.player;
-    int every = MODES[p->mode].bot_decision_ticks;
+    int every = player_mode(p)->bot_decision_ticks;
 
     if (near_live_orb(s))
         return true;

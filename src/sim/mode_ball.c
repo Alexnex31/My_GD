@@ -8,6 +8,7 @@
 #include <math.h>
 
 #include "sim/internal.h"
+#include "sim/modes.h"
 
 /*
 ** A click flips the gravity, where the cube has its jump, with a small push
@@ -23,7 +24,7 @@ void ball_input(player_t *p, input_t in)
     if (p->hold != HOLD_FRESH || !p->can_jump)
         return;
     player_flip_gravity(p);
-    p->vy = fmin(p->vy, -PER_TICK(BALL_FLIP_V));   /* toward its new floor */
+    p->vy = fmin(p->vy, -player_mode(p)->jump_v);   /* toward its new floor */
     p->hold = HOLD_USED;
 }
 

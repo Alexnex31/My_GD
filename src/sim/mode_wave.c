@@ -8,6 +8,7 @@
 #include <math.h>
 
 #include "sim/internal.h"
+#include "sim/modes.h"
 
 /*
 ** Its rise speed is its horizontal speed, one way or the other, set again
@@ -19,7 +20,7 @@ void wave_input(player_t *p, input_t in)
 {
     bool down = in.held || in.pressed;       /* a tap inside one tick still counts */
 
-    p->vy = down ? p->vx : -p->vx;
+    p->vy = (down ? p->vx : -p->vx) * player_mode(p)->slope;
 }
 
 void wave_forces(player_t *p)

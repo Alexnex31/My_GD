@@ -8,11 +8,12 @@
 #include <math.h>
 
 #include "sim/internal.h"
+#include "sim/modes.h"
 
 /*
 ** From takeoff the robot rises at a steady speed, 45 degrees at the normal
 ** scroll speed, for as long as the button stays down and for
-** ROBOT_BOOST_TICKS at most; then it falls like anything else. A tap is the
+** its row's rise_ticks at most; then it falls like anything else. A tap is the
 ** lowest jump, a full hold the highest. Anything else that takes over its
 ** speed (a pad, an orb, a flip, another mode) ends the rise.
 */
@@ -21,7 +22,7 @@ void robot_input(player_t *p, input_t in)
     bool down = in.held || in.pressed;       /* a tap inside one tick still counts */
 
     if (down && p->can_jump) {
-        p->boost_ticks = ROBOT_BOOST_TICKS;
+        p->boost_ticks = player_mode(p)->rise_ticks;
         p->can_jump = false;
         p->grounded = false;
         p->hold = HOLD_USED;                 /* this hold activates no orb now */
@@ -29,7 +30,7 @@ void robot_input(player_t *p, input_t in)
         p->boost_ticks = 0;
     }
     if (p->boost_ticks > 0)
-        p->vy = PER_TICK(ROBOT_RISE_V);
+        p->vy = player_mode(p)->jump_v;
 }
 
 /* No gravity on a tick it rises on: that is the whole of its jump. */

@@ -39,7 +39,7 @@ static bool starts_on_the_floor(const sim_t *s)
 {
     const player_t *p = &s->st.player;
     const ship_bounds_t *b = &s->st.bounds;
-    double feet = p->pos.y + MODES[p->mode].half * p->gravity_dir;
+    double feet = p->pos.y + player_mode(p)->half * p->gravity_dir;
 
     if (b->active)
         return feet == (p->gravity_dir > 0 ? b->bottom : b->top);
@@ -71,7 +71,7 @@ static void place_along(sim_t *s, const level_start_t *start)
 static void spend_what_is_behind(sim_t *s)
 {
     const player_t *p = &s->st.player;
-    double back = p->pos.x - MODES[p->mode].half;
+    double back = p->pos.x - player_mode(p)->half;
 
     for (size_t i = 0; i < s->lvl.nb_objects; i++) {
         const object_t *o = &s->lvl.objects[i];
@@ -130,8 +130,8 @@ void sim_tick(sim_t *s, input_t in)
     p->prev_pos = p->pos;
     player_update_hold(p, in);               /* 0. fresh / used / none          */
     in = activate_orbs(s, in);               /*    an orb it is in takes the click */
-    MODES[p->mode].apply_input(p, in);       /* 1. the mode's impulses          */
-    MODES[p->mode].apply_forces(p);          /* 2. gravity and the fall cap     */
+    player_mode(p)->apply_input(p, in);       /* 1. the mode's impulses          */
+    player_mode(p)->apply_forces(p);          /* 2. gravity and the fall cap     */
     move_and_collide(s);                     /* 3. legs, contacts, deaths (4.4) */
     if (p->alive)
         collide_kill_ceiling(p, &s->lvl);    /* 4. flipped gravity only (4.7)   */
@@ -144,7 +144,7 @@ void sim_tick(sim_t *s, input_t in)
     if (p->alive && st->distance >= s->lvl.end_shift)
         st->complete = true;                 /* 7.                              */
     if (p->alive)
-        MODES[p->mode].update_rotation(p);   /* 8. the icon, cosmetic           */
+        player_mode(p)->update_rotation(p);   /* 8. the icon, cosmetic           */
 }
 
 float sim_percent(const sim_t *s)

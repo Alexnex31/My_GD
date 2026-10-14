@@ -21,7 +21,7 @@
 */
 static rect_t zone_rect(const player_t *p, double *y_line)
 {
-    const mode_ops_t *m = &MODES[p->mode];
+    const mode_ops_t *m = player_mode(p);
     double g = p->gravity_dir;
     double a = p->pos.y + m->inner_half * g;
     double b = p->pos.y + m->half * g;
@@ -45,7 +45,7 @@ static bool zone_dark(const player_t *p, const hitbox_t *h, double y_line)
     if (n == 0)
         return false;
     return poly_points_distance(p->pos, clipped, n)
-        <= MODES[p->mode].half + ZONE_SKIN;
+        <= player_mode(p)->half + ZONE_SKIN;
 }
 
 static bool segment_in_rect(vec2_t a, vec2_t b, rect_t r)

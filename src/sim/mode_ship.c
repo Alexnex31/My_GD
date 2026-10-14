@@ -13,11 +13,11 @@
 /* Thrust adds up to the ship's own limit; speed from elsewhere is never cut. */
 void ship_input(player_t *p, input_t in)
 {
+    const mode_ops_t *m = player_mode(p);
     bool down = in.held || in.pressed;
 
-    if (down && p->vy < PER_TICK(SHIP_MAX_VY))
-        p->vy = fmin(p->vy + PER_TICK2(SHIP_THRUST),
-            PER_TICK(SHIP_MAX_VY) + MODES[MODE_SHIP].gravity);
+    if (down && p->vy < m->max_fall)        /* its cap, up as down */
+        p->vy = fmin(p->vy + m->thrust, m->max_fall + m->gravity);
 }
 
 /* Its nose follows its path. */

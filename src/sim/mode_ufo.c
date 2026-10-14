@@ -8,6 +8,7 @@
 #include <math.h>
 
 #include "sim/internal.h"
+#include "sim/modes.h"
 
 /*
 ** A hop sets the rise speed and never adds to it, so every hop is the same
@@ -17,7 +18,7 @@ void ufo_input(player_t *p, input_t in)
 {
     if (!in.pressed)
         return;
-    p->vy = PER_TICK(UFO_JUMP_V);
+    p->vy = player_mode(p)->jump_v;
     p->can_jump = false;
     p->grounded = false;
     p->hold = HOLD_USED;                     /* this hold activates no orb now */

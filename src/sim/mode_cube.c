@@ -8,6 +8,7 @@
 #include <math.h>
 
 #include "sim/internal.h"
+#include "sim/modes.h"
 
 void cube_input(player_t *p, input_t in)
 {
@@ -15,7 +16,7 @@ void cube_input(player_t *p, input_t in)
 
     if (!down || !p->can_jump)
         return;
-    p->vy = PER_TICK(CUBE_JUMP_V);           /* an impulse: it sets the rise speed */
+    p->vy = player_mode(p)->jump_v;          /* an impulse: it sets the rise speed */
     p->can_jump = false;
     p->grounded = false;
     p->hold = HOLD_USED;                     /* this hold activates no orb now */

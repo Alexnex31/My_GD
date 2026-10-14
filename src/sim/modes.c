@@ -40,22 +40,25 @@ const mode_ops_t MODES[MODE_COUNT] = {
     [MODE_CUBE] = {.name = "cube", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
         .gravity = PER_TICK2(CUBE_GRAVITY),
         .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
+        .jump_v = PER_TICK(CUBE_JUMP_V),
         .apply_input = cube_input, .apply_forces = player_apply_gravity,
         .update_rotation = cube_rotation},
     [MODE_SHIP] = {.name = "ship", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
         .gravity = PER_TICK2(SHIP_GRAVITY),
         .max_fall = PER_TICK(SHIP_MAX_VY), .head_restitution = BOUNCE_RESTITUTION_SHIP,
+        .thrust = PER_TICK2(SHIP_THRUST),
         .corridor_height = 1000.0, .bot_decision_ticks = 12,
         .apply_input = ship_input, .apply_forces = player_apply_gravity,
         .update_rotation = ship_rotation},
     [MODE_UFO] = {.name = "ufo", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
         .gravity = PER_TICK2(UFO_GRAVITY),
         .max_fall = PER_TICK(UFO_MAX_FALL), .head_restitution = BOUNCE_RESTITUTION_SHIP,
+        .jump_v = PER_TICK(UFO_JUMP_V),
         .corridor_height = 1000.0, .bot_decision_ticks = 12,
         .apply_input = ufo_input, .apply_forces = player_apply_gravity,
         .update_rotation = ufo_rotation},
     [MODE_WAVE] = {.name = "wave", .half = WAVE_HALF, .inner_half = WAVE_HALF,
-        .head_restitution = -1.0,
+        .head_restitution = -1.0, .slope = 1.0,
         .corridor_height = 1000.0, .neutral_kills = true,
         .keep_vy_on_surface = true, .bot_decision_ticks = 12,
         .apply_input = wave_input, .apply_forces = wave_forces,
@@ -63,12 +66,13 @@ const mode_ops_t MODES[MODE_COUNT] = {
     [MODE_BALL] = {.name = "ball", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
         .gravity = PER_TICK2(BALL_GRAVITY),
         .max_fall = PER_TICK(BALL_MAX_FALL), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .corridor_height = 800.0,
+        .jump_v = PER_TICK(BALL_FLIP_V), .corridor_height = 800.0,
         .apply_input = ball_input, .apply_forces = player_apply_gravity,
         .update_rotation = ball_rotation},
     [MODE_ROBOT] = {.name = "robot", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
         .gravity = PER_TICK2(CUBE_GRAVITY),
         .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
+        .jump_v = PER_TICK(ROBOT_RISE_V), .rise_ticks = ROBOT_BOOST_TICKS,
         .apply_input = robot_input, .apply_forces = robot_forces,
         .update_rotation = robot_rotation},
     [MODE_SWING] = {.name = "swing", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
@@ -84,6 +88,11 @@ const mode_ops_t MODES[MODE_COUNT] = {
         .apply_input = spider_input, .apply_forces = player_apply_gravity,
         .update_rotation = robot_rotation},
 };
+
+const mode_ops_t *player_mode(const player_t *p)
+{
+    return &MODES[p->mode];
+}
 
 /*
 ** The square that dies on a neutral object: the small inner box, or the whole

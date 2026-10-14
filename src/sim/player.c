@@ -26,7 +26,7 @@ void player_update_hold(player_t *p, input_t in)
 */
 void player_apply_gravity(player_t *p)
 {
-    const mode_ops_t *m = &MODES[p->mode];
+    const mode_ops_t *m = player_mode(p);
     double limit = -m->max_fall;
 
     if (p->grounded && p->surface_rise - m->gravity < limit)

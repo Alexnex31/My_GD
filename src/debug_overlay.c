@@ -61,7 +61,7 @@ static void rect_outline(sfVertexArray *va, rect_t r, sfColor col)
 static void draw_player_shapes(sfVertexArray *va, const level_t *lv)
 {
     const player_t *p = &lv->sim.st.player;
-    const mode_ops_t *m = &MODES[p->mode];
+    const mode_ops_t *m = player_mode(p);
     rect_t zone;
     double y_line = 0.0;
 
@@ -155,7 +155,7 @@ static void draw_numbers(gd_t *gd, level_t *lv, float ms)
         "tick %ld  x %.2f  y %.2f\nvx %.4f  vy %.4f  rise %.4f\n"
         "grounded %d  can_jump %d  mode %s\n%.2f%%  %.2f ms  %d draw calls",
         lv->sim.st.tick, p->pos.x, p->pos.y, p->vx, p->vy, p->surface_rise,
-        p->grounded, p->can_jump, MODES[p->mode].name, sim_percent(&lv->sim),
+        p->grounded, p->can_jump, player_mode(p)->name, sim_percent(&lv->sim),
         ms, gd->draw_calls);
     sfText_setString(lv->debug_text, text);
     draw_text(gd, lv->debug_text);

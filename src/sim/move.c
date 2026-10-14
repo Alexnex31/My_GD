@@ -16,7 +16,7 @@
 /* Everything the tick's movement can reach, step-up room included (G.8). */
 static rect_t tick_sweep_bounds(const player_t *p)
 {
-    const mode_ops_t *m = &MODES[p->mode];
+    const mode_ops_t *m = player_mode(p);
     double ys = p->pos.y;
     double ye = p->pos.y - p->vy * p->gravity_dir;
     double room = m->half - m->inner_half + CONTACT_SKIN;
@@ -113,7 +113,7 @@ static void try_square(sim_t *s, size_t i, vec2_t d, event_t *out)
 {
     const player_t *p = &s->st.player;
     const hitbox_t *h = &s->lvl.objects[i].hitbox;
-    double half = MODES[p->mode].half;
+    double half = player_mode(p)->half;
     contact_t c;
 
     if (!sweep_box_poly(p->pos, half, d, h, &c))
@@ -130,7 +130,7 @@ static void try_square(sim_t *s, size_t i, vec2_t d, event_t *out)
 static void try_surfaces(sim_t *s, vec2_t d, event_t *out)
 {
     const player_t *p = &s->st.player;
-    double half = MODES[p->mode].half;
+    double half = player_mode(p)->half;
     contact_t c;
 
     if (sweep_box_plane(p->pos, half, d, GROUND_Y, 1.0, &c)) {
@@ -158,7 +158,7 @@ static void try_surfaces(sim_t *s, vec2_t d, event_t *out)
 static double leg_death_time(sim_t *s, vec2_t d)
 {
     const player_t *p = &s->st.player;
-    const mode_ops_t *m = &MODES[p->mode];
+    const mode_ops_t *m = player_mode(p);
     double death = INFINITY;
     double t;
 
@@ -200,7 +200,7 @@ static void try_circle(sim_t *s, size_t i, vec2_t d, event_t *out)
 {
     const player_t *p = &s->st.player;
     const hitbox_t *h = &s->lvl.objects[i].hitbox;
-    double half = MODES[p->mode].half;
+    double half = player_mode(p)->half;
     contact_t c;
 
     if (!sweep_circle_clear(p->pos, half, d, h, circle_face_ok,
@@ -220,7 +220,7 @@ static void try_shapes(sim_t *s, size_t i, vec2_t d, event_t *out)
 {
     const player_t *p = &s->st.player;
     const hitbox_t *h = &s->lvl.objects[i].hitbox;
-    double half = MODES[p->mode].half;
+    double half = player_mode(p)->half;
     bool in_square;
 
     if (is_passed(s, i))
@@ -238,7 +238,7 @@ static bool lift_hits_surface(const sim_t *s, double y, double lift)
 {
     const player_t *p = &s->st.player;
     double g = p->gravity_dir;
-    double top = (y - lift * g) - MODES[p->mode].half * g;
+    double top = (y - lift * g) - player_mode(p)->half * g;
     double ceiling;
 
     if (s->st.bounds.active)
@@ -258,7 +258,7 @@ static bool step_event(const sim_t *s, vec2_t d, vec2_t vel, face_t f,
     double *t_out)
 {
     const player_t *p = &s->st.player;
-    const mode_ops_t *m = &MODES[p->mode];
+    const mode_ops_t *m = player_mode(p);
     double g = p->gravity_dir;
     double lead = p->pos.x + m->inner_half;
     double t = lead >= f.x0 ? 0.0 : (f.x0 - lead) / d.x;
@@ -314,7 +314,7 @@ static void try_steps(sim_t *s, vec2_t d, vec2_t vel, event_t *out)
 static double circle_lift_death(sim_t *s, vec2_t lift)
 {
     const player_t *p = &s->st.player;
-    double half = MODES[p->mode].half;
+    double half = player_mode(p)->half;
     double death = INFINITY;
 
     for (size_t k = 0; k < s->nb_cand; k++) {
@@ -333,7 +333,7 @@ static double circle_lift_death(sim_t *s, vec2_t lift)
 static void step_up(sim_t *s, const face_t *f, vec2_t *vel)
 {
     player_t *p = &s->st.player;
-    const mode_ops_t *m = &MODES[p->mode];
+    const mode_ops_t *m = player_mode(p);
     double g = p->gravity_dir;
     double target = f->y - m->half * g;
     vec2_t lift = {0.0, target - p->pos.y};
@@ -388,12 +388,12 @@ static void land(sim_t *s, const contact_t *c, vec2_t *vel)
     double rise = vel->x * (c->normal.x / c->normal.y) * p->gravity_dir;
 
     log_debug(s, DBG_LAND, c->normal);
-    settle(p, c, MODES[p->mode].half);
+    settle(p, c, player_mode(p)->half);
     p->grounded = true;
     p->support_normal = c->normal;
     p->surface_rise = rise;
     vel->y = rise;
-    if (!MODES[p->mode].keep_vy_on_surface)
+    if (!player_mode(p)->keep_vy_on_surface)
         p->vy = rise;
 }
 
@@ -401,7 +401,7 @@ static void land(sim_t *s, const contact_t *c, vec2_t *vel)
 static void head_hit(sim_t *s, const contact_t *c, vec2_t *vel)
 {
     player_t *p = &s->st.player;
-    double e = MODES[p->mode].head_restitution;
+    double e = player_mode(p)->head_restitution;
     double follow = vel->x * (c->normal.x / c->normal.y) * p->gravity_dir;
 
     log_debug(s, e < 0.0 && !is_surface(c->surface) ? DBG_DEATH : DBG_HEAD,
@@ -473,7 +473,7 @@ static double far_side(const sim_t *s)
 static void teleport(sim_t *s)
 {
     player_t *p = &s->st.player;
-    double half = MODES[p->mode].half;
+    double half = player_mode(p)->half;
     double far = far_side(s);
     vec2_t d = {0.0, far - p->pos.y};
     vec2_t vel = {p->vx, 0.0};               /* a slope it lands on: its slide */
@@ -502,7 +502,7 @@ static void teleport(sim_t *s)
             break;
         respond(s, &e.contact, &vel);
     }
-    p->vy = (p->grounded ? p->surface_rise : 0.0) - MODES[p->mode].gravity;
+    p->vy = (p->grounded ? p->surface_rise : 0.0) - player_mode(p)->gravity;
 }
 
 void move_and_collide(sim_t *s)
@@ -556,6 +556,6 @@ void move_and_collide(sim_t *s)
 /* Only flipped gravity has a ceiling to fall into (4.7). */
 void collide_kill_ceiling(player_t *p, const level_data_t *lvl)
 {
-    if (p->gravity_dir < 0 && p->pos.y - MODES[p->mode].half < lvl->kill_y)
+    if (p->gravity_dir < 0 && p->pos.y - player_mode(p)->half < lvl->kill_y)
         p->alive = false;
 }
