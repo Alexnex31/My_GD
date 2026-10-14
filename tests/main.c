@@ -32,6 +32,7 @@ int main(void)
     test_speed();
     test_robot();
     test_swing();
+    test_spider();
     test_doc();
     test_editor();
     test_edit();
