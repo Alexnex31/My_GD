@@ -989,7 +989,7 @@ Both count in **GD blocks**: a block is the player's size, so **1 block = our 10
 | Ship | 10 blocks | 1000 px |
 | UFO | 10 | 1000 px |
 | Wave | 10 | 1000 px |
-| Swing | 10 | 1000 px (later, 10.5) |
+| Swing | 10 | 1000 px (10.5) |
 | Spider | 9 | 900 px (later, 10.5) |
 | Ball | 8 | 800 px |
 
@@ -1008,7 +1008,7 @@ Both count in **GD blocks**: a block is the player's size, so **1 block = our 10
 | Blue pad and blue orb | −1.37 | flip, then 1.37 toward the new floor (10.1) |
 | Green orb | −1.91 in GD's tables | flip, then a jump of 1.91 away from the new floor (10.2) |
 | Black orb | −2.6 | straight toward the floor, at the fall cap |
-| Ship, UFO, ball, wave | not published | ours (7–9), except the UFO's hop height |
+| Ship, UFO, ball, wave, swing | not published | ours (7–9, 10.5), except the UFO's hop height |
 
 **The ship, and how its numbers were chosen.** GD publishes nothing here, so guessing a number is guessing twice: once at the value and once at the units. Instead the ship is defined by the **arc it draws**, which is what a player actually feels, and the constants fall out of it:
 
@@ -1495,6 +1495,17 @@ Consequences:
 - **Every level that existed plays bit for bit as before** (the every-tick hashes were compared before the new field was added to the hash).
 - **The game layer:** the cube's icon stands in, kept upright in the air instead of spinning; the portal is light grey. The palette's ninth entry is now `portal robot`, so `gravity up` lost its key.
 - **Tests:** `tests/test_robot.c` (the row; a full hold tick by tick and its height; a tap and a half hold; no second rise; held through landings; the same height at speed 4; upside down; the rise ended by a ceiling, a pad, a mode portal and a gravity portal; an orb risen through with the click held, and taken by a new one; the counter hashed and restored; a wall only a robot clears and a low ceiling only a short hop passes, both for the bot) and `levels/18.gd`, which the bot solves.
+
+### 10.5c As built (swing)
+
+- **The rule:** each press turns the swing's gravity round, on the ground or in the air; holding does nothing. `src/sim/mode_swing.c` is one function, and one row in `MODES`: the ship's body, corridor (1000 px), bounce on a block's underside (30%), bot decisions every 12 ticks and icon rotation (its nose follows its path).
+- **No push:** the press is `player_flip_gravity` (PLAN 3.4), which keeps the motion, so the swing curves round to its new side instead of jumping there ("inverts gravity gradually", 6.9). On the tick of a press, its speed down the screen changes by one tick of gravity the other way, and nothing else.
+- **Its numbers:** GD publishes none, so `SWING_GRAVITY` and `SWING_MAX_VY` are the ship's (4530.5 px/s², and a cap at the scroll speed, so never steeper than 45 degrees). Measured: from the floor, a press brings it to rest on the corridor's ceiling **235 ticks** later (0.98 s), and back down in the same time. Provisional like every constant.
+- **The hold rule (PLAN 3.4):** only `pressed` flips, and the flip uses the hold, so a button kept down activates no orb. A fresh press inside an orb is the orb's, and the gravity stays (orbs win, 10.2). A hold carried into the attempt flips nothing.
+- **Across portals:** a mode portal keeps the gravity it had, as always (6.1): a swing flipped at a cube portal is a flipped cube. Pads launch it like any mode.
+- **Nothing new in the state:** no field, so the hash and the snapshots are unchanged.
+- **The game layer:** the ship's icon stands in; the portal is yellow. The palette's tenth entry is `portal swing`, without a key.
+- **Tests:** `tests/test_swing.c` (the row; the crossing tick by tick, at the cap; holding does nothing, nor a carried hold; a press in the air keeps the motion, and each new press flips; an orb pressed in and one held through; a block's underside; a mode portal, a swing portal, a pad; walls from the floor and from the ceiling, which the bot passes as a swing and not as a cube), the swing in `tests/test_mirror.c` (200 seeds upside down, and the bot), and `levels/19.gd`, which the bot solves.
 
 ### 10.6 Saws
 
