@@ -43,57 +43,65 @@ const launch_ops_t LAUNCHES[LAUNCH_KIND_COUNT] = {
     [LAUNCH_BLACK] = {.name = "black", .orb_v = -2.6, .mini_orb_v = -2.6},
 };
 
+/*
+** What a mode is at either size. Each row below gives a mode's shared part,
+** then its size, then only the numbers that size changes: mini (FEATURES
+** 10.4) can't drift from its mode by a field forgotten in one table.
+*/
+#define FULL_SIZE .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF
+#define MINI_SIZE .half = PLAYER_HALF * MINI_SCALE, \
+    .inner_half = PLAYER_INNER_HALF * MINI_SCALE
+
+#define CUBE .name = "cube", .max_fall = PER_TICK(CUBE_MAX_FALL), \
+    .head_restitution = -1.0, .apply_input = cube_input, \
+    .apply_forces = player_apply_gravity, .update_rotation = cube_rotation
+#define SHIP .name = "ship", .gravity = PER_TICK2(SHIP_GRAVITY), \
+    .max_fall = PER_TICK(SHIP_MAX_VY), \
+    .head_restitution = BOUNCE_RESTITUTION_SHIP, \
+    .thrust = PER_TICK2(SHIP_THRUST), .corridor_height = 1000.0, \
+    .bot_decision_ticks = 12, .apply_input = ship_input, \
+    .apply_forces = player_apply_gravity, .update_rotation = ship_rotation
+#define UFO .name = "ufo", .gravity = PER_TICK2(UFO_GRAVITY), \
+    .max_fall = PER_TICK(UFO_MAX_FALL), \
+    .head_restitution = BOUNCE_RESTITUTION_SHIP, .corridor_height = 1000.0, \
+    .bot_decision_ticks = 12, .apply_input = ufo_input, \
+    .apply_forces = player_apply_gravity, .update_rotation = ufo_rotation
+#define WAVE .name = "wave", .head_restitution = -1.0, \
+    .corridor_height = 1000.0, .neutral_kills = true, \
+    .keep_vy_on_surface = true, .orbs_flip_only = true, \
+    .bot_decision_ticks = 12, .apply_input = wave_input, \
+    .apply_forces = wave_forces, .update_rotation = wave_rotation
+#define BALL .name = "ball", .gravity = PER_TICK2(BALL_GRAVITY), \
+    .max_fall = PER_TICK(BALL_MAX_FALL), \
+    .head_restitution = BOUNCE_RESTITUTION_SHIP, \
+    .jump_v = PER_TICK(BALL_FLIP_V), .corridor_height = 800.0, \
+    .apply_input = ball_input, .apply_forces = player_apply_gravity, \
+    .update_rotation = ball_rotation
+#define ROBOT .name = "robot", .gravity = PER_TICK2(CUBE_GRAVITY), \
+    .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0, \
+    .jump_v = PER_TICK(ROBOT_RISE_V), .apply_input = robot_input, \
+    .apply_forces = robot_forces, .update_rotation = robot_rotation
+#define SWING .name = "swing", .gravity = PER_TICK2(SWING_GRAVITY), \
+    .max_fall = PER_TICK(SWING_MAX_VY), \
+    .head_restitution = BOUNCE_RESTITUTION_SHIP, .corridor_height = 1000.0, \
+    .bot_decision_ticks = 12, .apply_input = swing_input, \
+    .apply_forces = player_apply_gravity, .update_rotation = ship_rotation
+#define SPIDER .name = "spider", .gravity = PER_TICK2(CUBE_GRAVITY), \
+    .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0, \
+    .corridor_height = 900.0, .apply_input = spider_input, \
+    .apply_forces = player_apply_gravity, .update_rotation = robot_rotation
+
 const mode_ops_t MODES[MODE_COUNT] = {
-    [MODE_CUBE] = {.name = "cube", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
-        .gravity = PER_TICK2(CUBE_GRAVITY),
-        .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
-        .jump_v = PER_TICK(CUBE_JUMP_V),
-        .apply_input = cube_input, .apply_forces = player_apply_gravity,
-        .update_rotation = cube_rotation},
-    [MODE_SHIP] = {.name = "ship", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
-        .gravity = PER_TICK2(SHIP_GRAVITY),
-        .max_fall = PER_TICK(SHIP_MAX_VY), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .thrust = PER_TICK2(SHIP_THRUST),
-        .corridor_height = 1000.0, .bot_decision_ticks = 12,
-        .apply_input = ship_input, .apply_forces = player_apply_gravity,
-        .update_rotation = ship_rotation},
-    [MODE_UFO] = {.name = "ufo", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
-        .gravity = PER_TICK2(UFO_GRAVITY),
-        .max_fall = PER_TICK(UFO_MAX_FALL), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .jump_v = PER_TICK(UFO_JUMP_V),
-        .corridor_height = 1000.0, .bot_decision_ticks = 12,
-        .apply_input = ufo_input, .apply_forces = player_apply_gravity,
-        .update_rotation = ufo_rotation},
-    [MODE_WAVE] = {.name = "wave", .half = WAVE_HALF, .inner_half = WAVE_HALF,
-        .head_restitution = -1.0, .slope = 1.0,
-        .corridor_height = 1000.0, .neutral_kills = true,
-        .keep_vy_on_surface = true, .bot_decision_ticks = 12,
-        .apply_input = wave_input, .apply_forces = wave_forces,
-        .update_rotation = wave_rotation},
-    [MODE_BALL] = {.name = "ball", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
-        .gravity = PER_TICK2(BALL_GRAVITY),
-        .max_fall = PER_TICK(BALL_MAX_FALL), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .jump_v = PER_TICK(BALL_FLIP_V), .corridor_height = 800.0,
-        .apply_input = ball_input, .apply_forces = player_apply_gravity,
-        .update_rotation = ball_rotation},
-    [MODE_ROBOT] = {.name = "robot", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
-        .gravity = PER_TICK2(CUBE_GRAVITY),
-        .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
-        .jump_v = PER_TICK(ROBOT_RISE_V), .rise_ticks = ROBOT_BOOST_TICKS,
-        .apply_input = robot_input, .apply_forces = robot_forces,
-        .update_rotation = robot_rotation},
-    [MODE_SWING] = {.name = "swing", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
-        .gravity = PER_TICK2(SWING_GRAVITY),
-        .max_fall = PER_TICK(SWING_MAX_VY), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .corridor_height = 1000.0, .bot_decision_ticks = 12,
-        .apply_input = swing_input, .apply_forces = player_apply_gravity,
-        .update_rotation = ship_rotation},
-    [MODE_SPIDER] = {.name = "spider", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
-        .gravity = PER_TICK2(CUBE_GRAVITY),
-        .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
-        .corridor_height = 900.0,
-        .apply_input = spider_input, .apply_forces = player_apply_gravity,
-        .update_rotation = robot_rotation},
+    [MODE_CUBE] = {CUBE, FULL_SIZE, .gravity = PER_TICK2(CUBE_GRAVITY),
+        .jump_v = PER_TICK(CUBE_JUMP_V)},
+    [MODE_SHIP] = {SHIP, FULL_SIZE},
+    [MODE_UFO] = {UFO, FULL_SIZE, .jump_v = PER_TICK(UFO_JUMP_V)},
+    [MODE_WAVE] = {WAVE, .half = WAVE_HALF, .inner_half = WAVE_HALF,
+        .slope = 1.0},
+    [MODE_BALL] = {BALL, FULL_SIZE},
+    [MODE_ROBOT] = {ROBOT, FULL_SIZE, .rise_ticks = ROBOT_BOOST_TICKS},
+    [MODE_SWING] = {SWING, FULL_SIZE},
+    [MODE_SPIDER] = {SPIDER, FULL_SIZE},
 };
 
 /*
@@ -103,64 +111,16 @@ const mode_ops_t MODES[MODE_COUNT] = {
 ** change: a mini ship flies in the same 1000 px.
 */
 const mode_ops_t MINI_MODES[MODE_COUNT] = {
-    [MODE_CUBE] = {.name = "cube", .half = PLAYER_HALF * MINI_SCALE,
-        .inner_half = PLAYER_INNER_HALF * MINI_SCALE,
-        .gravity = PER_TICK2(MINI_CUBE_GRAVITY),
-        .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
-        .jump_v = PER_TICK(MINI_CUBE_JUMP_V),
-        .apply_input = cube_input, .apply_forces = player_apply_gravity,
-        .update_rotation = cube_rotation},
-    [MODE_SHIP] = {.name = "ship", .half = PLAYER_HALF * MINI_SCALE,
-        .inner_half = PLAYER_INNER_HALF * MINI_SCALE,
-        .gravity = PER_TICK2(SHIP_GRAVITY),
-        .max_fall = PER_TICK(SHIP_MAX_VY), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .thrust = PER_TICK2(SHIP_THRUST),
-        .corridor_height = 1000.0, .bot_decision_ticks = 12,
-        .apply_input = ship_input, .apply_forces = player_apply_gravity,
-        .update_rotation = ship_rotation},
-    [MODE_UFO] = {.name = "ufo", .half = PLAYER_HALF * MINI_SCALE,
-        .inner_half = PLAYER_INNER_HALF * MINI_SCALE,
-        .gravity = PER_TICK2(UFO_GRAVITY),
-        .max_fall = PER_TICK(UFO_MAX_FALL), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .jump_v = PER_TICK(MINI_UFO_JUMP_V),
-        .corridor_height = 1000.0, .bot_decision_ticks = 12,
-        .apply_input = ufo_input, .apply_forces = player_apply_gravity,
-        .update_rotation = ufo_rotation},
-    [MODE_WAVE] = {.name = "wave", .half = WAVE_HALF * MINI_SCALE,
-        .inner_half = WAVE_HALF * MINI_SCALE,
-        .head_restitution = -1.0, .slope = MINI_WAVE_SLOPE,
-        .corridor_height = 1000.0, .neutral_kills = true,
-        .keep_vy_on_surface = true, .bot_decision_ticks = 12,
-        .apply_input = wave_input, .apply_forces = wave_forces,
-        .update_rotation = wave_rotation},
-    [MODE_BALL] = {.name = "ball", .half = PLAYER_HALF * MINI_SCALE,
-        .inner_half = PLAYER_INNER_HALF * MINI_SCALE,
-        .gravity = PER_TICK2(BALL_GRAVITY),
-        .max_fall = PER_TICK(BALL_MAX_FALL), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .jump_v = PER_TICK(BALL_FLIP_V), .corridor_height = 800.0,
-        .apply_input = ball_input, .apply_forces = player_apply_gravity,
-        .update_rotation = ball_rotation},
-    [MODE_ROBOT] = {.name = "robot", .half = PLAYER_HALF * MINI_SCALE,
-        .inner_half = PLAYER_INNER_HALF * MINI_SCALE,
-        .gravity = PER_TICK2(CUBE_GRAVITY),
-        .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
-        .jump_v = PER_TICK(ROBOT_RISE_V), .rise_ticks = MINI_ROBOT_TICKS,
-        .apply_input = robot_input, .apply_forces = robot_forces,
-        .update_rotation = robot_rotation},
-    [MODE_SWING] = {.name = "swing", .half = PLAYER_HALF * MINI_SCALE,
-        .inner_half = PLAYER_INNER_HALF * MINI_SCALE,
-        .gravity = PER_TICK2(SWING_GRAVITY),
-        .max_fall = PER_TICK(SWING_MAX_VY), .head_restitution = BOUNCE_RESTITUTION_SHIP,
-        .corridor_height = 1000.0, .bot_decision_ticks = 12,
-        .apply_input = swing_input, .apply_forces = player_apply_gravity,
-        .update_rotation = ship_rotation},
-    [MODE_SPIDER] = {.name = "spider", .half = PLAYER_HALF * MINI_SCALE,
-        .inner_half = PLAYER_INNER_HALF * MINI_SCALE,
-        .gravity = PER_TICK2(CUBE_GRAVITY),
-        .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
-        .corridor_height = 900.0,
-        .apply_input = spider_input, .apply_forces = player_apply_gravity,
-        .update_rotation = robot_rotation},
+    [MODE_CUBE] = {CUBE, MINI_SIZE, .gravity = PER_TICK2(MINI_CUBE_GRAVITY),
+        .jump_v = PER_TICK(MINI_CUBE_JUMP_V)},
+    [MODE_SHIP] = {SHIP, MINI_SIZE},
+    [MODE_UFO] = {UFO, MINI_SIZE, .jump_v = PER_TICK(MINI_UFO_JUMP_V)},
+    [MODE_WAVE] = {WAVE, .half = WAVE_HALF * MINI_SCALE,
+        .inner_half = WAVE_HALF * MINI_SCALE, .slope = MINI_WAVE_SLOPE},
+    [MODE_BALL] = {BALL, MINI_SIZE},
+    [MODE_ROBOT] = {ROBOT, MINI_SIZE, .rise_ticks = MINI_ROBOT_TICKS},
+    [MODE_SWING] = {SWING, MINI_SIZE},
+    [MODE_SPIDER] = {SPIDER, MINI_SIZE},
 };
 
 const mode_ops_t *player_mode(const player_t *p)
@@ -208,18 +168,19 @@ int launch_from_name(const char *name)
 /* What it does to a player of that size: GD has mini pads and orbs (6.9). */
 double launch_speed_for(const object_t *o, bool mini)
 {
-    if (!mini)
-        return launch_speed(o);
+    const launch_ops_t *l = NULL;
+
+    if (o->type != OBJ_PAD && o->type != OBJ_ORB)
+        return 0.0;
+    l = &LAUNCHES[o->launch];
     if (o->type == OBJ_PAD)
-        return LAUNCHES[o->launch].mini_pad_v;
-    return o->type == OBJ_ORB ? LAUNCHES[o->launch].mini_orb_v : 0.0;
+        return mini ? l->mini_pad_v : l->pad_v;
+    return mini ? l->mini_orb_v : l->orb_v;
 }
 
 double launch_speed(const object_t *o)
 {
-    if (o->type == OBJ_PAD)
-        return LAUNCHES[o->launch].pad_v;
-    return o->type == OBJ_ORB ? LAUNCHES[o->launch].orb_v : 0.0;
+    return launch_speed_for(o, false);
 }
 
 int mode_from_name(const char *name)

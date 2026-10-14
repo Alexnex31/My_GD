@@ -118,6 +118,7 @@ static bool near_live_orb(const sim_t *s)
         if (o->hitbox.aabb.x > reach)
             return false;                    /* sorted: nothing nearer follows */
         if (o->type == OBJ_ORB && !is_spent(&s->st, i)
+            && (!player_mode(p)->orbs_flip_only || o->launch == LAUNCH_BLUE)
             && o->hitbox.aabb.x + o->hitbox.aabb.w >= p->pos.x - half)
             return true;
     }

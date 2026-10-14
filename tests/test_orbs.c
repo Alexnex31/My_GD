@@ -46,8 +46,16 @@ static void load(sim_t *s, const char *text)
 
 static bool inside(const sim_t *s, size_t i)
 {
-    return overlap_box_poly(s->st.player.pos, MODES[s->st.player.mode].half,
+    return overlap_box_poly(s->st.player.pos, player_mode(&s->st.player)->half,
         &s->lvl.objects[i].hitbox);
+}
+
+/* No button until the player is inside object i; false if it never gets there. */
+static bool run_into(sim_t *s, size_t i)
+{
+    for (int t = 0; t < 2000 && s->st.player.alive && !inside(s, i); t++)
+        sim_tick(s, NONE);
+    return s->st.player.alive && inside(s, i);
 }
 
 /* The dropped cube, no button: the ticks it first and last overlaps the orb. */
@@ -226,8 +234,7 @@ static void test_orb_before_the_surface_jump(void)
     sim_t s;
 
     load(&s, "orb 1000 750 2 red\n" FAR);
-    while (!inside(&s, 0))
-        sim_tick(&s, NONE);
+    CHECK(run_into(&s, 0));
     sim_tick(&s, NONE);
     CHECK(s.st.player.grounded && s.st.player.can_jump);
     sim_tick(&s, PRESS);
@@ -247,22 +254,19 @@ static void test_other_modes(void)
     sim_t s;
 
     load(&s, "start_gamemode ufo\norb 1000 750 2 red\n" FAR);
-    while (!inside(&s, 0))
-        sim_tick(&s, NONE);
+    CHECK(run_into(&s, 0));
     sim_tick(&s, PRESS);
     CHECK(is_spent(&s.st, 0));
     CHECK(s.st.player.vy == UNITS(2.68) - MODES[MODE_UFO].gravity);
     sim_free(&s);
     load(&s, "start_gamemode ball\norb 1000 750 2 yellow\n" FAR);
-    while (!inside(&s, 0))
-        sim_tick(&s, NONE);
+    CHECK(run_into(&s, 0));
     sim_tick(&s, PRESS);
     CHECK(is_spent(&s.st, 0) && s.st.player.gravity_dir == 1);   /* no flip */
     CHECK(s.st.player.vy == UNITS(1.91) - MODES[MODE_BALL].gravity);
     sim_free(&s);
     load(&s, "start_gamemode ball\norb 1000 750 2 blue\n" FAR);
-    while (!inside(&s, 0))
-        sim_tick(&s, NONE);
+    CHECK(run_into(&s, 0));
     sim_tick(&s, PRESS);                       /* the orb's flip, not its own */
     CHECK(s.st.player.gravity_dir == -1);
     CHECK(s.st.player.vy == UNITS(-1.37) - MODES[MODE_BALL].gravity);
@@ -303,6 +307,64 @@ static void test_green_jumps_blue_throws(void)
     sim_free(&s);
 }
 
+/*
+** The orb takes the click, not the button: a ship pressing inside one is
+** launched and still thrusts on that tick, as it does held (FEATURES 10.2).
+** A black orb, since every other one throws it past its thrust's cap.
+*/
+static void test_ship_keeps_its_thrust(void)
+{
+    const mode_ops_t *m = &MODES[MODE_SHIP];
+    double v = fmin(UNITS(-2.6) + m->thrust, m->max_fall + m->gravity);
+    sim_t s;
+
+    load(&s, "start_gamemode ship\nstart_y 500\norb 400 450 2 black\n" FAR);
+    CHECK(inside(&s, 0) || run_into(&s, 0));
+    sim_tick(&s, PRESS);
+    CHECK(is_spent(&s.st, 0));
+    if (v > -m->max_fall)
+        v = fmax(v - m->gravity, -m->max_fall);
+    CHECK(s.st.player.vy == v);
+    sim_free(&s);
+}
+
+/*
+** A wave uses no orb but a blue one, and a blue one only flips it: the
+** button stays down, so it keeps climbing, toward its new ceiling now
+** (FEATURES 10.2). The other colours stay live as it goes through them.
+*/
+static void test_wave_orbs(void)
+{
+    const char *colours[] = {"yellow", "pink", "red", "green", "black"};
+    char text[128];
+    double y;
+    sim_t s;
+
+    for (int c = 0; c < 5; c++) {
+        snprintf(text, sizeof(text), "start_gamemode wave\nstart_x 450\n"
+            "start_y 500\norb 400 450 2 %s\n" FAR, colours[c]);
+        load(&s, text);
+        CHECK(inside(&s, 0));
+        y = s.st.player.pos.y;
+        sim_tick(&s, PRESS);
+        CHECK(!is_spent(&s.st, 0) && s.st.player.gravity_dir == 1);
+        CHECK(s.st.player.pos.y == y - s.st.player.vx);   /* it climbed */
+        sim_free(&s);
+    }
+    load(&s, "start_gamemode wave\nstart_x 450\nstart_y 500\n"
+        "orb 400 450 2 blue\n" FAR);
+    CHECK(inside(&s, 0));
+    y = s.st.player.pos.y;
+    sim_tick(&s, PRESS);
+    CHECK(is_spent(&s.st, 0) && s.st.player.gravity_dir == -1);
+    CHECK(s.st.player.hold == HOLD_USED);
+    CHECK(s.st.player.pos.y == y + s.st.player.vx);   /* climbing, flipped */
+    y = s.st.player.pos.y;
+    sim_tick(&s, HELD);
+    CHECK(s.st.player.pos.y == y + s.st.player.vx);   /* and it goes on */
+    sim_free(&s);
+}
+
 /* A ship's hold is never used by flying: held for a while, it takes the orb. */
 static void test_ship(void)
 {
@@ -328,4 +390,6 @@ void test_orbs(void)
     test_other_modes();
     test_green_jumps_blue_throws();
     test_ship();
+    test_ship_keeps_its_thrust();
+    test_wave_orbs();
 }

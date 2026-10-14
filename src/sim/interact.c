@@ -131,16 +131,26 @@ static void enter_portal(sim_t *s, const object_t *o)
 ** A size portal halves the player or gives it its size back, around the same
 ** center, and nothing else changes: speeds, gravity, mode (10.4). Growing can
 ** push it off a surface it would cross; an object it now overlaps is left to
-** the contact rules, which kill an inner box inside a block. A robot's rise
-** keeps going, no longer than the new size allows.
+** the contact rules, which kill an inner box inside a block. Shrinking lifts
+** its feet off whatever held it: it is in the air until it lands again.
+** A robot's rise keeps going, as long in all as the new size allows: the
+** ticks it already rose count.
 */
 static void enter_mini(sim_t *s, const object_t *o)
 {
     player_t *p = &s->st.player;
+    int risen = player_mode(p)->rise_ticks - p->boost_ticks;
 
+    if (p->mini == o->portal_mini)
+        return;                              /* already that size */
     p->mini = o->portal_mini;
-    if (p->boost_ticks > player_mode(p)->rise_ticks)
-        p->boost_ticks = player_mode(p)->rise_ticks;
+    if (p->boost_ticks > 0)
+        p->boost_ticks = risen < player_mode(p)->rise_ticks
+            ? player_mode(p)->rise_ticks - risen : 0;
+    if (p->mini) {
+        p->grounded = false;
+        p->surface_rise = 0.0;
+    }
     stay_off_the_surfaces(s);
 }
 
@@ -171,12 +181,18 @@ static void enter_speed(sim_t *s, const object_t *o)
 ** doing: the same launch every time, and no mode's cap cuts it (3.4). Blue
 ** and green flip the gravity first, and their speed is in the new gravity:
 ** toward the new floor for blue, a jump away from it for green.
-** An orb uses the hold that activated it (FEATURES 10.1, 10.2).
+** An orb uses the hold that activated it (FEATURES 10.1, 10.2). A wave's
+** blue orb only flips it: its climb is its input's, every tick.
 */
 static void launch(sim_t *s, const object_t *o)
 {
     player_t *p = &s->st.player;
 
+    if (o->type == OBJ_ORB && player_mode(p)->orbs_flip_only) {
+        player_flip_gravity(p);
+        p->hold = HOLD_USED;
+        return;
+    }
     if (LAUNCHES[o->launch].flips)
         player_flip_gravity(p);
     p->vy = PER_TICK(launch_speed_for(o, p->mini) * V_UNIT);
@@ -187,12 +203,20 @@ static void launch(sim_t *s, const object_t *o)
         p->hold = HOLD_USED;
 }
 
-/* An orb needs a hold nothing has used yet; the others only a touch (5.1). */
+/*
+** An orb needs a hold nothing has used yet; the others only a touch (5.1).
+** A wave uses no orb but a blue one (FEATURES 10.2): it flies through the
+** others, which stay live.
+*/
 static bool interactive_wants_activation(const sim_t *s, const object_t *o)
 {
-    if (o->type == OBJ_ORB)
-        return s->st.player.hold == HOLD_FRESH;
-    return true;
+    const player_t *p = &s->st.player;
+
+    if (o->type != OBJ_ORB)
+        return true;
+    if (player_mode(p)->orbs_flip_only && o->launch != LAUNCH_BLUE)
+        return false;
+    return p->hold == HOLD_FRESH;
 }
 
 static void interactive_act(sim_t *s, const object_t *o)
@@ -225,7 +249,9 @@ static void touch_interactive(sim_t *s, size_t i)
 ** live orb (it flew in without pressing, and the press comes now). The orb
 ** acts before the mode's own input and takes the click: nothing else may
 ** jump, hop or flip on it this tick, so the orb wins over a surface jump
-** (FEATURES 10.2). One orb per hold: the first in the level's order.
+** (FEATURES 10.2). The button stays down: what flies by holding it, a ship
+** or a wave, keeps doing so. One orb per hold: the first in the level's
+** order.
 */
 input_t activate_orbs(sim_t *s, input_t in)
 {
@@ -240,10 +266,11 @@ input_t activate_orbs(sim_t *s, input_t in)
         if (o->hitbox.aabb.x > p->pos.x + half)
             break;                           /* sorted: nothing further touches */
         if (o->type != OBJ_ORB || is_spent(&s->st, i)
+            || !interactive_wants_activation(s, o)
             || !overlap_box_poly(p->pos, half, &o->hitbox))
             continue;
         touch_interactive(s, i);
-        return (input_t){false, false};
+        return (input_t){.held = in.held || in.pressed, .pressed = false};
     }
     return in;
 }

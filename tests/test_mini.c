@@ -197,17 +197,71 @@ static void test_portals(void)
     sim_free(&s);
 }
 
-/* A robot made mini while it rises keeps rising, no longer than mini may. */
+/*
+** A robot held through a size portal: the ticks its first rise lasted, and
+** whether the portal came while it was rising.
+*/
+static int rise_through(const char *text, bool *mid_rise)
+{
+    sim_t s;
+    int risen = 0;
+    bool mini = false;
+
+    load(&s, text);
+    mini = s.st.player.mini;
+    *mid_rise = false;
+    sim_tick(&s, PRESS);
+    while (s.st.player.alive && risen < 200
+        && s.st.player.vy == player_mode(&s.st.player)->jump_v) {
+        risen += 1;
+        *mid_rise = *mid_rise || s.st.player.mini != mini;
+        sim_tick(&s, HELD);
+    }
+    sim_free(&s);
+    return risen;
+}
+
+/*
+** A robot made mini while it rises keeps rising, as long in all as mini
+** may: the ticks it already rose count. Grown back, the same the other way.
+*/
 static void test_robot_rise(void)
 {
+    bool mid_rise = false;
     sim_t s;
 
     load(&s, "start_gamemode robot\nmini 400 650 2 on\n" FAR);
     sim_tick(&s, PRESS);                     /* the portal is touched at once */
     CHECK(s.st.player.mini && is_spent(&s.st, 0));
-    CHECK(s.st.player.boost_ticks == MINI_ROBOT_TICKS);
+    CHECK(s.st.player.boost_ticks == MINI_ROBOT_TICKS - 1);   /* one risen */
     sim_tick(&s, HELD);
     CHECK(s.st.player.vy == MINI_MODES[MODE_ROBOT].jump_v);
+    sim_free(&s);
+    CHECK(rise_through("start_gamemode robot\nmini 600 650 2 on\n" FAR,
+        &mid_rise) == MINI_ROBOT_TICKS);
+    CHECK(mid_rise);
+    CHECK(rise_through("start_gamemode robot\n" MINI "mini 450 650 2 off\n"
+        FAR, &mid_rise) == ROBOT_BOOST_TICKS);
+    CHECK(mid_rise);
+}
+
+/*
+** Shrinking lifts the feet off what held them: the player is in the air,
+** with no surface's slide, until it lands again (10.4).
+*/
+static void test_shrink_leaves_the_surface(void)
+{
+    sim_t s;
+    double rise = 0.0;
+
+    load(&s, "slope 1000 750 2\nmini 1100 600 2 on\n" FAR);
+    while (!s.st.player.mini && s.st.player.alive && s.st.tick < 400) {
+        rise = s.st.player.grounded ? s.st.player.surface_rise : 0.0;
+        sim_tick(&s, NONE);
+    }
+    CHECK(rise > 0.0);                        /* it was climbing the slope */
+    CHECK(s.st.player.mini && !s.st.player.grounded);
+    CHECK(s.st.player.surface_rise == 0.0 && !s.st.player.can_jump);
     sim_free(&s);
 }
 
@@ -402,6 +456,7 @@ void test_mini(void)
     test_launches();
     test_portals();
     test_robot_rise();
+    test_shrink_leaves_the_surface();
     test_grow_in_a_corridor();
     test_grow_by_a_block();
     test_jump_zone_after_growing();
