@@ -15,7 +15,8 @@
 ** scroll speed, for as long as the button stays down and for
 ** its row's rise_ticks at most; then it falls like anything else. A tap is the
 ** lowest jump, a full hold the highest. Anything else that takes over its
-** speed (a pad, an orb, a flip, another mode) ends the rise.
+** speed (a pad, an orb, a flip, another mode, a surface it hits its head
+** on) ends the rise.
 */
 void robot_input(player_t *p, input_t in)
 {

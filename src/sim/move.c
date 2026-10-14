@@ -439,6 +439,7 @@ static void head_hit(sim_t *s, const contact_t *c, vec2_t *vel)
         return;
     }
     e = e < 0.0 ? 0.0 : e;
+    p->boost_ticks = 0;                      /* a robot's rise ends on what stops it */
     p->pos.y += c->normal.y * CONTACT_SKIN;
     p->vy = p->vy > PER_TICK(BOUNCE_MIN_SPEED) ? -p->vy * e : 0.0;
     if (p->vy > follow)

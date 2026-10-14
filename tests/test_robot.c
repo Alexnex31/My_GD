@@ -253,6 +253,33 @@ static void test_rise_ends(void)
 }
 
 /*
+** A surface it hits its head on ends the rise as a pad would: flipped, the
+** ground stops it, and it falls back at once, held or not (4.3).
+*/
+static void test_head_on_a_surface(void)
+{
+    sim_t s;
+    bool hit = false;
+    double y;
+
+    load(&s, ROBOT "start_gravity flipped\nstart_y 650\n"
+        "block 0 500 2 w=3000 h=2\n");
+    sim_tick(&s, NONE);
+    CHECK(s.st.player.grounded);
+    sim_tick(&s, PRESS);
+    for (int t = 0; t < 200 && !hit && s.st.player.alive; t++) {
+        sim_tick(&s, HELD);
+        for (int k = 0; k < s.nb_dbg; k++)
+            hit = hit || s.dbg[k].kind == DBG_HEAD;
+    }
+    CHECK(hit && s.st.player.alive && s.st.player.boost_ticks == 0);
+    y = s.st.player.pos.y;
+    sim_tick(&s, HELD);
+    CHECK(s.st.player.pos.y < y);            /* back up the screen */
+    sim_free(&s);
+}
+
+/*
 ** The click that makes it jump is used from the takeoff on (PLAN 3.4): held,
 ** it rises through an orb without activating it, and the rise goes on. Only
 ** a new press, after letting go, takes an orb.
@@ -374,6 +401,7 @@ void test_robot(void)
     test_any_speed();
     test_flipped();
     test_rise_ends();
+    test_head_on_a_surface();
     test_ignores_orbs();
     test_state();
     test_robot_bot();
