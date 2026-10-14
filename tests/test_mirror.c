@@ -241,9 +241,12 @@ void test_mirror(void)
     test_mode("wave", "ship");
     test_mode("swing", "ufo");
     test_mode("spider", "ball");
+    test_mode("wave\nstart_size mini", "ship");   /* mini, 10.4 */
+    test_mode("ufo\nstart_size mini", "spider");
     CHECK(pads_used > 20 && orbs_used > 20);
     test_bot_agrees("ship", "ufo");
     test_bot_agrees("ball", "wave");
     test_bot_agrees("swing", "ship");
     test_bot_agrees("spider", "cube");
+    test_bot_agrees("ship\nstart_size mini", "ball");
 }
