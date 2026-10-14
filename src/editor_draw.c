@@ -160,6 +160,7 @@ static void draw_start(editor_t *ed, gd_t *gd, const level_start_t *st,
     sfColor tint)
 {
     sfTexture *tex = st->mode == MODE_SHIP || st->mode == MODE_UFO
+        || st->mode == MODE_SWING
         ? gd->res->ship_icon : gd->res->player_icon;
     sfVector2u size = sfTexture_getSize(tex);
     float side = (float)fmax(2.0 * MODES[st->mode].half, 60.0);

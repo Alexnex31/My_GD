@@ -218,6 +218,7 @@ static void setup_player_sprite(gd_t *gd, level_t *lv)
         [MODE_WAVE] = gd->res->player_icon,  /* the same */
         [MODE_BALL] = gd->res->player_icon,  /* the same, rolling */
         [MODE_ROBOT] = gd->res->player_icon, /* the same, upright */
+        [MODE_SWING] = gd->res->ship_icon,   /* the ship's, for now */
     };
     sfTexture *tex = icons[p->mode];
     sfVector2u size = sfTexture_getSize(tex);

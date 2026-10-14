@@ -36,6 +36,7 @@ static const sfColor PORTAL_COLORS[MODE_COUNT] = {
     [MODE_WAVE] = {110, 80, 255, 255},
     [MODE_BALL] = {255, 60, 60, 255},
     [MODE_ROBOT] = {235, 235, 235, 255},
+    [MODE_SWING] = {255, 220, 60, 255},
 };
 
 /* Pads and orbs wear their own colour, GD's (FEATURES 10.1, 10.2). */
