@@ -66,6 +66,8 @@ static void test_across(void)
     CHECK(s.st.player.pos.y == TOP && s.st.player.grounded);
     CHECK(s.st.player.vy == 0.0 && !s.st.player.teleport);
     CHECK(s.st.player.pos.x == x + s.st.player.vx);
+    CHECK(s.st.player.prev_pos.y == TOP);     /* drawn there at once, no glide */
+    CHECK(s.st.player.prev_pos.x == x);
     CHECK(s.st.player.hold == HOLD_USED && s.st.player.can_jump);
     sim_tick(&s, NONE);
     CHECK(s.st.player.pos.y == TOP && s.st.player.grounded);

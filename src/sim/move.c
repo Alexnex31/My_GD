@@ -29,13 +29,19 @@ static rect_t tick_sweep_bounds(const player_t *p)
     return r;
 }
 
-/* The objects this tick can touch, using the level's x order (4.1). */
+/*
+** The objects this tick can touch, using the level's x order (4.1). The
+** cursor only moves forward, so it keeps everything the biggest player could
+** reach from here: a size or mode portal can grow this one into objects
+** behind it, and the jump zone reaches a skin further than the square.
+*/
 static void broadphase(sim_t *s, rect_t sweep)
 {
     const level_data_t *lv = &s->lvl;
+    double behind = s->st.player.pos.x - modes_widest_half() - ZONE_SKIN;
 
     while (s->st.first_active < lv->nb_objects
-        && lv->objects[s->st.first_active].hitbox.aabb.x + lv->reach <= sweep.x)
+        && lv->objects[s->st.first_active].hitbox.aabb.x + lv->reach <= behind)
         s->st.first_active += 1;
     s->nb_cand = 0;
     for (size_t i = s->st.first_active; i < lv->nb_objects; i++) {
@@ -66,10 +72,10 @@ static void advance(sim_t *s, vec2_t d, double t)
     s->legs += 1;
 }
 
-/* A step's lift: straight against gravity, so it costs no horizontal travel. */
-static void advance_y(sim_t *s, double dy)
+/* A step's lift or the spider's press: no horizontal travel at all. */
+static void advance_y(sim_t *s, vec2_t d, double t)
 {
-    s->st.player.pos.y += dy;
+    s->st.player.pos.y += d.y * t;
     s->legs += 1;
 }
 
@@ -168,13 +174,13 @@ static double leg_death_time(sim_t *s, vec2_t d)
         if (OBJ_CATEGORY[o->type] == CAT_NEUTRAL)
             t = sweep_box_touch(p->pos, mode_neutral_kill_half(m), d,
                 &o->hitbox);
+        else if (OBJ_CATEGORY[o->type] != CAT_HARM)
+            continue;
         else if (o->hitbox.kind == SHAPE_CIRCLE)         /* a saw (G.10) */
             t = sweep_box_disc(p->pos, m->half, d, o->hitbox.center,
                 o->hitbox.radius);
-        else if (OBJ_CATEGORY[o->type] == CAT_HARM)
-            t = sweep_box_touch(p->pos, m->half, d, &o->hitbox);
         else
-            continue;
+            t = sweep_box_touch(p->pos, m->half, d, &o->hitbox);
         death = fmin(death, t);
     }
     return death;
@@ -261,12 +267,17 @@ static bool step_event(const sim_t *s, vec2_t d, vec2_t vel, face_t f,
     const mode_ops_t *m = player_mode(p);
     double g = p->gravity_dir;
     double lead = p->pos.x + m->inner_half;
-    double t = lead >= f.x0 ? 0.0 : (f.x0 - lead) / d.x;
-    double y = p->pos.y + d.y * t;
-    double feet = y + m->half * g;
+    double t;
+    double y;
+    double feet;
 
-    if (d.x <= 0.0 || t > 1.0)
+    if (d.x <= 0.0)
+        return false;                        /* only a move to the right steps */
+    t = lead >= f.x0 ? 0.0 : (f.x0 - lead) / d.x;
+    if (t > 1.0)
         return false;
+    y = p->pos.y + d.y * t;
+    feet = y + m->half * g;
     if (vel.y > p->surface_rise + RISE_EPSILON)
         return false;                        /* rising: it keeps its motion */
     if (p->pos.x + d.x * t - m->half >= f.x1)
@@ -329,6 +340,27 @@ static double circle_lift_death(sim_t *s, vec2_t lift)
     return death;
 }
 
+typedef void (*advance_fn)(sim_t *s, vec2_t d, double t);
+
+/*
+** How every leg ends, in the order of 4.4: a death no later than the leg's
+** event stops everything there; otherwise what the leg went through is
+** touched and the player moves to the event. False when it died.
+*/
+static bool finish_leg(sim_t *s, vec2_t d, double death, double t_end,
+    advance_fn move)
+{
+    if (death <= t_end) {
+        move(s, d, death);
+        log_debug(s, DBG_DEATH, (vec2_t){0.0, 0.0});
+        s->st.player.alive = false;
+        return false;
+    }
+    leg_touches(s, d, t_end);
+    move(s, d, t_end);
+    return true;
+}
+
 /* The lift is a leg of its own: checked like any other, then it lands (4.4). */
 static void step_up(sim_t *s, const face_t *f, vec2_t *vel)
 {
@@ -339,14 +371,8 @@ static void step_up(sim_t *s, const face_t *f, vec2_t *vel)
     vec2_t lift = {0.0, target - p->pos.y};
     double death = fmin(leg_death_time(s, lift), circle_lift_death(s, lift));
 
-    if (death <= 1.0) {
-        advance_y(s, lift.y * death);
-        log_debug(s, DBG_DEATH, (vec2_t){0.0, 0.0});
-        p->alive = false;
+    if (!finish_leg(s, lift, death, 1.0, advance_y))
         return;
-    }
-    leg_touches(s, lift, 1.0);
-    advance_y(s, lift.y);
     log_debug(s, DBG_STEP, (vec2_t){0.0, 0.0});
     p->pos.y = target;                       /* exact, like settle on a face */
     p->grounded = true;
@@ -356,7 +382,8 @@ static void step_up(sim_t *s, const face_t *f, vec2_t *vel)
     vel->y = 0.0;
 }
 
-static bool first_event(sim_t *s, vec2_t d, vec2_t vel, event_t *out)
+static bool first_event(sim_t *s, vec2_t d, vec2_t vel, bool steps,
+    event_t *out)
 {
     out->kind = EV_NONE;
     out->t = 1.0;
@@ -368,7 +395,8 @@ static bool first_event(sim_t *s, vec2_t d, vec2_t vel, event_t *out)
         try_shapes(s, i, d, out);
     }
     try_surfaces(s, d, out);
-    try_steps(s, d, vel, out);               /* contacts first, then steps (G.9) */
+    if (steps)
+        try_steps(s, d, vel, out);           /* contacts first, then steps (G.9) */
     return out->kind != EV_NONE;
 }
 
@@ -467,6 +495,7 @@ static double far_side(const sim_t *s)
 ** move. What is on the way acts as in any move: a spike kills, a portal or a
 ** pad is touched, a block or a slope stops it, a steep face is gone through.
 ** With nothing above, it is carried to the kill line and dies there (4.7).
+** A step is not on the way: nothing moves sideways.
 ** It arrives as a grounded player does: at its floor's slide, with one tick
 ** of gravity past it.
 */
@@ -485,18 +514,10 @@ static void teleport(sim_t *s)
     broadphase(s, r);
     for (int n = 0; n < MAX_CONTACTS && !p->grounded; n++) {
         event_t e = {.kind = EV_NONE, .t = 1.0};
-        double death;
 
-        first_event(s, d, vel, &e);
-        death = leg_death_time(s, d);
-        if (death <= e.t) {
-            advance_y(s, d.y * death);
-            log_debug(s, DBG_DEATH, (vec2_t){0.0, 0.0});
-            p->alive = false;
+        first_event(s, d, vel, false, &e);
+        if (!finish_leg(s, d, leg_death_time(s, d), e.t, advance_y))
             return;
-        }
-        leg_touches(s, d, e.t);
-        advance_y(s, d.y * e.t);
         d.y *= 1.0 - e.t;
         if (e.kind != EV_CONTACT)
             break;
@@ -514,8 +535,10 @@ void move_and_collide(sim_t *s)
     s->legs = 0;
     s->nb_touch = 0;
     s->nb_passed = 0;
-    if (p->teleport)
+    if (p->teleport) {
         teleport(s);
+        p->prev_pos.y = p->pos.y;            /* drawn there at once, not gliding */
+    }
     if (!p->alive)
         return;
     vel = (vec2_t){p->vx, p->vy};
@@ -529,19 +552,10 @@ void move_and_collide(sim_t *s)
             last ? 0.0 : -vel.y * p->gravity_dir * s->tick_left};
         event_t e = {.kind = EV_NONE, .t = 1.0};
 
-        double death;
-
         if (!last)
-            first_event(s, d, vel, &e);
-        death = leg_death_time(s, d);
-        if (death <= e.t) {
-            advance(s, d, death);            /* death stops everything (4.4) */
-            log_debug(s, DBG_DEATH, (vec2_t){0.0, 0.0});
-            p->alive = false;
-            return;
-        }
-        leg_touches(s, d, e.t);
-        advance(s, d, e.t);
+            first_event(s, d, vel, true, &e);
+        if (!finish_leg(s, d, leg_death_time(s, d), e.t, advance))
+            return;                          /* death stops everything (4.4) */
         if (e.kind == EV_CONTACT)
             respond(s, &e.contact, &vel);
         else if (e.kind == EV_STEP)

@@ -228,6 +228,46 @@ static void test_grow_in_a_corridor(void)
 }
 
 /*
+** Growing back next to a block the mini player had already left: the bigger
+** square still finds it and steps back up onto it. A wide block far away,
+** which widens the broadphase's reach, changes nothing (4.1).
+*/
+static void test_grow_by_a_block(void)
+{
+    const char *base = "start_size mini\nstart_x 820\nstart_y 675\n"
+        "block 800 700 2\nmini 960 640 1 off\n";
+    char text[256];
+    sim_t s;
+
+    for (int wide = 0; wide < 2; wide++) {
+        snprintf(text, sizeof(text), "%s%s", base,
+            wide ? "block 5000 0 2 w=40\n" : "");
+        load(&s, text);
+        while (s.st.player.alive && s.st.player.pos.x < 950.0)
+            sim_tick(&s, NONE);
+        CHECK(!s.st.player.mini && s.st.player.alive);
+        CHECK(s.st.player.grounded && s.st.player.pos.y == 650.0);
+        sim_free(&s);
+    }
+}
+
+/*
+** The jump zone is the one of the size the tick ends with: grown over a
+** block it now reaches, the player may jump on that same tick (4.3).
+*/
+static void test_jump_zone_after_growing(void)
+{
+    sim_t s;
+
+    load(&s, "start_size mini\nstart_x 400\nstart_y 655\n"
+        "block 0 700 2 w=40\nmini 375 640 1 off\n");
+    sim_tick(&s, NONE);
+    CHECK(!s.st.player.mini && s.st.player.vy < 0.0);
+    CHECK(s.st.player.can_jump);             /* its top 45 px under the center */
+    sim_free(&s);
+}
+
+/*
 ** A tunnel 60 px high: a mini cube runs through it, a full one can't, and
 ** one that grows back inside it dies there.
 */
@@ -363,6 +403,8 @@ void test_mini(void)
     test_portals();
     test_robot_rise();
     test_grow_in_a_corridor();
+    test_grow_by_a_block();
+    test_jump_zone_after_growing();
     test_tunnel();
     test_state();
     test_mini_bot();

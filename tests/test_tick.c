@@ -135,6 +135,36 @@ static void test_seams(void)
     sim_free(&s);
 }
 
+/*
+** A gap exactly the player's height: its top runs along the ceiling's bottom,
+** under its corners and the seam between two blocks. Every mode a head hit
+** kills, at every speed: none of them is a hit (4.3).
+*/
+static void test_exact_gap(void)
+{
+    const double xs[] = {900.0, 950.0, 1000.0, 1234.0, 1700.0};
+    const char *speeds[] = {"0.5", "1", "2", "3", "4"};
+    const char *modes[] = {"cube", "robot", "spider"};
+    char text[256];
+    sim_t s;
+
+    for (int m = 0; m < 3; m++)
+        for (int v = 0; v < 5; v++)
+            for (int i = 0; i < 5; i++) {
+                snprintf(text, sizeof(text), "start_gamemode %s\n"
+                    "start_speed %s\nblock %g 650 2 w=5 h=2\n"
+                    "block %g 650 2 w=5 h=2\n", modes[m], speeds[v], xs[i],
+                    xs[i] + 500.0);
+                load(&s, text);
+                while (s.st.player.alive && s.st.player.pos.x < xs[i] + 1100.0) {
+                    sim_tick(&s, NONE);
+                    CHECK(s.st.player.pos.y == PLAYER_SPAWN_Y);
+                }
+                CHECK(s.st.player.alive);
+                sim_free(&s);
+            }
+}
+
 /* Off a ledge the player stays level, then falls with gravity alone. */
 static void test_ledge(void)
 {
@@ -341,6 +371,7 @@ void test_tick(void)
     test_scroll_is_exact();
     test_land_on_ground_and_block();
     test_seams();
+    test_exact_gap();
     test_ledge();
     test_wall_kills_at_the_inner_box();
     test_spawn_inside_a_block();

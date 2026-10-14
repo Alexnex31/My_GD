@@ -131,6 +131,7 @@
     #define MAX_CANDIDATES      256      /* objects a tick's broadphase may collect (4.1)  */
     #define MAX_TOUCHES         32       /* interactive objects touched in one tick (4.6)  */
     #define CONTACT_SKIN        (1.0 / 1024.0)   /* gap kept from tilted faces (4.4)     */
+    #define ZONE_SKIN           (2.0 * CONTACT_SKIN)   /* the jump zone covers that gap (G.6) */
 
     /* Camera (screen y of the player's center) */
     /* The camera's dead zone (3.5): a band CAM_ZONE_HEIGHT tall in the middle of

@@ -13,8 +13,6 @@
 #include "sim/sim.h"
 #include "sim/sweep.h"
 
-#define ZONE_SKIN (2.0 * CONTACT_SKIN)       /* covers the gap kept from slopes */
-
 /*
 ** The strip of the rigid square below the inner box (above it when gravity is
 ** flipped), grown by a skin because it is a support test, not a collision.
@@ -91,6 +89,9 @@ void sim_jump_zone(const sim_t *s, rect_t *out, double *y_line)
 /*
 ** Touching alone isn't enough: the player also has to be moving into its
 ** surface, which is what stops a second jump in mid-air (4.3).
+** The zone looks the objects up itself, from where the tick ended and at the
+** size it ended with: a portal of step 5 may have grown the player since the
+** movement's broadphase, and the zone reaches a skin past it anyway.
 */
 void update_can_jump(sim_t *s)
 {
@@ -99,9 +100,12 @@ void update_can_jump(sim_t *s)
     rect_t zone = zone_rect(p, &y_line);
     bool touched = zone_surface(s, zone);
 
-    for (size_t k = 0; !touched && k < s->nb_cand; k++) {
-        const object_t *o = &s->lvl.objects[s->cand[k]];
+    for (size_t i = s->st.first_active; !touched && i < s->lvl.nb_objects;
+        i++) {
+        const object_t *o = &s->lvl.objects[i];
 
+        if (o->hitbox.aabb.x >= zone.x + zone.w)
+            break;                           /* sorted: nothing further touches */
         if (OBJ_CATEGORY[o->type] != CAT_NEUTRAL)
             continue;
         if (!rect_overlap(o->hitbox.aabb, zone))

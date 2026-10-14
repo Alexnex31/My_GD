@@ -375,23 +375,58 @@ static void test_step_on_a_rotated_slope(void)
     sim_free(&s);
 }
 
-/* Rising through a corner phases past it; falling into it steps up (4.4). */
+/*
+** Rising through a corner phases past it; falling into it steps up (4.4).
+** The jump comes the tick before the lead reaches the step's face, with the
+** square already in its corner: rising, the face is passed, not stepped on,
+** and the jump carries the cube over the block.
+*/
 static void test_step_needs_downward_momentum(void)
 {
     sim_t s;
-    bool lifted = false;
+    int rising_steps = 0;
+    int rising_ticks = 0;
 
     load(&s, "block 1000 825 2\n");
-    place(&s, 900.0, PLAYER_SPAWN_Y);
+    while (s.st.player.pos.x + PLAYER_INNER_HALF + PER_TICK(SCROLL_SPEED)
+        < 1000.0)
+        sim_tick(&s, NONE);
+    CHECK(s.st.player.pos.x + PLAYER_HALF > 1000.0);     /* in its corner */
     s.st.player.vy = PER_TICK(CUBE_JUMP_V);              /* rising through it */
     s.st.player.can_jump = false;
-    for (int i = 0; i < 40 && s.st.player.alive; i++) {
+    for (int i = 0; i < 120 && s.st.player.alive; i++) {
+        bool rising = s.st.player.vy > 0.0;
+
         sim_tick(&s, NONE);
-        if (s.st.player.pos.x > 1000.0 && s.st.player.vy > 0.0
-            && s.st.player.grounded)
-            lifted = true;
+        rising_ticks += rising;
+        for (int k = 0; rising && k < s.nb_dbg; k++)
+            rising_steps += s.dbg[k].kind == DBG_STEP;
     }
-    CHECK(!lifted);                                      /* never snapped on top */
+    CHECK(rising_ticks > 3);
+    CHECK(rising_steps == 0);                            /* never snapped on top */
+    CHECK(s.st.player.alive);
+    sim_free(&s);
+}
+
+/*
+** A lift that ends with the head exactly under a ceiling only touches it:
+** a 25 px step under a block 100 px above its top (4.4). A hair lower and
+** the lift runs into it.
+*/
+static void test_step_up_to_an_exact_ceiling(void)
+{
+    sim_t s;
+
+    load(&s, "block 1000 825 2 w=10\nblock 900 625 2 w=10 h=2\n");
+    while (s.st.player.alive && s.st.player.pos.x < 1300.0)
+        sim_tick(&s, NONE);
+    CHECK(s.st.player.alive);
+    CHECK(s.st.player.pos.y == 775.0 && s.st.player.grounded);
+    sim_free(&s);
+    load(&s, "block 1000 825 2 w=10\nblock 900 626 2 w=10 h=2\n");
+    while (s.st.player.alive && s.st.player.pos.x < 1300.0)
+        sim_tick(&s, NONE);
+    CHECK(!s.st.player.alive);
     sim_free(&s);
 }
 
@@ -446,6 +481,7 @@ void test_slopes(void)
     test_contact_budget();
     test_step_on_a_rotated_slope();
     test_step_needs_downward_momentum();
+    test_step_up_to_an_exact_ceiling();
     test_jump_off_a_corner();
     test_jump_from_a_slope();
 }

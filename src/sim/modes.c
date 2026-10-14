@@ -5,6 +5,7 @@
 ** the tables everything reads: object categories, gamemodes (FEATURES 6.1)
 */
 
+#include <math.h>
 #include <string.h>
 #include "sim/internal.h"
 #include "sim/modes.h"
@@ -184,6 +185,16 @@ double modes_tallest_corridor(void)
         if (MODES[i].corridor_height > tallest)
             tallest = MODES[i].corridor_height;
     return tallest;
+}
+
+/* Over every mode and size: what the broadphase keeps behind the player (4.1). */
+double modes_widest_half(void)
+{
+    double widest = 0.0;
+
+    for (int i = 0; i < MODE_COUNT; i++)
+        widest = fmax(widest, fmax(MODES[i].half, MINI_MODES[i].half));
+    return widest;
 }
 
 int launch_from_name(const char *name)

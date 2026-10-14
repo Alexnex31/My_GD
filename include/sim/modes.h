@@ -61,5 +61,6 @@ double launch_speed_for(const object_t *o, bool mini);
 int mode_from_name(const char *name);      /* -1 if unknown (5.5) */
 double mode_neutral_kill_half(const mode_ops_t *m);   /* FEATURES 6.4 */
 double modes_tallest_corridor(void);       /* over MODES[]: the kill line (4.7) */
+double modes_widest_half(void);            /* over MODES[] and MINI_MODES[] (4.1) */
 
 #endif
