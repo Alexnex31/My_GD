@@ -330,6 +330,8 @@ int ed_entries(ed_entry_t *out, int max)
         entry(out, &n, max, OBJ_PORTAL, MODES[m].name);
     entry(out, &n, max, OBJ_GRAVITY, "up");
     entry(out, &n, max, OBJ_GRAVITY, "down");
+    entry(out, &n, max, OBJ_MINI, "on");
+    entry(out, &n, max, OBJ_MINI, "off");
     entry(out, &n, max, OBJ_SAW, NULL);
     for (int k = 0; k < SPEED_COUNT; k++)
         entry(out, &n, max, OBJ_SPEED, speed_word(SPEED_NAMES[k]));
@@ -355,7 +357,8 @@ static bool same_object(const ed_object_t *ea, const ed_object_t *eb)
         && a->rect.y == b->rect.y && a->rect.w == b->rect.w
         && a->rect.h == b->rect.h && a->rotation == b->rotation
         && a->portal_mode == b->portal_mode
-        && a->portal_gravity == b->portal_gravity && a->launch == b->launch;
+        && a->portal_gravity == b->portal_gravity && a->launch == b->launch
+        && a->portal_mini == b->portal_mini;
 }
 
 /* The object is made by the loader from its line: what is placed is what

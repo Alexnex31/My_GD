@@ -25,7 +25,7 @@ static double *speed_of(ed_object_t *o)
 const char *ed_prop_name(ed_prop_t p)
 {
     static const char *const NAMES[ED_PROP_COUNT] = {"Turn", "Width",
-        "Height", "Kind", "Gravity", "Speed"};
+        "Height", "Kind", "Gravity", "Speed", "Size"};
 
     return NAMES[p];
 }
@@ -34,7 +34,7 @@ static bool has_kind(const ed_object_t *o)
 {
     return o->is_start || o->obj.type == OBJ_PORTAL
         || o->obj.type == OBJ_GRAVITY || o->obj.type == OBJ_PAD
-        || o->obj.type == OBJ_ORB;
+        || o->obj.type == OBJ_ORB || o->obj.type == OBJ_MINI;
 }
 
 static bool has(const ed_object_t *o, ed_prop_t p)
@@ -43,7 +43,7 @@ static bool has(const ed_object_t *o, ed_prop_t p)
         return has_kind(o);
     if (p == ED_PROP_SPEED)
         return o->is_start || o->obj.type == OBJ_SPEED;
-    if (p == ED_PROP_GRAVITY)
+    if (p == ED_PROP_GRAVITY || p == ED_PROP_SIZE)
         return o->is_start;
     return !o->is_start;
 }
@@ -56,6 +56,8 @@ static const char *kind_text(const ed_object_t *o)
         return MODES[o->obj.portal_mode].name;
     if (o->obj.type == OBJ_GRAVITY)
         return o->obj.portal_gravity < 0 ? "up" : "down";
+    if (o->obj.type == OBJ_MINI)
+        return o->obj.portal_mini ? "on" : "off";
     return LAUNCHES[o->obj.launch].name;
 }
 
@@ -73,6 +75,8 @@ static void text_of(const ed_object_t *o, ed_prop_t p, char *out, size_t size)
         snprintf(out, size, "%s", o->start.gravity_dir < 0 ? "up" : "down");
     if (p == ED_PROP_SPEED)
         snprintf(out, size, "x%s", speed_word(*speed_of((ed_object_t *)o)));
+    if (p == ED_PROP_SIZE)
+        snprintf(out, size, "%s", o->start.mini ? "mini" : "normal");
 }
 
 bool ed_prop_applies(const ed_level_t *lv, ed_prop_t p)
@@ -132,6 +136,8 @@ static void step_kind(ed_object_t *o, int dir)
             + MODE_COUNT) % MODE_COUNT);
     else if (o->obj.type == OBJ_GRAVITY)
         o->obj.portal_gravity = -o->obj.portal_gravity;
+    else if (o->obj.type == OBJ_MINI)
+        o->obj.portal_mini = !o->obj.portal_mini;
     else
         o->obj.launch = next_launch(&o->obj, dir);
 }
@@ -164,6 +170,8 @@ static void step_one(ed_object_t *o, ed_prop_t p, int dir)
         o->start.gravity_dir = -o->start.gravity_dir;
     if (p == ED_PROP_SPEED)
         step_speed(o, dir);
+    if (p == ED_PROP_SIZE)
+        o->start.mini = !o->start.mini;
     if (o->obj.type == OBJ_SAW && !o->is_start && p == ED_PROP_W)
         o->obj.rect.h = o->obj.rect.w;       /* a saw stays round: its hitbox */
     if (o->obj.type == OBJ_SAW && !o->is_start && p == ED_PROP_H)
@@ -180,7 +188,9 @@ static bool same(const ed_object_t *a, const ed_object_t *b)
         && a->obj.portal_gravity == b->obj.portal_gravity
         && a->obj.launch == b->obj.launch && a->start.mode == b->start.mode
         && a->start.gravity_dir == b->start.gravity_dir
-        && a->start.speed == b->start.speed && a->obj.speed == b->obj.speed;
+        && a->start.speed == b->start.speed && a->obj.speed == b->obj.speed
+        && a->obj.portal_mini == b->obj.portal_mini
+        && a->start.mini == b->start.mini;
 }
 
 /* One command if any grabbed object is no longer what it was. */

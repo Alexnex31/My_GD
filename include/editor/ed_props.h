@@ -19,9 +19,10 @@ typedef enum ed_prop {
     ED_PROP_TURN,             /* degrees, 15 at a time                        */
     ED_PROP_W,                /* grid units of 50 px, one at a time           */
     ED_PROP_H,
-    ED_PROP_KIND,             /* a portal's mode, a colour, up or down        */
+    ED_PROP_KIND,             /* a portal's mode, a colour, up or down, on or off */
     ED_PROP_GRAVITY,          /* a start position's                           */
     ED_PROP_SPEED,
+    ED_PROP_SIZE,             /* a start position's: normal or mini (10.4)    */
     ED_PROP_COUNT
 } ed_prop_t;
 

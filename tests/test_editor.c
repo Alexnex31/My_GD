@@ -140,7 +140,9 @@ static void test_entries(void)
     object_t o;
     char line[96];
 
-    CHECK(n == 3 + MODE_COUNT + 2 + 1 + 5 + 4 + 6 + 1);
+    CHECK(n == 3 + MODE_COUNT + 2 + 2 + 1 + 5 + 4 + 6 + 1);
+    CHECK(find_entry(e, n, "mini on") != NULL);
+    CHECK(find_entry(e, n, "mini off") != NULL);
     CHECK(find_entry(e, n, "speed 0.5") != NULL);
     CHECK(find_entry(e, n, "speed 4") != NULL);
     CHECK(find_entry(e, n, "saw") != NULL);
