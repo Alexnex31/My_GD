@@ -282,6 +282,44 @@ static void test_reset_at(void)
     sim_free(&s);
 }
 
+/*
+** A start at or before the level's own begins where the level does, at
+** tick 0: the run is measured from there (FEATURES 11.8).
+*/
+static void test_start_before_the_level(void)
+{
+    sim_t s;
+
+    load(&s, "start_x 1000\nstart 500 800 cube\nblock 9000 750 2\n");
+    CHECK(warnings == 0 && s.lvl.nb_starts == 1);
+    sim_reset_at(&s, &s.lvl.starts[0]);
+    CHECK(s.st.tick == 0 && s.st.distance == 0.0);
+    CHECK(s.st.player.pos.x == 1000.0 && s.st.player.prev_pos.x == 1000.0);
+    sim_tick(&s, (input_t){false, false});
+    CHECK(s.st.player.pos.x == 1000.0 + s.st.player.vx);
+    sim_free(&s);
+}
+
+/*
+** However high a start is, the corridor it opens is under the kill line: a
+** flipped ship started near the top of a high section falls onto its
+** ceiling and lives (4.7).
+*/
+static void test_kill_line_above_the_starts(void)
+{
+    sim_t s;
+
+    load(&s, "portal 1000 -50 2 ship\ngravity 1300 -50 2 up\n"
+        "start 2000 -400 ship up\nblock 9000 750 2\n");
+    sim_reset_at(&s, &s.lvl.starts[0]);
+    CHECK(s.st.bounds.active && s.lvl.kill_y < s.st.bounds.top);
+    for (int i = 0; i < 400 && s.st.player.alive; i++)
+        sim_tick(&s, (input_t){false, false});
+    CHECK(s.st.player.alive);
+    CHECK(s.st.player.pos.y == s.st.bounds.top + PLAYER_HALF);
+    sim_free(&s);
+}
+
 void test_start(void)
 {
     test_defaults();
@@ -293,4 +331,6 @@ void test_start(void)
     test_start_size();
     test_reset_returns_to_the_start();
     test_reset_at();
+    test_start_before_the_level();
+    test_kill_line_above_the_starts();
 }

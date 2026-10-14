@@ -51,15 +51,20 @@ static bool starts_on_the_floor(const sim_t *s)
 ** A start position is somewhere along the level: the run is put at the tick
 ** a run from the level's own start reaches that x at, through the level's
 ** speed portals, rounded down, so the player stays on the tick grid and the
-** music knows where it is (FEATURES 11.8, 10.3).
+** music knows where it is (FEATURES 11.8, 10.3). One at or before the
+** level's own start begins where the level does, at tick 0: the run is
+** measured from there, and no tick comes before it.
 */
 static void place_along(sim_t *s, const level_start_t *start)
 {
     const level_start_t *own = &s->lvl.hdr.start;
     run_state_t *st = &s->st;
 
-    if (start->pos.x <= own->pos.x)
+    if (start->pos.x <= own->pos.x) {
+        st->player.pos.x = own->pos.x;
+        st->player.prev_pos = st->player.pos;
         return;
+    }
     st->tick = (long)floor(speed_map_ticks(&s->lvl.speeds, own,
         start->pos.x));
     st->distance = speed_map_x(&s->lvl.speeds, own, (double)st->tick)

@@ -30,6 +30,11 @@ static int cmp_object(const void *a, const void *b)
     return (la > lb) - (la < lb);
 }
 
+/*
+** The kill line sits a margin above everything the run can reach (4.7): the
+** objects, and every start, whose corridor is centred on it (7.2) and so
+** reaches half a corridor above it at most, well inside the margin.
+*/
 void level_finalize(level_data_t *lvl)
 {
     double right = 0.0;
@@ -44,6 +49,9 @@ void level_finalize(level_data_t *lvl)
         right = fmax(right, box.x + box.w);
         top = fmin(top, box.y);
     }
+    top = fmin(top, lvl->hdr.start.pos.y - PLAYER_HALF);
+    for (size_t i = 0; i < lvl->nb_starts; i++)
+        top = fmin(top, lvl->starts[i].pos.y - PLAYER_HALF);
     speed_map_free(&lvl->speeds);
     for (size_t i = 0; i < lvl->nb_objects; i++)
         speed_map_add(&lvl->speeds, &lvl->objects[i]);
