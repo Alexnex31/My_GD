@@ -449,6 +449,39 @@ static void test_song_along(void)
     ed_level_free(&lv);
 }
 
+/*
+** Portals stacked at one x: the later in the level acts last, in the run and
+** in the time maths alike, whatever qsort does with ties (4.6).
+*/
+static void test_same_x(void)
+{
+    const double order[] = {2.0, 4.0, 0.5, 3.0, 2.0, 4.0, 1.0, 3.0};
+    char text[512];
+    size_t len = 0;
+    sim_t s;
+    sim_t one;
+
+    for (int i = 0; i < 8; i++)
+        len += snprintf(text + len, sizeof(text) - len, "speed 1500 650 2 %s\n",
+            speed_word(order[i]));
+    snprintf(text + len, sizeof(text) - len, FAR);
+    load(&s, text);
+    load(&one, "speed 1500 650 2 3\n" FAR);       /* the last of them alone */
+    CHECK(s.lvl.speeds.n == 8);
+    for (size_t i = 0; i + 1 < s.lvl.speeds.n; i++)
+        CHECK(s.lvl.speeds.at[i].order < s.lvl.speeds.at[i + 1].order);
+    for (int t = 0; t < 300 && s.st.player.alive; t++) {
+        sim_tick(&s, NONE);
+        sim_tick(&one, NONE);
+        CHECK(s.st.player.pos.x == one.st.player.pos.x);
+        CHECK(speed_map_x(&s.lvl.speeds, &s.lvl.hdr.start, (double)t)
+            == speed_map_x(&one.lvl.speeds, &one.lvl.hdr.start, (double)t));
+    }
+    CHECK(s.st.player.vx == speed_step(3.0));
+    sim_free(&s);
+    sim_free(&one);
+}
+
 void test_speed(void)
 {
     test_table();
@@ -458,6 +491,7 @@ void test_speed(void)
     test_other_modes();
     test_map_against_a_run();
     test_map_edges();
+    test_same_x();
     test_start_position();
     test_speed_bot();
     test_speed_editor();

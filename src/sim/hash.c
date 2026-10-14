@@ -50,9 +50,7 @@ static void hash_player(uint64_t *h, const player_t *p)
     hash_double(h, p->pos.y);
     hash_double(h, p->vx);
     hash_double(h, p->vy);
-    hash_double(h, p->surface_rise);
-    hash_double(h, p->support_normal.x);
-    hash_double(h, p->support_normal.y);
+    hash_double(h, p->surface_rise);         /* support_normal: the icon's only */
     hash_long(h, p->gravity_dir);
     hash_long(h, p->mode);
     hash_long(h, p->hold);
@@ -74,8 +72,10 @@ static uint64_t hash_state(const sim_t *s, bool with_camera)
     hash_double(&h, st->speed_mult);
     hash_player(&h, &st->player);
     hash_long(&h, st->bounds.active);
-    hash_double(&h, st->bounds.top);
-    hash_double(&h, st->bounds.bottom);
+    if (st->bounds.active) {                 /* nothing reads them otherwise */
+        hash_double(&h, st->bounds.top);
+        hash_double(&h, st->bounds.bottom);
+    }
     hash_long(&h, (long)st->first_active);
     hash_long(&h, st->complete);
     hash_bytes(&h, st->spent, st->spent_words * sizeof(uint64_t));

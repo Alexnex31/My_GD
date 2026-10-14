@@ -62,16 +62,23 @@ void speed_map_add(speed_map_t *m, const object_t *o)
         m->at = bigger;
     }
     m->at[m->n] = (speed_change_t){o->hitbox.aabb.x - PLAYER_HALF,
-        o->hitbox.aabb.x + o->hitbox.aabb.w, speed_step(o->speed)};
+        o->hitbox.aabb.x + o->hitbox.aabb.w, speed_step(o->speed), m->n};
     m->n += 1;
 }
 
+/*
+** By x, then in the order they were added: the caller adds them in the
+** level's object order, so of two portals at the same x the later one acts
+** last, as the run touches them (4.6). Never qsort's own order.
+*/
 static int by_x(const void *a, const void *b)
 {
-    double xa = ((const speed_change_t *)a)->x;
-    double xb = ((const speed_change_t *)b)->x;
+    const speed_change_t *ca = a;
+    const speed_change_t *cb = b;
 
-    return (xa > xb) - (xa < xb);
+    if (ca->x != cb->x)
+        return (ca->x > cb->x) - (ca->x < cb->x);
+    return (ca->order > cb->order) - (ca->order < cb->order);
 }
 
 void speed_map_sort(speed_map_t *m)

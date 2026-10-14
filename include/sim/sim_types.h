@@ -120,6 +120,7 @@ typedef struct speed_change {
     double x;
     double right;
     double step;
+    size_t order;             /* when it was added: ties in x (FEATURES 10.3) */
 } speed_change_t;
 
 typedef struct speed_map {

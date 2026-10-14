@@ -345,6 +345,27 @@ static void test_physics_hash_ignores_camera(void)
     sim_free(&b);
 }
 
+/*
+** Nor what only the icon reads, nor a corridor that is gone: the bot's memo
+** must not tell two runs apart that will play the same (G.11).
+*/
+static void test_hash_ignores_what_decides_nothing(void)
+{
+    sim_t a;
+    uint64_t h;
+
+    load(&a, "block 600 700 2\n");
+    run(&a, 50, NONE);
+    h = sim_physics_hash(&a);
+    a.st.player.support_normal = (vec2_t){0.6, -0.8};
+    a.st.bounds.top = -123.0;
+    a.st.bounds.bottom = 456.0;
+    CHECK(!a.st.bounds.active && sim_physics_hash(&a) == h);
+    a.st.bounds.active = true;
+    CHECK(sim_physics_hash(&a) != h);
+    sim_free(&a);
+}
+
 static void test_percent_and_completion(void)
 {
     sim_t s;
@@ -381,5 +402,6 @@ void test_tick(void)
     test_kill_ceiling();
     test_determinism_and_snapshots();
     test_physics_hash_ignores_camera();
+    test_hash_ignores_what_decides_nothing();
     test_percent_and_completion();
 }
