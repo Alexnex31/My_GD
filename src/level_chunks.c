@@ -65,7 +65,9 @@ static sfColor speed_color(double name)
 
 /*
 ** A mode portal has its mode's colour; a gravity portal is yellow when it
-** sends the player up and blue when it brings it back down, as in GD.
+** sends the player up and blue when it brings it back down, and a size
+** portal pink when it makes it mini and green when it gives its size back,
+** as in GD.
 */
 static sfColor object_color(const object_t *o)
 {
@@ -76,6 +78,9 @@ static sfColor object_color(const object_t *o)
         return LAUNCH_COLORS[o->launch];
     if (o->type == OBJ_SPEED)
         return speed_color(o->speed);
+    if (o->type == OBJ_MINI)
+        return o->portal_mini ? (sfColor){255, 90, 200, 255}
+            : (sfColor){80, 230, 90, 255};
     if (o->type != OBJ_PORTAL)
         return sfWhite;
     return PORTAL_COLORS[o->portal_mode];

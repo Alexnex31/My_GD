@@ -163,7 +163,8 @@ static void draw_start(editor_t *ed, gd_t *gd, const level_start_t *st,
         || st->mode == MODE_SWING
         ? gd->res->ship_icon : gd->res->player_icon;
     sfVector2u size = sfTexture_getSize(tex);
-    float side = (float)fmax(2.0 * MODES[st->mode].half, 60.0);
+    const mode_ops_t *m = st->mini ? &MINI_MODES[st->mode] : &MODES[st->mode];
+    float side = (float)fmax(2.0 * m->half, st->mini ? 30.0 : 60.0);
 
     sfSprite_setTexture(ed->marker, tex, sfTrue);
     sfSprite_setOrigin(ed->marker, (sfVector2f){size.x / 2.0f, size.y / 2.0f});

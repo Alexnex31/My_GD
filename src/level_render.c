@@ -204,7 +204,10 @@ static void render_background(gd_t *gd, level_t *lv, vec2_t cam)
     (void)ts;
 }
 
-/* The wave's square is 30 px, too small to read: its icon is drawn at 60 (8.4). */
+/*
+** The wave's square is 30 px, too small to read: its icon is drawn at 60
+** (8.4), and a mini one at half that, so mini still reads as smaller (10.4).
+*/
 #define ICON_MIN_SIDE 60.0
 
 /* Texture, origin and scale for the current mode: both draw paths need them. */
@@ -223,7 +226,8 @@ static void setup_player_sprite(gd_t *gd, level_t *lv)
     };
     sfTexture *tex = icons[p->mode];
     sfVector2u size = sfTexture_getSize(tex);
-    double side = fmax(2.0 * player_mode(p)->half, ICON_MIN_SIDE);
+    double side = fmax(2.0 * player_mode(p)->half,
+        ICON_MIN_SIDE * (p->mini ? MINI_SCALE : 1.0));
 
     sfSprite_setTexture(lv->player_sprite, tex, sfTrue);
     sfSprite_setOrigin(lv->player_sprite,

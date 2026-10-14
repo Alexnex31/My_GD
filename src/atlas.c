@@ -27,6 +27,7 @@ static const char *const ATLAS_FILES[OBJ_TYPE_COUNT] = {
     [OBJ_ORB] = DRAWN_ORB,                   /* white, tinted by its colour */
     [OBJ_SAW] = DRAWN_SAW,
     [OBJ_SPEED] = DRAWN_SPEED,               /* white, tinted by its speed */
+    [OBJ_MINI] = "res/cube_portal.png",
 };
 
 /*
