@@ -101,6 +101,11 @@ static bool same_run(const sim_t *a, const sim_t *b)
         && p->hold == q->hold && a->st.complete == b->st.complete
         && p->pos.x == q->pos.x && p->pos.y == -q->pos.y
         && p->vy == q->vy && p->surface_rise == q->surface_rise
+        && p->vx == q->vx && p->mini == q->mini
+        && p->boost_ticks == q->boost_ticks
+        && a->st.speed_mult == b->st.speed_mult
+        && memcmp(a->st.spent, b->st.spent,
+            a->st.spent_words * sizeof(uint64_t)) == 0
         && a->st.bounds.active == b->st.bounds.active
         && a->st.bounds.top == -b->st.bounds.bottom
         && a->st.bounds.bottom == -b->st.bounds.top;

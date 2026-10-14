@@ -30,7 +30,8 @@ static void run_until_mode(sim_t *s, gamemode_t mode, double stop_x)
 /* Drops the player at the portal's height just before it, then crosses it. */
 static void cross_at(sim_t *s, double portal_x, double y)
 {
-    while (s->st.player.pos.x + PLAYER_HALF < portal_x - 20.0)
+    for (int t = 0; t < 20000 && s->st.player.alive
+        && s->st.player.pos.x + PLAYER_HALF < portal_x - 20.0; t++)
         sim_tick(s, NONE);
     s->st.player.pos.y = y;
     s->st.player.vy = 0.0;

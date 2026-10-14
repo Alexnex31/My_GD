@@ -281,7 +281,8 @@ static void test_step_up(void)
     sim_free(&s);
     /* the lift happens when the inner box (20 px) reaches the face, not before */
     load(&s, "block 1000 825 2\n");
-    while (s.st.player.pos.x + PLAYER_INNER_HALF + PER_TICK(SCROLL_SPEED)
+    while (s.st.player.alive
+        && s.st.player.pos.x + PLAYER_INNER_HALF + PER_TICK(SCROLL_SPEED)
         < 1000.0)
         sim_tick(&s, NONE);
     CHECK(s.st.player.pos.y == PLAYER_SPAWN_Y);          /* still on the ground */
@@ -388,7 +389,8 @@ static void test_step_needs_downward_momentum(void)
     int rising_ticks = 0;
 
     load(&s, "block 1000 825 2\n");
-    while (s.st.player.pos.x + PLAYER_INNER_HALF + PER_TICK(SCROLL_SPEED)
+    while (s.st.player.alive
+        && s.st.player.pos.x + PLAYER_INNER_HALF + PER_TICK(SCROLL_SPEED)
         < 1000.0)
         sim_tick(&s, NONE);
     CHECK(s.st.player.pos.x + PLAYER_HALF > 1000.0);     /* in its corner */
