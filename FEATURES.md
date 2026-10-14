@@ -1000,11 +1000,11 @@ Both count in **GD blocks**: a block is the player's size, so **1 block = our 10
 | Cube gravity | 0.876 | `CUBE_GRAVITY` |
 | Cube jump | 1.94 | `CUBE_JUMP_V` = 1.9522, so the **measured** height is GD's (PLAN 11.1) |
 | Fall cap | 2.6 | `CUBE_MAX_FALL` |
-| Mini cube jump | 1.41 | 10.4 |
+| Mini cube jump | 1.41 | `MINI_CUBE_JUMP_V` (10.4) |
 | Yellow / pink / red pad | 2.77 / 1.79 / 3.65 | 10.1 |
-| Mini pads | 2.13 / 1.32 / 2.71 | 10.4 |
+| Mini pads | 2.13 / 1.32 / 2.71 | `LAUNCHES`, `mini_pad_v` (10.4) |
 | Yellow / pink / red orb | 1.91 / 1.37 / 2.68 | 10.2 |
-| Mini orbs | 1.43 / 0.94 / 2.05 | 10.4 |
+| Mini orbs | 1.43 / 0.94 / 2.05 | `LAUNCHES`, `mini_orb_v` (10.4) |
 | Blue pad and blue orb | −1.37 | flip, then 1.37 toward the new floor (10.1) |
 | Green orb | −1.91 in GD's tables | flip, then a jump of 1.91 away from the new floor (10.2) |
 | Black orb | −2.6 | straight toward the floor, at the fall cap |
@@ -1025,11 +1025,11 @@ A negative value is a speed **toward the floor the player is falling to**: for t
 | Move | GD | Ours |
 |---|---|---|
 | Cube jump | 2.1333 blocks (2.233 chained) | 213.3 px (223.3), matched exactly: measured apex 213.32 px, airtime 0.425 s, length 441 px (PLAN 11.1) |
-| Mini cube jump | 1.3583 (wiki), 1.633 (P1kachu) | jump 1.41 units; with the wiki's height the mini gravity is 0.7318 units, with P1kachu's 0.6087. Re-measure when mini lands (10.4) |
+| Mini cube jump | 1.3583 (wiki), 1.633 (P1kachu) | the wiki's: jump 1.41 units and `MINI_CUBE_GRAVITY` 0.7158 units (0.7318 by the formula, solved against the measure as for the cube): measured apex 135.84 px, airtime 91 ticks (10.4) |
 | UFO hop | 1.5666 | 156.7 px: our `UFO_JUMP_V` is set from it (1.416 units, 7.2) |
-| Mini UFO hop | 1.2 | 120 px, 0.77× |
-| Robot jump (held) | up to 3.5111 | up to 351 px (later, 10.5) |
-| Mini robot jump | up to 2.7666 | up to 276.7 px |
+| Mini UFO hop | 1.2 | 120 px, 0.77×: `MINI_UFO_JUMP_V` 1.2532 units, measured 120.00 px (10.4) |
+| Robot jump (held) | up to 3.5111 | up to 349.2 px, 68 ticks of rise (10.5) |
+| Mini robot jump | up to 2.7666 | up to 275.6 px, 51 ticks of rise (10.4) |
 
 **Horizontal speeds** (GD's five speeds, which are now ours, 10.3):
 
@@ -1474,6 +1474,18 @@ Consequences:
 ### 10.4 Mini portals
 
 `mini x y size on|off`. `on` halves `half`, and scales each mode's constants (a mini cube jumps 1.3583 blocks instead of 2.1333, so 0.64× the height, and a mini UFO 1.2 instead of 1.5666, 0.77×; 6.9); `off` returns to normal size. Corridors don't change: a mini ship flies in the same 1000 px corridor. A **mini wave** isn't at 45°: its vertical speed is double its horizontal one (`vy = ±2 × vx`, 6.9). Implement as a `scale` on the player that every mode function multiplies in. Add it after all modes exist, since it touches all of them.
+
+### 10.4b As built (mini)
+
+- **The size is a row, not a scale.** `MINI_MODES` (`src/sim/modes.c`) has one row per mode beside `MODES`: half of every size (the mini cube's square is 50 px, its inner box 20, the mini wave's 15), and GD's mini numbers where 6.9 gives any. Everything that reads the player's physics goes through **`player_mode(p)`**, which picks the row by `player_t.mini`. Done first and alone, with the every-tick hashes of every level unchanged: every read of `MODES[p->mode]`, then each mode's own numbers moved into its row (`jump_v`: the cube's jump, the UFO's hop, the ball's push, the robot's rise; `thrust`, the ship's; `rise_ticks`, the robot's; `slope`, the wave's).
+- **GD's mini numbers, measured:** the cube jumps GD's 1.41 units, with its gravity solved so the apex is the wiki's 1.3583 blocks (135.84 px; P1kachu's 1.633 was not chosen); the UFO's hop is 120 px; the robot rises at most 51 ticks (275.6 px, GD 276.7); the wave climbs 2 px per px; pads and orbs use GD's mini speeds, blue, green and black the same as full size. **Ship, ball, swing and spider keep their own numbers**: GD publishes none for their mini forms, so only their size changes. All provisional, like every constant.
+- **Corridors don't change**: a mini ship flies in the same 1000 px.
+- **`mini x y size on|off`** is a size portal (`OBJ_MINI`), interactive and spent on touch, with a portal's box. It changes `mini` and nothing else, **around the same center**, as a mode portal keeps the position (5.2). Shrinking on the ground leaves the player 25 px in the air, and it falls back in a few ticks. Growing is pushed back off the ground and the corridor's boundaries it would cross; an object it now overlaps is left to the contact rules, so growing back inside a tunnel too low for the full size kills on the next tick. A robot's rise keeps going, no longer than the mini limit.
+- **`player_t.mini` is run state:** hashed and snapshotted, from the start's `start_size mini` (which now works) or a start position's `mini` word (`start x y mode [up|down] [speed] [mini]`). A start's `y` is the player's center at either size.
+- **The editor:** two palette entries, `mini on` and `mini off`; a size portal's **Kind** toggles on and off; a start position has a **Size** row, normal or mini, in the undo history. A mini start is drawn half size.
+- **The game layer:** the mini icon is drawn at half size (the smallest icon too: 30 px instead of 60, so a mini wave still reads as smaller). The portal is the mode portal's image, pink for on and green for off, as in GD. No image of its own yet.
+- **Approximation left as it was:** the time along the level (10.3) and the editor's warnings still assume a full-size player, so with mini they place a speed portal's change 25 px later than a mini player meets it.
+- **Tests:** `tests/test_mini.c` (the two tables side by side; the line, its box, a bad word, the start's word and the line written back; the measured heights at both sizes; the mini wave's slope; mini pads and orbs; a portal on and off on the ground; a robot made mini while rising; growing against the corridor's ceiling; a tunnel a mini cube runs through, a full one can't, and growing inside it kills; the field from the start, hashed and restored; a spike in a low tunnel the bot passes only mini; the Kind and Size rows and their undo), mini runs in `tests/test_mirror.c` (a mini wave and a mini UFO upside down, and the bot), and `levels/21.gd`, which the bot solves. Two tests that expected `start_size mini` to warn now expect it to work.
 
 ### 10.5 Robot, swing, spider
 
