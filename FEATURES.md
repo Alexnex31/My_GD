@@ -1483,6 +1483,19 @@ Consequences:
 | Swing | Ship-like flight; each press flips gravity | Ship integration with `gravity_dir`; ball-style flip on `pressed` |
 | Spider | Press teleports to the opposite surface and flips gravity | Needs a vertical raycast among nearby blocks, corridor and ground to find the landing surface; set `pos.y` directly |
 
+### 10.5b As built (robot)
+
+- **The rule**, which replaces this section's first wording (reduced gravity): from takeoff the robot **rises at a steady speed for as long as the button is held, up to a time limit, then falls normally**. `src/sim/mode_robot.c`, one row in `MODES` (a cube's body, gravity and fall cap, no corridor, a ceiling kills it).
+- **The rise** is `ROBOT_RISE_V`, the normal scroll speed, so 45 degrees at the normal speed. It is **not** `vx`: like every vertical number it stays tied to the normal speed (6.9), so the robot jumps as high at speed 4 as at speed 1, and its path is then flatter than 45 degrees.
+- **The limit** is `ROBOT_BOOST_TICKS`, 68 ticks (0.283 s). Measured: a full hold reaches **349.2 px**, a tap **59.3 px**, and in between the height is 4.3275 px per tick held plus the same 54.9 px of fall's arc. 68 is the whole number of ticks nearest GD's 3.5111 blocks (69 gives 353.5 px). Provisional like every constant.
+- **`player_t.boost_ticks`**, the ticks of rise left, is run state: hashed, saved in snapshots, zero at a reset. A pad, an orb, a gravity flip or a mode portal ends the rise. Letting go ends it for good: a second press in the air does nothing.
+- **The click that jumps is used** from the takeoff on (PLAN 3.4): held, the robot rises through an orb without activating it and the rise goes on. Only a new press, after letting go, takes an orb, and the orb's launch then replaces any rise.
+- **A button still down at the landing** takes off again on the next tick with a full rise, as a cube's used hold does (PLAN 3.4).
+- **The bot** decides when the robot can jump, like the cube, and also every 8 ticks while it rises (keep holding, or let go): without that it could only ever make full jumps, and a spike under a low ceiling would be "no path".
+- **Every level that existed plays bit for bit as before** (the every-tick hashes were compared before the new field was added to the hash).
+- **The game layer:** the cube's icon stands in, kept upright in the air instead of spinning; the portal is light grey. The palette's ninth entry is now `portal robot`, so `gravity up` lost its key.
+- **Tests:** `tests/test_robot.c` (the row; a full hold tick by tick and its height; a tap and a half hold; no second rise; held through landings; the same height at speed 4; upside down; the rise ended by a ceiling, a pad, a mode portal and a gravity portal; an orb risen through with the click held, and taken by a new one; the counter hashed and restored; a wall only a robot clears and a low ceiling only a short hop passes, both for the bot) and `levels/18.gd`, which the bot solves.
+
 ### 10.6 Saws
 
 `saw x y size [rot=...]`: a **harm** object (PLAN 3.0) with a **circle** hitbox: center at the rect's center, radius `0.42 × w` (a little inside the sprite's teeth, forgiving like spikes). Any contact kills. Rotation doesn't change a circle, but the sprite can spin as decoration (game layer).
