@@ -1700,7 +1700,8 @@ With normal gravity, whatever goes up comes back down. With **flipped** gravity 
 The limit is fixed in the world, computed once at load:
 
 ```c
-kill_y = min(highest hitbox top among all objects, GROUND_Y - modes_tallest_corridor())
+kill_y = min(highest hitbox top among all objects, GROUND_Y - modes_tallest_corridor(),
+        top of the player's square at every start, the level's own included)
     - KILL_CEILING_MARGIN;                                  /* margin 600 px */
 ```
 
@@ -1716,7 +1717,7 @@ It exists **only while gravity is flipped**, in every mode. With normal gravity 
 
 Why 600 px: with flipped gravity, anything above the highest object has nothing left to land on, so the line only has to stay clear of what a flipped player can legitimately reach: a corridor's ceiling (below), and an upward-falling player passing just above the top of the level's highest structure on its way to landing on it from the side. 600 px leaves room for both without letting a lost run drag on.
 
-Corridors are never above the kill line. The tallest corridor is 1000 px (5.2), so a centered corridor's ceiling is at most 525 px above its portal's top (500 px, plus up to 25 px of grid snapping), and the portal is an object, so its top is at or below the highest hitbox top: the ceiling stays at least 75 px under the line. A corridor pushed up against the ground has its ceiling at `GROUND_Y - modes_tallest_corridor()` = −150, which is why that value is part of the `min`. It is computed from `MODES[]`, not written down a second time, so a mode added with a taller corridor moves the line with it: without it, a level whose highest object is a portal at y = 650 would put the kill line at y = 50, far below that corridor's ceiling, and the ship would die touching it.
+Corridors are never above the kill line. The tallest corridor is 1000 px (5.2), so a centered corridor's ceiling is at most 525 px above its portal's top (500 px, plus up to 25 px of grid snapping), and the portal is an object, so its top is at or below the highest hitbox top: the ceiling stays at least 75 px under the line. A start position opens a corridor too, centred on the player (7.2), and it is no object, so the starts are part of the `min` as well: without them, a flipped ship started high in a section whose objects are lower would fall toward a ceiling above the line and die without touching anything. A corridor pushed up against the ground has its ceiling at `GROUND_Y - modes_tallest_corridor()` = −150, which is why that value is part of the `min`. It is computed from `MODES[]`, not written down a second time, so a mode added with a taller corridor moves the line with it: without it, a level whose highest object is a portal at y = 650 would put the kill line at y = 50, far below that corridor's ceiling, and the ship would die touching it.
 
 The renderer doesn't draw the line (GD has no visible ceiling), but the debug overlay does (9.6).
 
@@ -3549,6 +3550,8 @@ static void hash_double(uint64_t *h, double v)
 ```
 
 Start from `14695981039346656037ULL`. The sim never produces a NaN (G.10), so there's no NaN case to normalize (G.12).
+
+Only what decides what happens next is hashed: the physics hash is the bot's memo key, and two runs that will play the same must get the same key. So `support_normal` is left out (only the icon reads it, 9.4), and the corridor's `top` and `bottom` are hashed only while `bounds.active` (nothing reads them otherwise).
 
 ### G.12 Numerical rules
 
