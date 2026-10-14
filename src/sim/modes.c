@@ -71,6 +71,12 @@ const mode_ops_t MODES[MODE_COUNT] = {
         .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
         .apply_input = robot_input, .apply_forces = robot_forces,
         .update_rotation = robot_rotation},
+    [MODE_SWING] = {.name = "swing", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
+        .gravity = PER_TICK2(SWING_GRAVITY),
+        .max_fall = PER_TICK(SWING_MAX_VY), .head_restitution = BOUNCE_RESTITUTION_SHIP,
+        .corridor_height = 1000.0, .bot_decision_ticks = 12,
+        .apply_input = swing_input, .apply_forces = player_apply_gravity,
+        .update_rotation = ship_rotation},
 };
 
 /*

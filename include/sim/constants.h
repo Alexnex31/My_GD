@@ -82,6 +82,11 @@
     #define SHIP_GRAVITY        (0.42 * A_UNIT)    /* ours: 4530.5 px/s^2                */
     #define SHIP_THRUST         (0.84 * A_UNIT)    /* ours: 9061.0 px/s^2, = 2x gravity  */
     #define SHIP_MAX_VY         (1.0 * V_UNIT)     /* ours: 1038.6 px/s, = the scroll    */
+    /* The swing (FEATURES 10.5): GD publishes nothing, so it falls like the
+       ship, at the ship's gravity up to the ship's 45-degree cap. A press only
+       turns that gravity round, so the turn is gradual, never a jump. */
+    #define SWING_GRAVITY       SHIP_GRAVITY       /* ours: 4530.5 px/s^2                */
+    #define SWING_MAX_VY        SHIP_MAX_VY        /* ours: 1038.6 px/s, = the scroll    */
     /* The UFO (FEATURES 7): the hop is GD's 1.5666 blocks, and it lasts as long
        as a cube jump (0.425 s), which is the rhythm that holds an altitude. */
     #define UFO_GRAVITY         (0.64 * A_UNIT)    /* ours: 6903.6 px/s^2                */

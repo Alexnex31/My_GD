@@ -36,6 +36,7 @@ void ball_rotation(player_t *p);
 void robot_input(player_t *p, input_t in);
 void robot_forces(player_t *p);
 void robot_rotation(player_t *p);
+void swing_input(player_t *p, input_t in);
 
 void move_and_collide(sim_t *s);                   /* 4.4 */
 void collide_kill_ceiling(player_t *p, const level_data_t *lvl);   /* 4.7 */
