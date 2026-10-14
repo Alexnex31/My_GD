@@ -1190,10 +1190,11 @@ Objects are sorted by `hitbox.aabb.x`, the left edge of their hitbox (ties broke
 static void broadphase(sim_t *s, rect_t sweep)
 {
     const level_data_t *lv = &s->lvl;
+    double behind = s->st.player.pos.x - modes_widest_half() - ZONE_SKIN;
     size_t i;
 
     while (s->st.first_active < lv->nb_objects &&
-        lv->objects[s->st.first_active].hitbox.aabb.x + lv->reach <= sweep.x)
+        lv->objects[s->st.first_active].hitbox.aabb.x + lv->reach <= behind)
         s->st.first_active += 1;
     s->nb_cand = 0;
     for (i = s->st.first_active; i < lv->nb_objects; i++) {
@@ -1207,7 +1208,7 @@ static void broadphase(sim_t *s, rect_t sweep)
 }
 ```
 
-`sweep` is the bounding box of everything the player can cover this tick: its box at the start and at the end of the unobstructed move `(vx, -vy * gravity_dir)`, grown by the step-up height (4.4). `reach` is the widest hitbox in the level (`max(hitbox.aabb.w)`), computed at load. Every object before the cursor has `hitbox left + reach <= sweep left`, so its right edge is behind the player. The cost per tick is the handful of objects near the player, not the level's length; this replaces today's screen-space window `100 < x < 600`, which causes F5.
+`sweep` is the bounding box of everything the player can cover this tick: its box at the start and at the end of the unobstructed move `(vx, -vy * gravity_dir)`, grown by the step-up height (4.4). `reach` is the widest hitbox in the level (`max(hitbox.aabb.w)`), computed at load. Every object before the cursor has `hitbox left + reach <= behind`, so its right edge is behind anything the player could become. `behind` is not the tick's `sweep` left: the cursor only moves forward, and a size or mode portal can grow the player (mini to full size, wave to cube) into objects the smaller square had already left, so it keeps what the **widest** mode at either size could reach, plus the jump zone's skin (`ZONE_SKIN`, G.6). Otherwise whether a grown player finds a block behind it would depend on `reach`, the widest object anywhere in the level. The cost per tick is the handful of objects near the player, not the level's length; this replaces today's screen-space window `100 < x < 600`, which causes F5.
 
 Culling uses **hitbox** bounds, not sprite bounds: a hitbox can stick out of its sprite (a rotated object's hitbox bounds differ from its rect), and a sprite-based bound would drop objects early. `cand` lives in `sim_t` next to the run state (it's scratch space, rebuilt every tick, not part of snapshots); `MAX_CANDIDATES` = 256 is far more than a tick can reach, and `--check` warns if a level exceeds it anywhere.
 
@@ -1406,9 +1407,9 @@ How to read it:
 - `flat` means the contact came through the y axis: the square met the polygon's topmost part (or bottommost, from below). That's a horizontal face, or a single point when the shape's top is a vertex (a slope's peak, the tip of a block rotated 45°): either way, the square stands on it (4.4).
 - `offset` describes the face's line (`normal · point = offset`), taken straight from the shape's precomputed projection. For the y axis it's exactly ± the shape's top (or bottom) world y, so the response can put the square **exactly** on it (4.4).
 
-*Circle against a polygon* (`sweep_circle_poly`): the circle's center touches the polygon when it reaches the polygon **inflated by the radius**: each face pushed out by 50 px along its normal, with a circle of radius 50 around each vertex. The earliest time over those pieces is the contact. For a face, it's the time the center's projection on the face's normal reaches `offset + r`, kept only if the center is then within the face's extent; the normal is the face's. For a vertex, it's the smallest `t` in 0..1 with `|c + t·d − vertex| = r` (a quadratic, solved with `sqrt`), and the normal points from the vertex to the center at that time. Already overlapping counts as a contact at `t = 0`, and only moving into the contact counts, as for the square. `sqrt` is correctly rounded, so this stays deterministic. **Appendix G.4 writes this out**: the face equation, the vertex quadratic, which root to keep and how ties are broken.
+*Circle against a polygon* (`sweep_circle_clear`): the circle's center touches the polygon when it reaches the polygon **inflated by the radius**: each face pushed out by 50 px along its normal, with a circle of radius 50 around each vertex. The earliest time over those pieces is the contact. For a face, it's the time the center's projection on the face's normal reaches `offset + r`, kept only if the center is then within the face's extent; the normal is the face's. For a vertex, it's the smallest `t` in 0..1 with `|c + t·d − vertex| = r` (a quadratic, solved with `sqrt`), and the normal points from the vertex to the center at that time. A path that passes a vertex at `r` or more only touches it and is skipped before the quadratic is solved (G.4). The caller has already checked that the circle doesn't overlap the shape (4.4), and only moving into the contact counts, as for the square. `sqrt` is correctly rounded, so this stays deterministic. **Appendix G.4 writes this out**: the face equation, the vertex quadratic, which root to keep and how ties are broken.
 
-*Touch tests* (`sweep_box_touch`, `sweep_circle_touch`, `overlap_box_poly`, `overlap_circle_poly`): the same loops without the moving-into test and without the normal, for everything where "any contact" is all that matters: harm and interactive objects, the inner box, the circle during a step-up's lift (4.4), and the jump zone. Like everything else, they measure area overlap: touching isn't a collision. The swept versions return the first `t` in 0..1 where the areas start overlapping (0 if they already do). The jump zone's dark part is the polygon clipped to the zone's half-plane (below the line at `center + 20`, at most 5 vertices after clipping), tested against the circle; Appendix G.6 gives the clipper and both tests.
+*Touch tests* (`sweep_box_touch`, `sweep_circle_touch_clear`, `overlap_box_poly`, `overlap_circle_poly`): the same loops without the moving-into test and without the normal, for everything where "any contact" is all that matters: harm and interactive objects, the inner box, the circle during a step-up's lift (4.4), and the jump zone. Like everything else, they measure area overlap: touching isn't a collision. The swept versions return the first `t` in `[0, 1)` where the areas start overlapping (0 if they already do). A touch that only comes at `t = 1` is not inside the leg: the areas meet as it ends, and the next leg, which starts there, decides. A lift that ends with the head exactly under a ceiling therefore doesn't kill (4.4). Contacts (`sweep_box_poly`, `sweep_circle_clear`) still count `t = 1`: a landing ends the leg on the face. The jump zone's dark part is the polygon clipped to the zone's half-plane (below the line at `center + 20`, at most 5 vertices after clipping), tested against the circle; Appendix G.6 gives the clipper and both tests.
 
 The ground and corridor surfaces are infinite half-planes, tested with a single axis (Appendix G.5): the ground is "everything below y = 850" with normal `(0, -1)`, the corridor ceiling "everything above `bounds.top`" with normal `(0, 1)`, the corridor floor "everything below `bounds.bottom`". `SURF_*` values in `contact.surface` identify them (`is_surface`). They're flat.
 
@@ -1621,7 +1622,7 @@ static void step_up(sim_t *s, const face_t *f, vec2_t *vel)
 }
 ```
 
-1. **The lift** is a leg of its own, straight up against gravity until the square rests on the face (at most 30 px). Everything moves with it, and it's checked like any leg: the inner box and the rigid square (`leg_deaths`), the interactive objects it touches (`leg_touches`), and the **circle against every neutral object** (`circle_hits_neutral`: `sweep_circle_touch` over the lift, no face filter, plus the corridor's ceiling). If the circle runs into anything on the way up, the player dies there, in every mode: a lift is forced, not a flight, so there's no bounce. Grazing a ceiling exactly at the top of the lift isn't a collision (3.0).
+1. **The lift** is a leg of its own, straight up against gravity until the square rests on the face (at most 30 px). Everything moves with it, and it's checked like any leg: the inner box and the rigid square (`leg_deaths`), the interactive objects it touches (`leg_touches`), and the **circle against every neutral object** (`circle_hits_neutral`: `sweep_circle_touch_clear` over the lift, no face filter, plus the corridor's ceiling). If the circle runs into anything on the way up, the player dies there, in every mode: a lift is forced, not a flight, so there's no bounce. Grazing a ceiling exactly at the top of the lift isn't a collision (3.0).
 2. **The landing**: `pos.y = f.y - half * gravity_dir` is exact, the same assignment `settle` makes on a flat face, so the square rests on the face bit for bit.
 
 - The trigger is exactly what you described: nothing happens while the face only overlaps the outer part of the square; the moment the inner box's leading side reaches the face's start, the player is lifted onto it. That's 30 px of horizontal penetration for a block entered from the side.
@@ -1637,7 +1638,7 @@ static void step_up(sim_t *s, const face_t *f, vec2_t *vel)
 
 The earliest overlap kills: the player is moved to the exact point where it starts, `alive` becomes false, and the tick's movement ends there. Interactive objects touched on that leg before the death point still count as touched, but step 5 doesn't run for a dead player (3.4), so nothing acts. "Swept" matters at high speed: at 4× the player moves 12.5 px per tick, and a thin wall or spike must not slip between two positions.
 
-**The jump zone.** `update_can_jump` runs at the very end of the tick (3.4), after interactive objects have acted: it tests the jump zone (4.3) against the neutral candidates and surfaces at the final position, and combines it with the momentum condition. The result is the next tick's `can_jump`.
+**The jump zone.** `update_can_jump` runs at the very end of the tick (3.4), after interactive objects have acted: it tests the jump zone (4.3) against the neutral objects and surfaces at the final position, and combines it with the momentum condition. It looks the objects up itself, from the broadphase cursor, with the zone's own rectangle: the movement's candidates were collected for the size the player had before step 5, and a size or mode portal may have grown it since. The result is the next tick's `can_jump`.
 
 ### 4.5 Harm contacts
 
@@ -3217,14 +3218,14 @@ bool overlap_box_poly(vec2_t c, double h, const hitbox_t *hb)
         double r = h * hitbox_extent(hb, k);
         double p = dot(c, hitbox_axis(hb, k));
 
-        if (p + r <= hitbox_lo(hb, k) || p - r >= hitbox_hi(hb, k))
+        if (p <= hitbox_lo(hb, k) - r || p >= hitbox_hi(hb, k) + r)
             return false;                      /* separated, or exactly touching */
     }
     return true;
 }
 ```
 
-`sweep_box_touch(c, h, d, hb)` is `sweep_box_poly` without the "moving into" test and without the normal: keep `t_in = max(entry times)` and `t_out = min(exit times)`, and return `max(t_in, 0)` when `t_in < t_out`, `t_in <= 1` and `t_out > 0`; otherwise "no touch" (`INFINITY`). The square's projection radius is `r = h * (|a.x| + |a.y|)` on every axis, which is exact for an axis-aligned square whatever the axis.
+`sweep_box_touch(c, h, d, hb)` is `sweep_box_poly` without the "moving into" test and without the normal: keep `t_in = max(entry times)` and `t_out = min(exit times)`, and return `max(t_in, 0)` when `t_in < t_out`, `t_in < 1` and `t_out > 0`; otherwise "no touch" (`INFINITY`). `t_in = 1` is a touch as the leg ends, not inside it (4.3). The static test compares `p` with `lo - r` and `hi + r`, exactly as the sweep's axes do (one helper, `axis_span`, computes them for both): written as `p + r <= lo` it rounds differently at an exact touch, and a square the static test calls clear could be one the sweep finds already inside. The square's projection radius is `r = h * (|a.x| + |a.y|)` on every axis, which is exact for an axis-aligned square whatever the axis.
 
 ### G.4 Circle against a polygon
 
@@ -3246,6 +3247,7 @@ candidate: t, normal n
 
 ```text
 a = dot(d, d)                          /* 0 if the player doesn't move: skip */
+if (|cross(f, d)| >= r * sqrt(a)) skip /* passes it at r or more: a touch at most */
 b = dot(f, d)
 cc = dot(f, f) - r * r
 disc = b * b - a * cc
@@ -3255,18 +3257,19 @@ if (t < 0 || t > 1) skip
 candidate: t, normal (c + t * d - V) / r
 ```
 
+**Grazing.** The path's closest distance to `V` is `|cross(f, d)| / |d|`; at `r` or more the disc only touches the vertex, and touching isn't a collision (3.0). The discriminant can't be trusted to say so: at exactly `r` it is a rounded zero, often a tiny positive one, whose root lands just before the closest point with a normal a few nano-radians off vertical, and a cube running in a gap exactly its height died on the ceiling's corner as a head hit. The test is written without a division. For a move along an axis it is exact: `cross(f, d)` is `-f.y * d.x` (or `f.x * d.y`), and `sqrt(d.x * d.x)` is `|d.x|` to the last bit, so both sides are the same products and a gap of exactly the player's size compares equal.
+
 Take the candidate with the smallest `t`; on a tie, the face (a face contact is a real surface, a vertex contact is a corner). A vertex's full disc sticks out of the inflated polygon nowhere, so no spurious early hit is possible, and only the smaller root can be an entry.
 
 The sweep takes the two predicates of G.9 (`face_ok`, `vertex_ok`) and skips the faces and vertices they reject; passing none means "all of them", which is what the touch tests and the step-up's ceiling check use.
 
-**Already touching** (`cc <= 0` for some vertex, or the center is inside the inflated shape): contact at `t = 0`. Its normal is the direction from the closest point of the polygon to the center, or, if the center is inside the polygon itself, the normal of the face with the smallest `off - dot(n, c)`. The neutral sweep never needs this case (`first_event` skips shapes the shape already overlaps, 4.4); the touch tests do.
+**Already overlapping** is never given to these sweeps, hence their name, `_clear`: the movement skips a shape the circle already overlaps (`try_shapes`, 4.4: the inner box decides there), and the lift skips a shape the circle is already in (the corner it climbs). So there is no "stuck" contact and no normal to invent for one.
 
 **Square roots.** `poly_distance` walks the edges keeping **squared** distances and takes a single `sqrt` at the end, instead of one per edge. That is not an approximation: `sqrt` is monotone and, by IEEE 754, correctly rounded, so `sqrt(min dᵢ²)` is the same `double` as `min sqrt(dᵢ²)`. The rule for the rest of the engine, the reason this one is safe, and the line not to cross:
 
 - **Comparing** two distances, or keeping the smallest, can be done squared. The ordering is the same and the value that comes out is the same.
 - **Returning** a distance, or normalizing a vector by its length, needs the real value: `sqrt` once, then.
 - **Never** turn `sqrt(x) < threshold` into `x < threshold²` to save that last root. It is the same value in exact arithmetic but not in `double`: a squared threshold rounds, and a distance one ulp under the threshold can land on the wrong side of it. Those comparisons are where "touching is not a collision" (3.0) is decided, so a one-ulp change there is a behaviour change, which is exactly what determinism forbids.
-- `stuck_normal` needs the closest **point**, not just its distance, so it keeps a `sqrt` per edge: the point it picks then stays the point the per-edge comparison picked. It only ever runs on a contact that is already there, so it is not on the hot path.
 
 **Distance to a convex polygon** (used by `overlap_circle_poly`, and by the jump zone):
 
@@ -3283,7 +3286,7 @@ distance = inside ? 0 : best
 
 `overlap_circle_poly` is `distance < r` (strict: touching isn't a collision). The jump zone's support test is the same with `<= r + 2 * CONTACT_SKIN` (4.3: contact counts there, and the skin covers the gap the circle keeps from slopes).
 
-`sweep_circle_touch` is the same candidate list without the "moving toward" filter, plus the already-touching case at `t = 0`.
+`sweep_circle_touch_clear` is the same candidate list without the filters, as a time only, and like every touch test it keeps `t < 1` (G.3).
 
 ### G.5 The ground and the corridor boundaries
 
@@ -3378,7 +3381,7 @@ s->legs += 1;                                  /* path position = leg index + fr
 
 ### G.9 `first_event`: which shape tests which face
 
-The shapes don't each test the whole hitbox: the square owns horizontal and vertical faces, the circle owns tilted ones and every head hit (4.3). Because `sweep_box_poly` and `sweep_circle_poly` report one contact per shape, the filtering happens on what they're allowed to return.
+The shapes don't each test the whole hitbox: the square owns horizontal and vertical faces, the circle owns tilted ones and every head hit (4.3). Because `sweep_box_poly` and `sweep_circle_clear` report one contact per shape, the filtering happens on what they're allowed to return.
 
 **The square** (`sweep_box_poly` with `half`, against neutral objects, the ground and the corridor floor) keeps a contact only when:
 
@@ -3387,7 +3390,7 @@ The shapes don't each test the whole hitbox: the square owns horizontal and vert
 
 A contact through any other axis is a tilted face: dropped, the circle's business.
 
-**The circle** (`sweep_circle_poly` with `half` as radius) is given, per object, the faces and vertices it's allowed to hit, with `g = gravity_dir` and `up = (0, -g)`:
+**The circle** (`sweep_circle_clear` with `half` as radius) is given, per object, the faces and vertices it's allowed to hit, with `g = gravity_dir` and `up = (0, -g)`:
 
 ```c
 static bool circle_face_ok(const hitbox_t *h, int i, double g)
@@ -3515,11 +3518,12 @@ corners (the four discs of radius r at the square's corners K = (±h, ±h)):
     a = dot(d, d)                      /* 0: no movement, skip */
     b = dot(f, d)
     cc = dot(f, f) - r * r
+    skip if |cross(f, d)| >= r * sqrt(a)   /* passes it at r or more (G.4) */
     disc = b * b - a * cc
     t = (b - sqrt(disc)) / a           /* the entering root, if disc >= 0 */
 ```
 
-Keep the candidates with `0 <= t <= 1`, take the smallest, and `t = 0` when the disc is already inside the grown rectangle at the start. Touching exactly (`= r`, or `= h + r` on a slab) isn't a collision (3.0), which is why the slab tests are strict.
+Keep the candidates with `0 <= t < 1` (a touch as the move ends is not in it, G.3), take the smallest, and `t = 0` when the disc is already inside the grown rectangle at the start. Touching exactly (`= r`, or `= h + r` on a slab) isn't a collision (3.0), which is why the slab tests are strict.
 
 ### G.11 Hashing (3.3)
 
@@ -3617,13 +3621,12 @@ Pure functions, no player, no tick. This is the step to be slow on: everything l
 | `bool sweep_box_poly(vec2_t c, double h, vec2_t d, const hitbox_t *hb, contact_t *out)` | the square's contact sweep | 4.3 |
 | `double sweep_box_touch(vec2_t c, double h, vec2_t d, const hitbox_t *hb)` | first touch time, `INFINITY` if none | G.3 |
 | `bool overlap_box_poly(vec2_t c, double h, const hitbox_t *hb)` | static overlap, touching excluded | G.3 |
-| `bool sweep_circle_poly(vec2_t c, double r, vec2_t d, const hitbox_t *hb, face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out)` | the circle's contact sweep, filtered | G.4, G.9 |
-| `double sweep_circle_touch(vec2_t c, double r, vec2_t d, const hitbox_t *hb)` | same, unfiltered, time only | G.4 |
+| `bool sweep_circle_clear(vec2_t c, double r, vec2_t d, const hitbox_t *hb, face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out)` | the circle's contact sweep, filtered; the circle is clear of `hb` | G.4, G.9 |
+| `double sweep_circle_touch_clear(vec2_t c, double r, vec2_t d, const hitbox_t *hb)` | same, unfiltered, time only | G.4 |
 | `double poly_distance(vec2_t c, const hitbox_t *hb)` | distance from a point to a convex polygon, 0 inside | G.4 |
 | `bool overlap_circle_poly(vec2_t c, double r, const hitbox_t *hb)` | `poly_distance < r` | G.4 |
 | `int clip_half_plane(const vec2_t *in, int n, double y_line, double g, vec2_t *out)` | Sutherland–Hodgman, one plane | G.6 |
 | `bool sweep_box_plane(vec2_t c, double h, vec2_t d, double sy, double side, contact_t *out)` | the square against the ground or a corridor boundary | G.5 |
-| `bool sweep_circle_plane(vec2_t c, double r, vec2_t d, double sy, double side, contact_t *out)` | the same for the circle | G.5 |
 | `double sweep_box_disc(vec2_t c, double h, vec2_t d, vec2_t C, double r)` | saws: slabs and corner discs | G.10 |
 
 **`tests/test_hitbox.c`, `tests/test_sweep.c`** — done when: a block at 0/90/180/270° has exactly axis-aligned vertices and only flat faces; at 30° only tilted ones; a 45° `slope` has one face of each kind and a `slope` at 180° a horizontal top; a square resting exactly on a face doesn't overlap it and a square 1/1024 px into it does; a square fully inside a block overlaps; a square sliding along a top face reports no contact, and the same square moving down into it reports `t` with `flat` true and the face's exact `offset`; a circle falling on a 45° face stops with its center 50 px from the surface; the 100 px gap of 8.2 passes; a 10 px spike is hit at 8 px/tick.
