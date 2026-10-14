@@ -239,7 +239,9 @@ void test_mirror(void)
     test_mode("ufo", "ball");
     test_mode("ball", "wave");
     test_mode("wave", "ship");
+    test_mode("swing", "ufo");
     CHECK(pads_used > 20 && orbs_used > 20);
     test_bot_agrees("ship", "ufo");
     test_bot_agrees("ball", "wave");
+    test_bot_agrees("swing", "ship");
 }
