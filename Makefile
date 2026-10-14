@@ -33,7 +33,8 @@ HDR       = $(wildcard include/sim/*.h) $(wildcard include/ui/*.h) \
             $(wildcard include/music/*.h) $(wildcard include/fx/*.h) \
             $(wildcard include/editor/*.h) \
             $(wildcard tests/*.h)
-TEST_FLAGS = -Wall -Wextra -Iinclude -ffp-contract=off -g -fsanitize=address,undefined
+TEST_FLAGS = -Wall -Wextra -Iinclude -ffp-contract=off -g \
+             -fsanitize=address,undefined,float-divide-by-zero
 
 all: $(NAME)
 
