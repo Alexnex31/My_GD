@@ -990,7 +990,7 @@ Both count in **GD blocks**: a block is the player's size, so **1 block = our 10
 | UFO | 10 | 1000 px |
 | Wave | 10 | 1000 px |
 | Swing | 10 | 1000 px (10.5) |
-| Spider | 9 | 900 px (later, 10.5) |
+| Spider | 9 | 900 px (10.5) |
 | Ball | 8 | 800 px |
 
 **Velocities and gravity** (all in velocity/acceleration units):
@@ -1506,6 +1506,16 @@ Consequences:
 - **Nothing new in the state:** no field, so the hash and the snapshots are unchanged.
 - **The game layer:** the ship's icon stands in; the portal is yellow. The palette's tenth entry is `portal swing`, without a key.
 - **Tests:** `tests/test_swing.c` (the row; the crossing tick by tick, at the cap; holding does nothing, nor a carried hold; a press in the air keeps the motion, and each new press flips; an orb pressed in and one held through; a block's underside; a mode portal, a swing portal, a pad; walls from the floor and from the ceiling, which the bot passes as a swing and not as a cube), the swing in `tests/test_mirror.c` (200 seeds upside down, and the bot), and `levels/19.gd`, which the bot solves.
+
+### 10.5d As built (spider)
+
+- **The rule:** a press while it can jump takes the spider **straight to the first surface above it** and turns its gravity round, within the tick. Holding does nothing more, as for the ball: one press, one crossing; a press in the air waits, fresh, for the first tick it can jump (PLAN 3.4). `src/sim/mode_spider.c` and one row in `MODES`: a cube's body, gravity and fall cap, a **900 px corridor** (6.9), a ceiling that kills (it never rises by itself; a pad can throw it into one), the bot deciding when it can jump, and the robot's upright icon.
+- **Modes still never move the player (6.1).** The press only flips the gravity (`player_flip_gravity`) and sets `player_t.teleport`. The move (`move_and_collide`, `src/sim/move.c`) then starts with the crossing: one straight sweep along the new gravity to the far side (the corridor's boundary, or the ground, or, with no corridor and gravity up, the kill line), with this tick's own legs, contacts and deaths. So everything on the way acts as in any move: a block's or a slope's underside stops it, a steep face is gone into and the crossing goes on, a spike or a saw kills it, a portal, a pad or an orb is touched once, in path order. It arrives as a grounded player would (at its floor's slide, one tick of gravity into it), then the tick's ordinary move covers the whole `vx`.
+- **Nothing above:** carried to the kill line and dies there (4.7), as decided. A spider always has its corridor, so in a level this only happens if the corridor is gone; the test forces it.
+- **`teleport` is not run state:** it is set and spent inside one tick, so it is false between ticks and is neither hashed nor needed in a snapshot.
+- **Every level that existed plays bit for bit as before** (every-tick hashes compared, with the move's new start in place).
+- **The game layer:** the cube's icon stands in, upright on whichever side it runs; the portal is purple. The palette's eleventh entry is `portal spider`, without a key. No trail or line for the crossing yet.
+- **Tests:** `tests/test_spider.c` (the row; floor to ceiling and back, each within one tick and its whole `vx`; held, and a hold carried into the attempt; a press in the air that waits for the landing; a block's underside, a slope's, which it then follows, and between two blocks; the tip of a steep slope gone into on the way; a spike on the way, one where it lands, one further on; a cube portal on the way; nothing above; the flag never left set; ten spikes the bot passes as a spider and not as a cube), the spider in `tests/test_mirror.c`, and `levels/20.gd`, which the bot solves. `start_gamemode spider` was the tests' example of an unknown mode: they use `rocket` now.
 
 ### 10.6 Saws
 
