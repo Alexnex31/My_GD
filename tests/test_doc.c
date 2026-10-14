@@ -49,7 +49,7 @@ static void test_starts(void)
     CHECK(doc.starts[2].mode == MODE_WAVE && doc.starts[2].speed == 0.5);
     CHECK(hdr.start.pos.x == PLAYER_SPAWN_X && hdr.start.mode == MODE_CUBE);
     level_doc_free(&doc);
-    CHECK(parse("start 2000 300\nstart 2000 300 spider\nstart x 300 cube\n"
+    CHECK(parse("start 2000 300\nstart 2000 300 rocket\nstart x 300 cube\n"
         "start 2000 300 cube sideways\nstart 2000 300 cube up 7\n", &doc,
         &hdr) == 5);
     CHECK(warnings == 5 && doc.nb_starts == 0 && doc.count == 0);

@@ -452,16 +452,74 @@ static bool crossed_surface(const sim_t *s)
         && (p->pos.y > s->st.bounds.bottom || p->pos.y < s->st.bounds.top);
 }
 
+/* Where a straight move along the gravity ends: its floor, or the kill line. */
+static double far_side(const sim_t *s)
+{
+    const ship_bounds_t *b = &s->st.bounds;
+
+    if (s->st.player.gravity_dir > 0)
+        return b->active ? b->bottom : GROUND_Y;
+    return b->active ? b->top : s->lvl.kill_y;
+}
+
+/*
+** The spider's press (10.5): straight to its new floor, before the tick's own
+** move. What is on the way acts as in any move: a spike kills, a portal or a
+** pad is touched, a block or a slope stops it, a steep face is gone through.
+** With nothing above, it is carried to the kill line and dies there (4.7).
+** It arrives as a grounded player does: at its floor's slide, with one tick
+** of gravity past it.
+*/
+static void teleport(sim_t *s)
+{
+    player_t *p = &s->st.player;
+    double half = MODES[p->mode].half;
+    double far = far_side(s);
+    vec2_t d = {0.0, far - p->pos.y};
+    vec2_t vel = {p->vx, 0.0};               /* a slope it lands on: its slide */
+    rect_t r = {p->pos.x - half - CONTACT_SKIN,
+        fmin(p->pos.y, far) - half - CONTACT_SKIN,
+        2.0 * (half + CONTACT_SKIN), fabs(d.y) + 2.0 * (half + CONTACT_SKIN)};
+
+    p->teleport = false;
+    broadphase(s, r);
+    for (int n = 0; n < MAX_CONTACTS && !p->grounded; n++) {
+        event_t e = {.kind = EV_NONE, .t = 1.0};
+        double death;
+
+        first_event(s, d, vel, &e);
+        death = leg_death_time(s, d);
+        if (death <= e.t) {
+            advance_y(s, d.y * death);
+            log_debug(s, DBG_DEATH, (vec2_t){0.0, 0.0});
+            p->alive = false;
+            return;
+        }
+        leg_touches(s, d, e.t);
+        advance_y(s, d.y * e.t);
+        d.y *= 1.0 - e.t;
+        if (e.kind != EV_CONTACT)
+            break;
+        respond(s, &e.contact, &vel);
+    }
+    p->vy = (p->grounded ? p->surface_rise : 0.0) - MODES[p->mode].gravity;
+}
+
 void move_and_collide(sim_t *s)
 {
     player_t *p = &s->st.player;
-    vec2_t vel = {p->vx, p->vy};
+    vec2_t vel;
 
-    broadphase(s, tick_sweep_bounds(p));
     s->nb_dbg = 0;                           /* the overlay's record (9.6) */
     s->legs = 0;
     s->nb_touch = 0;
     s->nb_passed = 0;
+    if (p->teleport)
+        teleport(s);
+    if (!p->alive)
+        return;
+    vel = (vec2_t){p->vx, p->vy};
+    broadphase(s, tick_sweep_bounds(p));
     s->tick_x0 = s->st.distance;
     s->tick_left = 1.0;
     p->grounded = false;                     /* surface_rise keeps its last value */

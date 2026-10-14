@@ -77,6 +77,12 @@ const mode_ops_t MODES[MODE_COUNT] = {
         .corridor_height = 1000.0, .bot_decision_ticks = 12,
         .apply_input = swing_input, .apply_forces = player_apply_gravity,
         .update_rotation = ship_rotation},
+    [MODE_SPIDER] = {.name = "spider", .half = PLAYER_HALF, .inner_half = PLAYER_INNER_HALF,
+        .gravity = PER_TICK2(CUBE_GRAVITY),
+        .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0,
+        .corridor_height = 900.0,
+        .apply_input = spider_input, .apply_forces = player_apply_gravity,
+        .update_rotation = robot_rotation},
 };
 
 /*
