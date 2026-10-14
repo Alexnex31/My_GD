@@ -27,6 +27,7 @@ void test_pads(void);
 void test_orbs(void);
 void test_saw(void);
 void test_speed(void);
+void test_robot(void);
 void test_doc(void);
 void test_editor(void);
 void test_edit(void);

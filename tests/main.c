@@ -30,6 +30,7 @@ int main(void)
     test_orbs();
     test_saw();
     test_speed();
+    test_robot();
     test_doc();
     test_editor();
     test_edit();
