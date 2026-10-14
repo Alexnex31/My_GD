@@ -24,6 +24,7 @@ static player_t start_player(const level_start_t *start)
         .vx = speed_step(start->speed),
         .gravity_dir = start->gravity_dir,
         .mode = start->mode,
+        .mini = start->mini,
         .hold = HOLD_FRESH,              /* a hold carried into the attempt is fresh */
         .support_normal = {0.0, (double)-start->gravity_dir},
         .alive = true,

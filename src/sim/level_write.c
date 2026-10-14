@@ -85,6 +85,8 @@ static void put_starts(text_buf_t *b, const level_doc_t *doc)
             MODES[st->mode].name, st->gravity_dir < 0 ? " up" : "");
         if (st->speed != 1.0)
             put(b, " %.10g", st->speed);
+        if (st->mini)
+            put(b, " mini");
         put(b, "\n");
     }
 }
@@ -93,7 +95,7 @@ static void put_starts(text_buf_t *b, const level_doc_t *doc)
 static bool is_portal_shaped(const object_t *o)
 {
     return o->type == OBJ_PORTAL || o->type == OBJ_GRAVITY
-        || o->type == OBJ_SPEED;
+        || o->type == OBJ_SPEED || o->type == OBJ_MINI;
 }
 
 /* The width or height a line without w= or h= gives this object (4.2). */
@@ -134,6 +136,8 @@ static const char *object_word(const object_t *o)
         return LAUNCHES[o->launch].name;
     if (o->type == OBJ_SPEED)
         return speed_word(o->speed);
+    if (o->type == OBJ_MINI)
+        return o->portal_mini ? "on" : "off";
     return NULL;
 }
 

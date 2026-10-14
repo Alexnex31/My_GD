@@ -198,7 +198,7 @@ static void test_kept_with_warning(void)
     CHECK(warnings == 1);                      /* one warning per level */
     CHECK(s.lvl.nb_objects == 2);
     sim_free(&s);
-    load(&s, "start_size mini\nfoo bar\nstart_gamemode rocket\n");
+    load(&s, "start_size tiny\nfoo bar\nstart_gamemode rocket\n");
     CHECK(warnings == 3 && s.lvl.skipped_lines == 0);
     sim_free(&s);
 }

@@ -120,7 +120,7 @@ static void portal_shape(object_t *o, bool given_w, bool given_h)
     vec2_t center = {o->rect.x + block / 2.0, o->rect.y + block / 2.0};
 
     if (o->type != OBJ_PORTAL && o->type != OBJ_GRAVITY
-        && o->type != OBJ_SPEED)
+        && o->type != OBJ_SPEED && o->type != OBJ_MINI)
         return;
     if (!given_w) {                          /* derived: centered on the cell */
         o->rect.w = block * PORTAL_BOX_W;
@@ -174,7 +174,7 @@ static const char *const TYPE_NAMES[OBJ_TYPE_COUNT] = {
     [OBJ_BLOCK] = "block", [OBJ_SLOPE] = "slope",
     [OBJ_SPIKE] = "spike", [OBJ_PORTAL] = "portal",
     [OBJ_GRAVITY] = "gravity", [OBJ_PAD] = "pad", [OBJ_ORB] = "orb",
-    [OBJ_SAW] = "saw", [OBJ_SPEED] = "speed",
+    [OBJ_SAW] = "saw", [OBJ_SPEED] = "speed", [OBJ_MINI] = "mini",
 };
 
 const char *obj_type_name(obj_type_t type)
@@ -203,6 +203,21 @@ static int gravity_word(object_t *o, const char *word, parse_ctx_t *ctx)
         o->portal_gravity = 1;
     else {
         warn(ctx, "gravity needs up or down, line skipped");
+        return -1;
+    }
+    hitbox_for_object(o);
+    return 0;
+}
+
+/* A size portal's word: on makes the player mini, off full size (10.4). */
+static int mini_word(object_t *o, const char *word, parse_ctx_t *ctx)
+{
+    if (word != NULL && strcmp(word, "on") == 0)
+        o->portal_mini = true;
+    else if (word != NULL && strcmp(word, "off") == 0)
+        o->portal_mini = false;
+    else {
+        warn(ctx, "mini needs on or off, line skipped");
         return -1;
     }
     hitbox_for_object(o);
@@ -259,6 +274,8 @@ static int object_init(object_t *o, const char *word, parse_ctx_t *ctx)
         return launch_word(o, word, ctx);
     if (o->type == OBJ_SPEED)
         return speed_word_of(o, word, ctx);
+    if (o->type == OBJ_MINI)
+        return mini_word(o, word, ctx);
     if (o->type == OBJ_PORTAL) {
         mode = word == NULL ? -1 : mode_from_name(word);
         if (mode < 0) {
@@ -376,7 +393,7 @@ static bool start_speed(const char *text, level_start_t *st, parse_ctx_t *ctx)
 }
 
 /*
-** start x y mode [up|down] [speed]: another place an attempt can begin, for
+** start x y mode [up|down] [speed] [mini]: another place an attempt can begin, for
 ** practice (FEATURES 11.8). It has no hitbox and is no object: the run never
 ** meets it. 0 kept, -1 skipped, 1 not a start line at all.
 */
@@ -405,8 +422,12 @@ static int parse_start(char *line, level_start_t *st, parse_ctx_t *ctx)
     }
     if (next < n && known_speed(tok[next], &st->speed))
         next += 1;
+    if (next < n && strcmp(tok[next], "mini") == 0) {
+        st->mini = true;
+        next += 1;
+    }
     if (next < n) {
-        warn(ctx, "start takes up or down, then a speed, line skipped");
+        warn(ctx, "start takes up or down, a speed, then mini, line skipped");
         return -1;
     }
     return 0;

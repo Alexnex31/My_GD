@@ -32,6 +32,7 @@ typedef enum obj_type {
     OBJ_ORB,                  /* interactive: launches on a fresh hold (10.2)  */
     OBJ_SAW,                  /* harm: a disc (FEATURES 10.6)                  */
     OBJ_SPEED,                /* interactive: a speed portal (FEATURES 10.3)   */
+    OBJ_MINI,                 /* interactive: a size portal (FEATURES 10.4)    */
     OBJ_TYPE_COUNT
 } obj_type_t;
 
@@ -87,6 +88,7 @@ typedef struct object {       /* level data: never modified after load */
     int portal_gravity;       /* OBJ_GRAVITY only: +1 down, -1 up               */
     launch_kind_t launch;     /* OBJ_PAD, OBJ_ORB: its colour                   */
     double speed;             /* OBJ_SPEED only: its name, 0.5 to 4 (10.3)      */
+    bool portal_mini;         /* OBJ_MINI only: on makes the player mini (10.4) */
     int line;                 /* source line, for messages and stable sort      */
 } object_t;
 
@@ -96,7 +98,7 @@ typedef struct level_start {  /* where and how an attempt starts (7.2) */
     double speed;             /* start_speed: GD's name for it, 0.5, 1, 2, 3 or 4:
                                  a name, not a ratio (FEATURES 10.3)             */
     int gravity_dir;          /* start_gravity: +1 normal, -1 flipped            */
-    bool mini;                /* start_size: needs the mini scale (FEATURES 10.4) */
+    bool mini;                /* start_size: the player starts mini (FEATURES 10.4) */
 } level_start_t;
 
 typedef struct level_header { /* the level file's header fields (7.2) */
@@ -157,6 +159,7 @@ typedef struct player {
     float rotation;           /* the icon's angle, degrees, cosmetic (9.4)      */
     hold_state_t hold;        /* HOLD_NONE, HOLD_FRESH, HOLD_USED (3.4)         */
     int boost_ticks;          /* the robot's rise: ticks of it left (10.5)      */
+    bool mini;                /* half size, with its own numbers (10.4)         */
     bool teleport;            /* the spider's press: cross to the surface opposite
                                  in this tick's move (10.5). False between ticks */
     bool alive;

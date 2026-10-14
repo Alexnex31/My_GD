@@ -57,6 +57,7 @@ static void hash_player(uint64_t *h, const player_t *p)
     hash_long(h, p->mode);
     hash_long(h, p->hold);
     hash_long(h, p->boost_ticks);
+    hash_long(h, p->mini);
     hash_long(h, p->grounded);
     hash_long(h, p->can_jump);
     hash_long(h, p->alive);

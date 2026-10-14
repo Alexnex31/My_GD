@@ -98,6 +98,19 @@
        One 30 x 30 square is its rigid square and its inner box at once. */
     #define WAVE_HALF           15.0
 
+    /* Mini (FEATURES 10.4): every size is halved. The numbers GD publishes
+       are its own; the modes it publishes none for keep theirs. The mini cube
+       jumps GD's 1.41 units, and its gravity is solved so the measured apex
+       is the wiki's 1.3583 blocks. The mini UFO's hop is GD's 1.2 blocks.
+       The mini robot rises at the same speed for at most 51 ticks: 275.6 px
+       with its fall, the nearest to GD's 2.7666 blocks. */
+    #define MINI_SCALE          0.5
+    #define MINI_CUBE_JUMP_V    (1.41 * V_UNIT)    /* 1464.4 px/s                        */
+    #define MINI_CUBE_GRAVITY   (0.7158 * A_UNIT)  /* ours: 7721.3 px/s^2                */
+    #define MINI_UFO_JUMP_V     (1.2532 * V_UNIT)  /* ours: 1301.6 px/s                  */
+    #define MINI_ROBOT_TICKS    51
+    #define MINI_WAVE_SLOPE     2.0      /* GD: a mini wave climbs 2 px per px (6.9)     */
+
     /* The ball (FEATURES 9): a click flips its gravity. Ours, chosen from the
        crossing they give: 0.5 s from one side of its corridor to the other,
        about 5 blocks of level. The icon turns once a second at 1x: a real

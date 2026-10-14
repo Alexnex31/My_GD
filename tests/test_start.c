@@ -200,14 +200,14 @@ static void test_start_speed(void)
     sim_free(&s);
 }
 
-/* start_size is parsed, and says out loud that the mini scale isn't there. */
+/* start_size is parsed, and the attempt starts at that size (10.4). */
 static void test_start_size(void)
 {
     sim_t s;
 
     load(&s, "start_size mini\nblock 5000 700 2\n");
-    CHECK(warnings == 1);                                    /* not implemented */
-    CHECK(s.lvl.hdr.start.mini);
+    CHECK(warnings == 0);
+    CHECK(s.lvl.hdr.start.mini && s.st.player.mini);
     sim_free(&s);
     load(&s, "start_size normal\nblock 5000 700 2\n");
     CHECK(warnings == 0);

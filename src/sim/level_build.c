@@ -92,8 +92,6 @@ int sim_load_mem(sim_t *s, const char *buf, size_t len, const char *id,
     doc.objs = NULL;
     doc.starts = NULL;
     level_doc_free(&doc);
-    if (s->lvl.hdr.start.mini && log != NULL)
-        log("start_size mini has no effect yet: the mini scale is FEATURES 10.4");
     sim_ready(s);
     return 0;
 }

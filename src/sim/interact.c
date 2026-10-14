@@ -91,15 +91,23 @@ void corridor_from_center(sim_t *s, double center)
 ** ground it was sliding on: a wave there turning into a cube is 35 px inside
 ** it. A surface is never crossed (4.3), so the player is put back on it, by
 ** exactly that much and no further. Objects are left to the contact rules.
-** Only the ground can be in the way: a new corridor is placed around the
-** player, and the ground is the one thing that can cut it short (5.2).
+** For a mode portal only the ground can be in the way: a new corridor is
+** placed around the player, and the ground is the one thing that can cut it
+** short (5.2). A player growing back to full size (10.4) can also meet the
+** corridor it is in, either side.
 */
-static void stay_above_the_ground(player_t *p)
+static void stay_off_the_surfaces(sim_t *s)
 {
-    double lowest = GROUND_Y - player_mode(p)->half;
+    player_t *p = &s->st.player;
+    const ship_bounds_t *b = &s->st.bounds;
+    double half = player_mode(p)->half;
 
-    if (p->pos.y > lowest)
-        p->pos.y = lowest;
+    if (b->active && p->pos.y - half < b->top)
+        p->pos.y = b->top + half;
+    if (b->active && p->pos.y + half > b->bottom)
+        p->pos.y = b->bottom - half;
+    if (p->pos.y > GROUND_Y - half)
+        p->pos.y = GROUND_Y - half;
 }
 
 /*
@@ -116,7 +124,24 @@ static void enter_portal(sim_t *s, const object_t *o)
         corridor_from_center(s, o->rect.y + o->rect.h / 2.0);
     else
         s->st.bounds.active = false;         /* its boundaries stop existing now */
-    stay_above_the_ground(&s->st.player);
+    stay_off_the_surfaces(s);
+}
+
+/*
+** A size portal halves the player or gives it its size back, around the same
+** center, and nothing else changes: speeds, gravity, mode (10.4). Growing can
+** push it off a surface it would cross; an object it now overlaps is left to
+** the contact rules, which kill an inner box inside a block. A robot's rise
+** keeps going, no longer than the new size allows.
+*/
+static void enter_mini(sim_t *s, const object_t *o)
+{
+    player_t *p = &s->st.player;
+
+    p->mini = o->portal_mini;
+    if (p->boost_ticks > player_mode(p)->rise_ticks)
+        p->boost_ticks = player_mode(p)->rise_ticks;
+    stay_off_the_surfaces(s);
 }
 
 /*
@@ -154,7 +179,7 @@ static void launch(sim_t *s, const object_t *o)
 
     if (LAUNCHES[o->launch].flips)
         player_flip_gravity(p);
-    p->vy = PER_TICK(launch_speed(o) * V_UNIT);
+    p->vy = PER_TICK(launch_speed_for(o, p->mini) * V_UNIT);
     p->boost_ticks = 0;
     p->grounded = false;
     p->can_jump = false;
@@ -178,6 +203,8 @@ static void interactive_act(sim_t *s, const object_t *o)
         enter_gravity(s, o);
     if (o->type == OBJ_SPEED)
         enter_speed(s, o);
+    if (o->type == OBJ_MINI)
+        enter_mini(s, o);
     if (o->type == OBJ_PAD || o->type == OBJ_ORB)
         launch(s, o);
 }

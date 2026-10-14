@@ -33,8 +33,9 @@ typedef struct mode_ops {
 } mode_ops_t;
 
 extern const mode_ops_t MODES[MODE_COUNT];
+extern const mode_ops_t MINI_MODES[MODE_COUNT];   /* the same modes, mini (10.4) */
 
-/* The row the player's physics reads: its mode's, at its size. */
+/* The row the player's physics reads: its mode's, at its size (10.4). */
 const mode_ops_t *player_mode(const player_t *p);
 
 /*
@@ -46,6 +47,8 @@ typedef struct launch_ops {
     const char *name;         /* name in level files ("yellow", ...)          */
     double pad_v;
     double orb_v;
+    double mini_pad_v;         /* the same, for a mini player (6.9) */
+    double mini_orb_v;
     bool flips;               /* gravity flips first, then the speed is set    */
 } launch_ops_t;
 
@@ -53,6 +56,7 @@ extern const launch_ops_t LAUNCHES[LAUNCH_KIND_COUNT];
 
 int launch_from_name(const char *name);    /* -1 if unknown */
 double launch_speed(const object_t *o);     /* velocity units; 0: not a launcher */
+double launch_speed_for(const object_t *o, bool mini);
 
 int mode_from_name(const char *name);      /* -1 if unknown (5.5) */
 double mode_neutral_kill_half(const mode_ops_t *m);   /* FEATURES 6.4 */
