@@ -3,10 +3,12 @@
 ** tests/test_circle.c
 ** File description:
 ** the circle's sweeps, the half-plane clipper and the saw disc (G.4, G.6, G.10)
+** The sweeps are the _clear ones the game calls: 4.4 tests the overlap first.
 */
 
 #include <math.h>
 
+#include "sim/constants.h"
 #include "sim/geom.h"
 #include "sim/hitbox.h"
 #include "sim/sweep.h"
@@ -65,7 +67,7 @@ static void test_land_on_slope(void)
     vec2_t end;
     int tilted = 0;
 
-    CHECK(sweep_circle_poly((vec2_t){1050.0, 600.0}, R, (vec2_t){0.0, 300.0},
+    CHECK(sweep_circle_clear((vec2_t){1050.0, 600.0}, R, (vec2_t){0.0, 300.0},
         &s, NULL, NULL, 1.0, &c));
     CHECK(fabs(c.normal.x + sqrt(0.5)) < 1e-9);
     CHECK(fabs(c.normal.y + sqrt(0.5)) < 1e-9);
@@ -82,7 +84,7 @@ static void test_vertex_contact(void)
     hitbox_t b = shape(OBJ_BLOCK, (rect_t){1000.0, 700.0, 100.0, 100.0}, 0.0);
     contact_t c = {0};
 
-    CHECK(sweep_circle_poly((vec2_t){960.0, 600.0}, R, (vec2_t){0.0, 300.0},
+    CHECK(sweep_circle_clear((vec2_t){960.0, 600.0}, R, (vec2_t){0.0, 300.0},
         &b, NULL, NULL, 1.0, &c));
     CHECK(fabs(c.t - 7.0 / 30.0) < 1e-9);
     CHECK(fabs(c.normal.x + 0.8) < 1e-9);
@@ -96,10 +98,10 @@ static void test_misses(void)
     hitbox_t b = shape(OBJ_BLOCK, (rect_t){1000.0, 700.0, 100.0, 100.0}, 0.0);
     contact_t c = {0};
 
-    CHECK(!sweep_circle_poly((vec2_t){800.0, 600.0}, R, (vec2_t){0.0, 300.0},
+    CHECK(!sweep_circle_clear((vec2_t){800.0, 600.0}, R, (vec2_t){0.0, 300.0},
         &b, NULL, NULL, 1.0, &c));
-    CHECK(sweep_circle_touch((vec2_t){800.0, 600.0}, R, (vec2_t){0.0, 300.0},
-        &b) == INFINITY);
+    CHECK(sweep_circle_touch_clear((vec2_t){800.0, 600.0}, R,
+        (vec2_t){0.0, 300.0}, &b) == INFINITY);
 }
 
 static void test_filters(void)
@@ -109,27 +111,57 @@ static void test_filters(void)
     contact_t c = {0};
 
     /* a block has no tilted face: the circle's support filter finds nothing */
-    CHECK(!sweep_circle_poly((vec2_t){1050.0, 600.0}, R, (vec2_t){0.0, 300.0},
+    CHECK(!sweep_circle_clear((vec2_t){1050.0, 600.0}, R, (vec2_t){0.0, 300.0},
         &b, tilted_only, no_face, 1.0, &c));
     /* the same filter does find the slope's tilted face */
-    CHECK(sweep_circle_poly((vec2_t){1050.0, 600.0}, R, (vec2_t){0.0, 300.0},
+    CHECK(sweep_circle_clear((vec2_t){1050.0, 600.0}, R, (vec2_t){0.0, 300.0},
         &s, tilted_only, no_face, 1.0, &c));
     /* rejecting everything means no contact at all */
-    CHECK(!sweep_circle_poly((vec2_t){1050.0, 600.0}, R, (vec2_t){0.0, 300.0},
+    CHECK(!sweep_circle_clear((vec2_t){1050.0, 600.0}, R, (vec2_t){0.0, 300.0},
         &s, no_face, no_face, 1.0, &c));
 }
 
-static void test_touch_from_inside(void)
+/*
+** A path that passes a corner at exactly r only touches it: running under a
+** ceiling 100 px over the ground, or past a wall 50 px to the side. A hair
+** closer is a contact.
+*/
+static void test_grazing_corner(void)
+{
+    hitbox_t b = shape(OBJ_BLOCK, (rect_t){900.0, 650.0, 500.0, 100.0}, 0.0);
+    contact_t c = {0};
+    vec2_t d = {PER_TICK(SCROLL_SPEED), 0.0};
+
+    for (double x = 840.0; x < 960.0; x += 0.37) {     /* its corner: (900, 750) */
+        CHECK(!sweep_circle_clear((vec2_t){x, 800.0}, R, d, &b, NULL, NULL,
+            1.0, &c));
+        CHECK(sweep_circle_touch_clear((vec2_t){x, 800.0}, R, d, &b)
+            == INFINITY);
+        CHECK(!sweep_circle_clear((vec2_t){x, 800.0}, R, (vec2_t){4.0 * d.x,
+            0.0}, &b, NULL, NULL, 1.0, &c));
+    }
+    CHECK(sweep_circle_touch_clear((vec2_t){850.0, 500.0}, R,
+        (vec2_t){0.0, 300.0}, &b) == INFINITY);          /* down its side */
+    CHECK(sweep_circle_touch_clear((vec2_t){897.0, 800.0 - 1.0 / 1024.0}, R,
+        d, &b) < 1.0);
+}
+
+/* A touch as the leg ends is not inside it: the next leg starts there (4.4). */
+static void test_touch_at_the_end(void)
 {
     hitbox_t b = shape(OBJ_BLOCK, (rect_t){1000.0, 700.0, 100.0, 100.0}, 0.0);
     contact_t c = {0};
 
-    CHECK(sweep_circle_touch((vec2_t){1050.0, 750.0}, R, (vec2_t){0.0, 10.0},
-        &b) == 0.0);
-    CHECK(sweep_circle_poly((vec2_t){1050.0, 660.0}, R, (vec2_t){0.0, 10.0},
+    CHECK(sweep_circle_touch_clear((vec2_t){1050.0, 600.0}, R,
+        (vec2_t){0.0, 50.0}, &b) == INFINITY);
+    CHECK(sweep_circle_touch_clear((vec2_t){1050.0, 600.0}, R,
+        (vec2_t){0.0, 100.0}, &b) == 0.5);
+    CHECK(sweep_circle_touch_clear((vec2_t){940.0, 750.0}, R,
+        (vec2_t){10.0, 0.0}, &b) == INFINITY);
+    /* a contact there still counts: a landing ends the tick on the face */
+    CHECK(sweep_circle_clear((vec2_t){1050.0, 600.0}, R, (vec2_t){0.0, 50.0},
         &b, NULL, NULL, 1.0, &c));
-    CHECK(c.t == 0.0);
-    CHECK(c.normal.y == -1.0);               /* pushed out the way it came in */
+    CHECK(c.t == 1.0);
 }
 
 static void test_clip(void)
@@ -175,6 +207,12 @@ static void test_saw_disc(void)
     /* the same disc just off the corner, not moving: nothing */
     CHECK(sweep_box_disc(c, R, (vec2_t){0.0, 0.0}, (vec2_t){980.0, 830.0},
         42.0) == INFINITY);
+    /* passing under the square's corners at exactly r: a touch, not a hit */
+    for (double x = 1000.0; x < 1200.0; x += 0.37)
+        CHECK(sweep_box_disc(c, R, d, (vec2_t){x, 842.0}, 42.0) == INFINITY);
+    /* reaching it only as the move ends: not in this move */
+    CHECK(sweep_box_disc(c, R, d, (vec2_t){1192.0, 750.0}, 42.0) == INFINITY);
+    CHECK(sweep_box_disc(c, R, d, (vec2_t){1100.0, 892.0}, 42.0) == INFINITY);
 }
 
 void test_circle(void)
@@ -185,7 +223,8 @@ void test_circle(void)
     test_vertex_contact();
     test_misses();
     test_filters();
-    test_touch_from_inside();
+    test_grazing_corner();
+    test_touch_at_the_end();
     test_clip();
     test_saw_disc();
 }

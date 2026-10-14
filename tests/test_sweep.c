@@ -109,6 +109,26 @@ static void test_touch_and_tunneling(void)
         &b) == 0.25);
 }
 
+/*
+** A touch as the leg ends is not inside it: the next leg, which starts
+** there, decides. A contact there still counts: it ends the leg on the face.
+*/
+static void test_touch_at_the_end(void)
+{
+    hitbox_t b = block(1000.0, 700.0, 100.0, 100.0, 0.0);
+    contact_t c = {0};
+
+    CHECK(sweep_box_touch((vec2_t){1050.0, 600.0}, HALF, (vec2_t){0.0, 50.0},
+        &b) == INFINITY);
+    CHECK(sweep_box_touch((vec2_t){940.0, 750.0}, HALF, (vec2_t){10.0, 0.0},
+        &b) == INFINITY);
+    CHECK(sweep_box_touch((vec2_t){1050.0, 650.0}, HALF, (vec2_t){0.0, 10.0},
+        &b) == 0.0);                                     /* from the start */
+    CHECK(sweep_box_poly((vec2_t){1050.0, 600.0}, HALF, (vec2_t){0.0, 50.0},
+        &b, &c));
+    CHECK(c.t == 1.0 && c.flat);
+}
+
 static void test_overlap(void)
 {
     hitbox_t b = block(1000.0, 700.0, 100.0, 100.0, 0.0);
@@ -119,6 +139,43 @@ static void test_overlap(void)
     CHECK(!overlap_box_poly((vec2_t){1050.0, 649.0}, HALF, &b));   /* above    */
     CHECK(overlap_box_poly((vec2_t){1050.0, 651.0}, HALF, &b));    /* 1 px in  */
     CHECK(overlap_box_poly((vec2_t){1050.0, 750.0}, HALF, &small));/* contains */
+}
+
+/*
+** The static test and a sweep that doesn't move agree to the last bit, at
+** every position around a tilted face: a square judged clear is clear for
+** the sweep too (4.4). They share one formula; this keeps it that way.
+*/
+static void test_overlap_agrees_with_the_sweep(void)
+{
+    hitbox_t b = block(1000.0, 700.0, 100.0, 100.0, 30.0);
+    vec2_t mid = {1050.0, 750.0};
+    int clear = 0;
+
+    for (int k = 0; k < b.naxes; k++) {
+        vec2_t a = hitbox_axis(&b, k);
+        vec2_t along = {-a.y, a.x};
+        double r = HALF * hitbox_extent(&b, k);
+        vec2_t c0 = vadd(vscale(a, hitbox_hi(&b, k) + r),
+            vscale(along, dot(along, mid)));     /* touching that face */
+        vec2_t c = c0;
+
+        for (int i = 0; i < 64; i++)
+            c.x = nextafter(c.x, -INFINITY);
+        for (int i = 0; i < 128; i++, c.x = nextafter(c.x, INFINITY)) {
+            c.y = c0.y;
+            for (int j = 0; j < 64; j++)
+                c.y = nextafter(c.y, -INFINITY);
+            for (int j = 0; j < 128; j++, c.y = nextafter(c.y, INFINITY)) {
+                bool in = overlap_box_poly(c, HALF, &b);
+
+                CHECK(in == (sweep_box_touch(c, HALF, (vec2_t){0.0, 0.0}, &b)
+                    == 0.0));
+                clear += !in;
+            }
+        }
+    }
+    CHECK(clear > 0);                        /* both sides of the faces seen */
 }
 
 /*
@@ -178,9 +235,6 @@ static void test_ceiling_plane(void)
     CHECK(c.t == 0.25);
     CHECK(c.flat && c.normal.y == 1.0);
     CHECK((c.offset + HALF) * c.normal.y == 50.0);
-    CHECK(sweep_circle_plane((vec2_t){350.0, 60.0}, HALF, (vec2_t){0.0, -40.0},
-        0.0, -1.0, &c));
-    CHECK(c.t == 0.25);
 }
 
 /* A shape already past a surface meets it at once: it can't be crossed (4.3). */
@@ -203,7 +257,9 @@ void test_sweep(void)
     test_corner_tie();
     test_moving_away();
     test_touch_and_tunneling();
+    test_touch_at_the_end();
     test_overlap();
+    test_overlap_agrees_with_the_sweep();
     test_apex_is_flat();
     test_tilted_face();
     test_ground_plane();

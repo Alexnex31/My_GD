@@ -14,7 +14,9 @@
 ** A "sweep" moves one of the player's shapes by d and reports the first moment
 ** it meets an obstacle (4.3). Touching is never overlapping (3.0), so a shape
 ** resting on a face or sliding along it reports nothing.
-** The touch versions return the time in 0..1, or INFINITY when there is none.
+** The touch versions return the time in [0, 1), or INFINITY when there is
+** none: a touch that only comes as the leg ends is not inside it, and the
+** next leg, starting there, decides.
 */
 
 /* The circle only meets some faces and corners of a shape (G.9): these filters
@@ -31,18 +33,12 @@ bool overlap_box_poly(vec2_t c, double h, const hitbox_t *hb);
 ** side = +1 when the solid part is below sy, -1 when it is above. */
 bool sweep_box_plane(vec2_t c, double h, vec2_t d, double sy, double side,
     contact_t *out);
-bool sweep_circle_plane(vec2_t c, double r, vec2_t d, double sy, double side,
-    contact_t *out);
-
-/* The circle against a polygon: the polygon inflated by r (G.4). */
-bool sweep_circle_poly(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
-    face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out);
-double sweep_circle_touch(vec2_t c, double r, vec2_t d, const hitbox_t *hb);
 
 /*
-** The same two for a caller that has **already** checked the circle is clear
-** of hb (4.4 does, before every sweep): they skip the overlap test instead of
-** computing the same distance a second time.
+** The circle against a polygon: the polygon inflated by r (G.4). The caller
+** has **already** checked the circle is clear of hb (4.4 does, before every
+** sweep, with overlap_circle_poly): a circle inside it is the inner box's
+** business, not a contact.
 */
 bool sweep_circle_clear(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out);

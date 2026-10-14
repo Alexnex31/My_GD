@@ -20,6 +20,20 @@ typedef struct sat {
 } sat_t;
 
 /*
+** Where on axis k the square's center overlaps the shape: strictly between
+** lo and hi. The sweep and the static test both use it, so they agree on an
+** exact touch to the last bit.
+*/
+static void axis_span(const hitbox_t *hb, double h, int k, double *lo,
+    double *hi)
+{
+    double r = h * hitbox_extent(hb, k);
+
+    *lo = hitbox_lo(hb, k) - r;
+    *hi = hitbox_hi(hb, k) + r;
+}
+
+/*
 ** Separating axis theorem over time, for an axis-aligned square of half h
 ** moving by d. Returns false as soon as one axis can never overlap.
 */
@@ -27,16 +41,14 @@ static bool sat_axis(vec2_t c, double h, vec2_t d, int k,
     const hitbox_t *hb, sat_t *s)
 {
     vec2_t a = hitbox_axis(hb, k);
-    double r = h * hitbox_extent(hb, k);
-    double raw_lo = hitbox_lo(hb, k);
-    double raw_hi = hitbox_hi(hb, k);
-    double lo = raw_lo - r;
-    double hi = raw_hi + r;
+    double lo = 0.0;
+    double hi = 0.0;
     double p = dot(c, a);
     double v = dot(d, a);
     double t0 = 0.0;
     double t1 = 0.0;
 
+    axis_span(hb, h, k, &lo, &hi);
     if (v == 0.0)
         return !(p <= lo || p >= hi);        /* touching is not overlapping */
     t0 = (lo - p) / v;
@@ -51,7 +63,7 @@ static bool sat_axis(vec2_t c, double h, vec2_t d, int k,
         s->t_in = t0;
         s->n_in = v > 0.0 ? (vec2_t){-a.x, -a.y} : a;
         s->k_in = k;
-        s->offset = v > 0.0 ? -raw_lo : raw_hi;
+        s->offset = v > 0.0 ? -hitbox_lo(hb, k) : hitbox_hi(hb, k);
     }
     s->t_out = fmin(s->t_out, t1);
     return s->t_in < s->t_out;
@@ -74,8 +86,6 @@ bool sweep_box_poly(vec2_t c, double h, vec2_t d, const hitbox_t *hb,
 
     if (!sat_box_poly(c, h, d, hb, &s) || s.k_in < 0)
         return false;                        /* never overlap, or nothing moves */
-    if (dot(s.n_in, d) >= 0.0)
-        return false;                        /* moving away from, or along, that face */
     out->t = s.t_in < 0.0 ? 0.0 : s.t_in;    /* already overlapping: contact now */
     out->normal = s.n_in;
     out->flat = s.k_in == 0;
@@ -92,16 +102,21 @@ double sweep_box_touch(vec2_t c, double h, vec2_t d, const hitbox_t *hb)
         return INFINITY;
     if (s.k_in < 0)
         return 0.0;                          /* overlapping, and no axis moves */
+    if (s.t_in >= 1.0)
+        return INFINITY;                     /* touching only as the leg ends */
     return s.t_in < 0.0 ? 0.0 : s.t_in;
 }
 
 bool overlap_box_poly(vec2_t c, double h, const hitbox_t *hb)
 {
+    double lo = 0.0;
+    double hi = 0.0;
+
     for (int k = 0; k < hb->naxes; k++) {
-        double r = h * hitbox_extent(hb, k);
         double p = dot(c, hitbox_axis(hb, k));
 
-        if (p + r <= hitbox_lo(hb, k) || p - r >= hitbox_hi(hb, k))
+        axis_span(hb, h, k, &lo, &hi);
+        if (p <= lo || p >= hi)
             return false;                    /* apart, or exactly touching */
     }
     return true;
@@ -111,16 +126,16 @@ bool overlap_box_poly(vec2_t c, double h, const hitbox_t *hb)
 ** A half-plane: everything on the side of y = sy the surface is solid on.
 ** The shape reaches it with the point half a size toward it (G.5).
 */
-static bool sweep_plane(vec2_t c, double reach, vec2_t d, double sy,
-    double side, contact_t *out)
+bool sweep_box_plane(vec2_t c, double h, vec2_t d, double sy, double side,
+    contact_t *out)
 {
-    double edge = c.y + side * reach;
+    double edge = c.y + side * h;
     double t = 0.0;
 
     if (d.y * side <= 0.0)
         return false;                        /* not moving into the surface */
     if ((edge - sy) * side < 0.0) {
-        t = (sy - side * reach - c.y) / d.y;
+        t = (sy - side * h - c.y) / d.y;
         if (t > 1.0)
             return false;
     }
@@ -130,18 +145,6 @@ static bool sweep_plane(vec2_t c, double reach, vec2_t d, double sy,
     out->offset = -side * sy;
     out->surface = SURF_GROUND;              /* the caller names the surface */
     return true;
-}
-
-bool sweep_box_plane(vec2_t c, double h, vec2_t d, double sy, double side,
-    contact_t *out)
-{
-    return sweep_plane(c, h, d, sy, side, out);
-}
-
-bool sweep_circle_plane(vec2_t c, double r, vec2_t d, double sy, double side,
-    contact_t *out)
-{
-    return sweep_plane(c, r, d, sy, side, out);
 }
 
 /* The point of edge i closest to c (G.4). */
@@ -186,48 +189,6 @@ bool overlap_circle_poly(vec2_t c, double r, const hitbox_t *hb)
     return poly_distance(c, hb) < r;         /* touching is not overlapping */
 }
 
-/*
-** Closest point of the outline to c, its distance, and which side c is on.
-** This one runs only on a contact that is already there, so it keeps the
-** per-edge square root: the point it picks stays exactly the one it picked.
-*/
-static double outline_closest(vec2_t c, const hitbox_t *hb, vec2_t *out,
-    bool *inside)
-{
-    double best = INFINITY;
-
-    *inside = true;
-    for (int i = 0; i < hb->nverts; i++) {
-        vec2_t p = edge_closest(c, hb, i);
-        double dist = vlen(vsub(c, p));
-
-        if (dot(hb->face_n[i], c) > hb->face_off[i])
-            *inside = false;
-        if (dist < best) {
-            best = dist;
-            *out = p;
-        }
-    }
-    return best;
-}
-
-/* The normal of a contact that is already there at t = 0 (G.4). */
-static vec2_t stuck_normal(vec2_t c, const hitbox_t *hb)
-{
-    vec2_t q = {0.0, 0.0};
-    bool inside = true;
-    double dist = outline_closest(c, hb, &q, &inside);
-    int shallow = 0;
-
-    if (!inside && dist > 0.0)
-        return vscale(vsub(c, q), 1.0 / dist);
-    for (int i = 1; i < hb->nverts; i++)     /* inside: the shallowest face */
-        if (hb->face_off[i] - dot(hb->face_n[i], c)
-            < hb->face_off[shallow] - dot(hb->face_n[shallow], c))
-            shallow = i;
-    return hb->face_n[shallow];
-}
-
 static void circle_faces(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     face_ok_fn fok, double g, contact_t *out)
 {
@@ -256,10 +217,24 @@ static void circle_faces(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     }
 }
 
+/*
+** A path that passes a corner at r or more never overlaps it: at most it
+** touches. The distance is |cross(f, d)| / |d|, compared without dividing.
+** The quadratic can't say so on its own: at exactly r its discriminant is
+** a rounded zero, and a positive one is a contact. For a move along an axis
+** both sides are |f| * |d| and r * |d|, since sqrt(x * x) is x exactly, so
+** a gap of exactly the player's size is a touch to the last bit.
+*/
+static bool grazes(vec2_t f, vec2_t d, double reach)
+{
+    return fabs(cross(f, d)) >= reach;
+}
+
 static void circle_vertices(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     vertex_ok_fn vok, double g, contact_t *out)
 {
     double a = dot(d, d);
+    double reach = r * sqrt(a);
 
     if (a <= 0.0)
         return;                              /* the circle doesn't move */
@@ -274,6 +249,8 @@ static void circle_vertices(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
         if (vok != NULL && !vok(hb, i, g))
             continue;
         f = vsub(c, hb->verts[i]);
+        if (grazes(f, d, reach))
+            continue;
         b = dot(f, d);
         cc = dot(f, f) - r * r;
         disc = b * b - a * cc;
@@ -304,26 +281,6 @@ bool sweep_circle_clear(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     return true;
 }
 
-/* The contact of a circle that is already inside the shape: now, at t = 0. */
-static bool circle_stuck(vec2_t c, vec2_t d, const hitbox_t *hb,
-    contact_t *out)
-{
-    out->t = 0.0;
-    out->normal = stuck_normal(c, hb);
-    out->flat = false;
-    out->offset = 0.0;
-    out->surface = 0;
-    return dot(out->normal, d) < 0.0;
-}
-
-bool sweep_circle_poly(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
-    face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out)
-{
-    if (poly_distance(c, hb) < r)            /* already overlapping: contact now */
-        return circle_stuck(c, d, hb, out);
-    return sweep_circle_clear(c, r, d, hb, fok, vok, g, out);
-}
-
 double sweep_circle_touch_clear(vec2_t c, double r, vec2_t d,
     const hitbox_t *hb)
 {
@@ -331,14 +288,7 @@ double sweep_circle_touch_clear(vec2_t c, double r, vec2_t d,
 
     circle_faces(c, r, d, hb, NULL, 0.0, &best);
     circle_vertices(c, r, d, hb, NULL, 0.0, &best);
-    return best.t;
-}
-
-double sweep_circle_touch(vec2_t c, double r, vec2_t d, const hitbox_t *hb)
-{
-    if (poly_distance(c, hb) < r)
-        return 0.0;
-    return sweep_circle_touch_clear(c, r, d, hb);
+    return best.t < 1.0 ? best.t : INFINITY;  /* touching as the leg ends: none */
 }
 
 int clip_half_plane(const vec2_t *in, int n, double y_line, double g,
@@ -389,7 +339,7 @@ static double rect_entry(vec2_t q, vec2_t v, double hx, double hy)
         t_in = fmax(t_in, fmin(t0, t1));
         t_out = fmin(t_out, fmax(t0, t1));
     }
-    if (t_in >= t_out || t_in > 1.0 || t_out <= 0.0)
+    if (t_in >= t_out || t_in >= 1.0 || t_out <= 0.0)
         return INFINITY;
     return t_in < 0.0 ? 0.0 : t_in;
 }
@@ -399,6 +349,7 @@ double sweep_box_disc(vec2_t c, double h, vec2_t d, vec2_t center, double r)
     vec2_t q = vsub(center, c);              /* the disc, in the square's frame */
     vec2_t v = vscale(d, -1.0);
     double a = dot(d, d);
+    double reach = r * sqrt(a);
     double best = fmin(rect_entry(q, v, h + r, h), rect_entry(q, v, h, h + r));
 
     for (int i = 0; i < 4; i++) {
@@ -411,10 +362,10 @@ double sweep_box_disc(vec2_t c, double h, vec2_t d, vec2_t center, double r)
 
         if (cc < 0.0)
             return 0.0;                      /* a corner is already in the disc */
-        if (a <= 0.0 || disc < 0.0)
+        if (a <= 0.0 || grazes(f, d, reach) || disc < 0.0)
             continue;
         t = (b - sqrt(disc)) / a;
-        if (t >= 0.0 && t <= 1.0 && t < best)
+        if (t >= 0.0 && t < 1.0 && t < best)
             best = t;
     }
     return best;
