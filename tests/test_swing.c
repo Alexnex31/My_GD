@@ -228,20 +228,6 @@ static void test_portals(void)
     sim_free(&s);
 }
 
-static bool replays(sim_t *s, const bot_result_t *r)
-{
-    bool prev = false;
-
-    sim_reset(s);
-    for (long t = 0; t < r->ticks; t++) {
-        sim_tick(s, (input_t){r->inputs[t], r->inputs[t] && !prev});
-        prev = r->inputs[t];
-        if (!s->st.player.alive)
-            return false;
-    }
-    return s->st.complete;
-}
-
 /* A wall up from the floor, then one down from the ceiling: flip, flip back. */
 static void test_swing_bot(void)
 {
@@ -253,14 +239,14 @@ static void test_swing_bot(void)
 
     snprintf(text, sizeof(text), "start_gamemode cube\n%s", WALLS);
     load(&s, text);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    r = bot_solve(&s, BOT_MAX_TICKS);
     CHECK(r.verdict == BOT_NO_PATH);         /* as a cube */
     bot_result_free(&r);
     sim_free(&s);
     snprintf(text, sizeof(text), SWING "%s", WALLS);
     load(&s, text);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_FOUND && replays(&s, &r));
+    r = bot_solve(&s, BOT_MAX_TICKS);
+    CHECK(r.verdict == BOT_FOUND && bot_replays(&s, &r));
     bot_result_free(&r);
     sim_free(&s);
 }

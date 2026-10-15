@@ -360,11 +360,12 @@ static void test_verify_found(void)
     ed_verify_begin(&v, &lv);
     CHECK(ed_verify_running(&v) && !v.done);
     CHECK(text_starts(&v, "Verifying: 0 runs"));
-    CHECK(!ed_verify_step(&v, 1, ED_VERIFY_MAX));        /* the run that dies */
+    while (!ed_verify_step(&v, 1, BOT_MAX_TICKS) && v.search != NULL
+        && bot_progress(v.search)->attempts == 0);       /* the run that dies */
     CHECK(ed_verify_running(&v) && text_starts(&v, "Verifying: 1 runs"));
-    while (!ed_verify_step(&v, 1, ED_VERIFY_MAX));
+    while (!ed_verify_step(&v, 50, BOT_MAX_TICKS));
     CHECK(!ed_verify_running(&v) && v.done && v.sim == NULL);
-    CHECK(ed_verify_step(&v, 1, ED_VERIFY_MAX));         /* over stays over */
+    CHECK(ed_verify_step(&v, 1, BOT_MAX_TICKS));         /* over stays over */
     CHECK(v.verdict == BOT_FOUND && v.attempts > 1 && v.furthest == 100.0f);
     CHECK(text_starts(&v, "Bot found a path"));
     ed_level_measure(&lv, &end_x, &kill_y);
@@ -392,15 +393,15 @@ static void test_verify_no_path(void)
     ed_level_new(&lv, "1");
     add(&lv, "block 1500 550 2 w=2 h=6");
     ed_verify_begin(&v, &lv);
-    while (!ed_verify_step(&v, 7, ED_VERIFY_MAX));
+    while (!ed_verify_step(&v, 70, BOT_MAX_TICKS));
     CHECK(v.verdict == BOT_NO_PATH && v.furthest > 0.0f && v.furthest < 100.0f);
     CHECK(text_starts(&v, "Bot found no path: furthest"));
     CHECK(is_a_run(&v, &lv));
     CHECK(v.end.x > 1400.0 && v.end.x < 1500.0);        /* its side meets the wall */
     ed_verify_begin(&v, &lv);                            /* again: from nothing */
     CHECK(ed_verify_running(&v) && !v.done && v.path == NULL);
-    CHECK(ed_verify_step(&v, 100, 2));                   /* two runs allowed */
-    CHECK(v.verdict == BOT_GAVE_UP && v.attempts == 2);
+    CHECK(ed_verify_step(&v, 1000, 400));                /* 400 ticks allowed */
+    CHECK(v.verdict == BOT_GAVE_UP && v.attempts >= 1);
     CHECK(text_starts(&v, "Undecided"));
     CHECK(is_a_run(&v, &lv) && v.end.x > 1400.0);
     ed_verify_begin(&v, &lv);

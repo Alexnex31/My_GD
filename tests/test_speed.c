@@ -306,20 +306,6 @@ static void test_start_position(void)
     sim_free(&s);
 }
 
-static bool replays(sim_t *s, const bot_result_t *r)
-{
-    bool prev = false;
-
-    sim_reset(s);
-    for (long t = 0; t < r->ticks; t++) {
-        sim_tick(s, (input_t){r->inputs[t], r->inputs[t] && !prev});
-        prev = r->inputs[t];
-        if (!s->st.player.alive)
-            return false;
-    }
-    return s->st.complete;
-}
-
 /* Six spikes are too wide for a jump at the normal speed, and not at 4. */
 static void test_speed_bot(void)
 {
@@ -331,14 +317,14 @@ static void test_speed_bot(void)
     bot_result_t r;
 
     load(&s, SPIKES);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    r = bot_solve(&s, BOT_MAX_TICKS);
     CHECK(r.verdict == BOT_NO_PATH);
     bot_result_free(&r);
     sim_free(&s);
     snprintf(text, sizeof(text), "speed 1200 650 2 4\n%s", SPIKES);
     load(&s, text);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_FOUND && replays(&s, &r) && is_spent(&s.st, 0));
+    r = bot_solve(&s, BOT_MAX_TICKS);
+    CHECK(r.verdict == BOT_FOUND && bot_replays(&s, &r) && is_spent(&s.st, 0));
     bot_result_free(&r);
     sim_free(&s);
 }

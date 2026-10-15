@@ -50,28 +50,26 @@ bool ed_verify_running(const ed_verify_t *v)
 static void trace(ed_verify_t *v, const bot_result_t *r)
 {
     sim_t *s = v->sim;
-    bool prev = false;
 
     v->path = sim_xcalloc((size_t)r->ticks / ED_VERIFY_EVERY + 3,
         sizeof(vec2_t));
     sim_reset(s);
     v->path[v->path_len++] = s->st.player.pos;
     for (long t = 0; t < r->ticks && s->st.player.alive; t++) {
-        sim_tick(s, (input_t){r->inputs[t], r->inputs[t] && !prev});
-        prev = r->inputs[t];
+        sim_tick(s, bot_input_at(r, t));
         if ((t + 1) % ED_VERIFY_EVERY == 0 || t + 1 == r->ticks)
             v->path[v->path_len++] = s->st.player.pos;
     }
     v->end = s->st.player.pos;
 }
 
-bool ed_verify_step(ed_verify_t *v, long runs, long max_runs)
+bool ed_verify_step(ed_verify_t *v, long ticks, long max_ticks)
 {
     bot_result_t r;
 
     if (v->search == NULL)
         return v->done;
-    if (!bot_step(v->search, runs, max_runs))
+    if (!bot_step(v->search, ticks, max_ticks))
         return false;
     r = bot_end(v->search);
     v->search = NULL;
@@ -93,8 +91,7 @@ void ed_verify_text(const ed_verify_t *v, char *out, size_t size)
 
     if (r != NULL)
         snprintf(out, size, "Verifying: %ld runs, furthest %.0f%%   "
-            "(Escape stops)", r->attempts, r->furthest < 0.0f ? 0.0f
-            : r->furthest);
+            "(Escape stops)", r->attempts, r->furthest);
     else if (!v->done)
         snprintf(out, size, "%s", "");
     else if (v->verdict == BOT_FOUND)

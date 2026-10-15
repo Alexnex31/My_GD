@@ -11,7 +11,6 @@
     #include "editor/ed_level.h"
     #include "sim/bot.h"
 
-    #define ED_VERIFY_MAX 300000L     /* runs before "undecided" (11.10)     */
     #define ED_VERIFY_EVERY 4         /* ticks between two points of the path */
 
 /*
@@ -34,8 +33,11 @@ typedef struct ed_verify {
 
 /* Stops and forgets whatever `v` held: zero it before its first use. */
 void ed_verify_begin(ed_verify_t *v, const ed_level_t *lv);
-/* Up to `runs` more; true once it is over, and the result is there. */
-bool ed_verify_step(ed_verify_t *v, long runs, long max_runs);
+/*
+** Up to `ticks` more of the search (BOT_MAX_TICKS in all, as --check); true
+** once it is over, and the result is there.
+*/
+bool ed_verify_step(ed_verify_t *v, long ticks, long max_ticks);
 bool ed_verify_running(const ed_verify_t *v);
 void ed_verify_free(ed_verify_t *v);
 

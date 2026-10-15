@@ -24,6 +24,7 @@
     #define ED_STATUS_H 40.0f     /* the strip along the canvas's bottom     */
     #define ED_STATUS_Y (VIEW_H - ED_STATUS_H)
     #define ED_VERIFY_FRAME_MS 10 /* the bot's share of a frame (11.10)      */
+    #define ED_VERIFY_SLICE 1000  /* ticks between two looks at the clock    */
     #define ED_ZOOM_MIN 0.25f
     #define ED_ZOOM_MAX 4.0f
     #define ED_BIG_STEP 100.0     /* Z, Q, S, D: a whole block               */

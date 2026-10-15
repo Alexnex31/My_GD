@@ -227,9 +227,10 @@ static void test_bot_agrees(const char *mode, const char *next)
     load(&a, mode, next);
     load(&b, mode, next);
     mirror(&b);
-    ra = bot_solve(&a, 20000);
-    rb = bot_solve(&b, 20000);
+    ra = bot_solve(&a, 2000000);
+    rb = bot_solve(&b, 2000000);
     CHECK(ra.verdict == rb.verdict && ra.attempts == rb.attempts);
+    CHECK(ra.work == rb.work);
     CHECK(ra.ticks == rb.ticks && ra.furthest == rb.furthest);
     bot_result_free(&ra);
     bot_result_free(&rb);

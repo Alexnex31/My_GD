@@ -375,20 +375,6 @@ static void test_state(void)
     sim_free(&s);
 }
 
-static bool replays(sim_t *s, const bot_result_t *r)
-{
-    bool prev = false;
-
-    sim_reset(s);
-    for (long t = 0; t < r->ticks; t++) {
-        sim_tick(s, (input_t){r->inputs[t], r->inputs[t] && !prev});
-        prev = r->inputs[t];
-        if (!s->st.player.alive)
-            return false;
-    }
-    return s->st.complete;
-}
-
 /*
 ** A spike in a tunnel 200 px high, under a wall nothing climbs: a cube's
 ** jump hits the roof, a mini cube's clears it.
@@ -402,14 +388,14 @@ static void test_mini_bot(void)
     bot_result_t r;
 
     load(&s, LEVEL);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    r = bot_solve(&s, BOT_MAX_TICKS);
     CHECK(r.verdict == BOT_NO_PATH);
     bot_result_free(&r);
     sim_free(&s);
     snprintf(text, sizeof(text), "mini 600 650 2 on\n%s", LEVEL);
     load(&s, text);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_FOUND && replays(&s, &r));
+    r = bot_solve(&s, BOT_MAX_TICKS);
+    CHECK(r.verdict == BOT_FOUND && bot_replays(&s, &r));
     bot_result_free(&r);
     sim_free(&s);
 }

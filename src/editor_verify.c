@@ -61,7 +61,8 @@ static void verified(editor_t *ed)
 
 /*
 ** While it searches, the editor only draws, and Escape stops it. The search
-** gets a few milliseconds of each frame (11.10).
+** gets a few milliseconds of each frame (11.10), in slices of ticks small
+** enough that one never runs far past them.
 */
 void editor_verify_events(editor_t *ed, gd_t *gd)
 {
@@ -79,7 +80,7 @@ void editor_verify_events(editor_t *ed, gd_t *gd)
             return editor_notice(ed, "Verify stopped");
         }
     }
-    while (!ed_verify_step(&ed->verify, 20, ED_VERIFY_MAX))
+    while (!ed_verify_step(&ed->verify, ED_VERIFY_SLICE, BOT_MAX_TICKS))
         if (ui_now_ms() >= until)
             return;
     verified(ed);

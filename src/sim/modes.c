@@ -75,7 +75,7 @@ const launch_ops_t LAUNCHES[LAUNCH_KIND_COUNT] = {
     .max_fall = PER_TICK(BALL_MAX_FALL), \
     .head_restitution = BOUNCE_RESTITUTION_SHIP, \
     .jump_v = PER_TICK(BALL_FLIP_V), .corridor_height = 800.0, \
-    .apply_input = ball_input, .apply_forces = player_apply_gravity, \
+    .bot_taps = true, .apply_input = ball_input, .apply_forces = player_apply_gravity, \
     .update_rotation = ball_rotation
 #define ROBOT .name = "robot", .gravity = PER_TICK2(CUBE_GRAVITY), \
     .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0, \
@@ -88,7 +88,7 @@ const launch_ops_t LAUNCHES[LAUNCH_KIND_COUNT] = {
     .apply_forces = player_apply_gravity, .update_rotation = ship_rotation
 #define SPIDER .name = "spider", .gravity = PER_TICK2(CUBE_GRAVITY), \
     .max_fall = PER_TICK(CUBE_MAX_FALL), .head_restitution = -1.0, \
-    .corridor_height = 900.0, .apply_input = spider_input, \
+    .corridor_height = 900.0, .bot_taps = true, .apply_input = spider_input, \
     .apply_forces = player_apply_gravity, .update_rotation = robot_rotation
 
 const mode_ops_t MODES[MODE_COUNT] = {

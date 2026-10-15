@@ -28,6 +28,8 @@ typedef struct mode_ops {
     bool keep_vy_on_surface;  /* sliding on a surface doesn't reset vy (the wave)   */
     bool orbs_flip_only;      /* only a blue orb acts, and it only flips (the wave) */
     int bot_decision_ticks;   /* the bot's choices: 0 when it can jump, else every N ticks (8.3) */
+    bool bot_taps;            /* the bot's press lasts one tick: holding on never
+                                 does more than a tap (the ball, the spider)        */
     void (*apply_input)(player_t *p, input_t in);   /* impulses, input-driven speed */
     void (*apply_forces)(player_t *p);              /* gravity and caps; never moves */
     void (*update_rotation)(player_t *p);           /* the icon, cosmetic (9.4)     */

@@ -173,7 +173,7 @@ static int check_song(const level_data_t *lvl)
 /* Whether the bot finds a way through: information, never a failure. */
 static void report_bot(sim_t *s)
 {
-    bot_result_t r = bot_solve(s, BOT_MAX_ATTEMPTS);
+    bot_result_t r = bot_solve(s, BOT_MAX_TICKS);
     char line[128];
 
     bot_describe(&r, line, sizeof(line));

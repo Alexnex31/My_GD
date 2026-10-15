@@ -123,20 +123,6 @@ static void test_round_not_square(void)
     sim_free(&s);
 }
 
-static bool replays(sim_t *s, const bot_result_t *r)
-{
-    bool prev = false;
-
-    sim_reset(s);
-    for (long t = 0; t < r->ticks; t++) {
-        sim_tick(s, (input_t){r->inputs[t], r->inputs[t] && !prev});
-        prev = r->inputs[t];
-        if (!s->st.player.alive)
-            return false;
-    }
-    return s->st.complete;
-}
-
 /* One saw is jumped; a column of them is not; a ship threads two. */
 static void test_saw_bot(void)
 {
@@ -144,20 +130,20 @@ static void test_saw_bot(void)
     bot_result_t r;
 
     load(&s, "saw 1500 750 2\nsaw 2600 750 2\n");
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_FOUND && r.attempts > 1 && replays(&s, &r));
+    r = bot_solve(&s, BOT_MAX_TICKS);
+    CHECK(r.verdict == BOT_FOUND && r.attempts > 1 && bot_replays(&s, &r));
     bot_result_free(&r);
     sim_free(&s);
     load(&s, "saw 1500 750 2\nsaw 1500 650 2\nsaw 1500 550 2\n"
         "saw 1500 450 2\nsaw 1500 350 2\n");
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    r = bot_solve(&s, BOT_MAX_TICKS);
     CHECK(r.verdict == BOT_NO_PATH && r.furthest < 100.0f);
     bot_result_free(&r);
     sim_free(&s);
     load(&s, "start_gamemode ship\nsaw 2000 600 4\nsaw 2000 0 4\n"
         "saw 3200 350 4\nsaw 3200 -250 4\n");
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_FOUND && r.attempts > 1 && replays(&s, &r));
+    r = bot_solve(&s, BOT_MAX_TICKS);
+    CHECK(r.verdict == BOT_FOUND && r.attempts > 1 && bot_replays(&s, &r));
     bot_result_free(&r);
     sim_free(&s);
 }

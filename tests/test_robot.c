@@ -340,20 +340,6 @@ static void test_state(void)
     sim_free(&s);
 }
 
-static bool replays(sim_t *s, const bot_result_t *r)
-{
-    bool prev = false;
-
-    sim_reset(s);
-    for (long t = 0; t < r->ticks; t++) {
-        sim_tick(s, (input_t){r->inputs[t], r->inputs[t] && !prev});
-        prev = r->inputs[t];
-        if (!s->st.player.alive)
-            return false;
-    }
-    return s->st.complete;
-}
-
 /*
 ** A wall three blocks tall: over a cube's jump, under a robot's. And a spike
 ** under a low ceiling too thick to jump onto, which only a short hop passes:
@@ -368,25 +354,25 @@ static void test_robot_bot(void)
     bot_result_t r;
 
     load(&s, WALL);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    r = bot_solve(&s, BOT_MAX_TICKS);
     CHECK(r.verdict == BOT_NO_PATH);         /* as a cube */
     bot_result_free(&r);
     sim_free(&s);
     snprintf(text, sizeof(text), ROBOT "%s", WALL);
     load(&s, text);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_FOUND && replays(&s, &r));
+    r = bot_solve(&s, BOT_MAX_TICKS);
+    CHECK(r.verdict == BOT_FOUND && bot_replays(&s, &r));
     bot_result_free(&r);
     sim_free(&s);
     load(&s, HOP);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    r = bot_solve(&s, BOT_MAX_TICKS);
     CHECK(r.verdict == BOT_NO_PATH);         /* a cube's jump hits the ceiling */
     bot_result_free(&r);
     sim_free(&s);
     snprintf(text, sizeof(text), ROBOT "%s", HOP);
     load(&s, text);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_FOUND && replays(&s, &r));
+    r = bot_solve(&s, BOT_MAX_TICKS);
+    CHECK(r.verdict == BOT_FOUND && bot_replays(&s, &r));
     bot_result_free(&r);
     sim_free(&s);
 }

@@ -244,20 +244,6 @@ static void test_state(void)
     sim_free(&s);
 }
 
-static bool replays(sim_t *s, const bot_result_t *r)
-{
-    bool prev = false;
-
-    sim_reset(s);
-    for (long t = 0; t < r->ticks; t++) {
-        sim_tick(s, (input_t){r->inputs[t], r->inputs[t] && !prev});
-        prev = r->inputs[t];
-        if (!s->st.player.alive)
-            return false;
-    }
-    return s->st.complete;
-}
-
 /* Ten spikes in a row: no jump clears them, the ceiling does. */
 static void test_spider_bot(void)
 {
@@ -271,13 +257,13 @@ static void test_spider_bot(void)
             "spike %d 750 2\n", 1500 + 100 * i);
     snprintf(cube, sizeof(cube), "%s", text + strlen(SPIDER));
     load(&s, cube);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
+    r = bot_solve(&s, BOT_MAX_TICKS);
     CHECK(r.verdict == BOT_NO_PATH);         /* as a cube */
     bot_result_free(&r);
     sim_free(&s);
     load(&s, text);
-    r = bot_solve(&s, BOT_MAX_ATTEMPTS);
-    CHECK(r.verdict == BOT_FOUND && replays(&s, &r));
+    r = bot_solve(&s, BOT_MAX_TICKS);
+    CHECK(r.verdict == BOT_FOUND && bot_replays(&s, &r));
     bot_result_free(&r);
     sim_free(&s);
 }
