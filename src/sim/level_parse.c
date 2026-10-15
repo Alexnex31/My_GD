@@ -542,7 +542,10 @@ static bool header_number(const char *key, const char *value,
         warn(ctx, "%s out of range, ignored", key);
         return true;
     }
-    hdr->music_offset = strcmp(key, "music_offset") == 0 ? v : hdr->music_offset;
+    if (strcmp(key, "music_offset") == 0) {
+        hdr->music_offset = v;
+        hdr->music_offset_set = true;
+    }
     hdr->bpm = strcmp(key, "bpm") == 0 ? v : hdr->bpm;
     hdr->first_beat = strcmp(key, "first_beat") == 0 ? v : hdr->first_beat;
     hdr->start.pos.x = strcmp(key, "start_x") == 0 ? v : hdr->start.pos.x;

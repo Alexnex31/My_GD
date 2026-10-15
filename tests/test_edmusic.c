@@ -41,6 +41,7 @@ static void test_time_and_x(void)
     snprintf(lv.hdr.music, sizeof(lv.hdr.music), "a.ogg");
     CHECK(ed_song_offset(&lv, &LIB) == 0.5);           /* the song's own */
     lv.hdr.music_offset = 2.0;
+    lv.hdr.music_offset_set = true;
     CHECK(ed_song_offset(&lv, &LIB) == 2.0);           /* the level's */
     CHECK(ed_time_at_x(&lv, &LIB, PLAYER_SPAWN_X) == 2.0);
     CHECK(fabs(ed_x_at_time(&lv, &LIB, 5.0) - (PLAYER_SPAWN_X
@@ -78,10 +79,67 @@ static void test_beats(void)
     lv.hdr.first_beat = 0.25;                          /* half a beat later */
     CHECK(fabs(ed_beat_x(&lv, &LIB, 0) - (PLAYER_SPAWN_X + gap / 2.0)) < 1e-9);
     lv.hdr.music_offset = 1.0;                         /* song ahead: beats earlier */
+    lv.hdr.music_offset_set = true;
     snprintf(lv.hdr.music, sizeof(lv.hdr.music), "b.ogg");
     CHECK(fabs(ed_beat_x(&lv, &LIB, 2) - (PLAYER_SPAWN_X + gap / 2.0)) < 1e-9);
     CHECK(ed_beats_between(&lv, &LIB, PLAYER_SPAWN_X, PLAYER_SPAWN_X + gap,
         &first, &last) && first == 2 && last == 2);
+    ed_level_free(&lv);
+}
+
+/* All the beats in view at once are the beats one by one. */
+static void test_beat_xs(void)
+{
+    double gap = SCROLL_SPEED * 60.0 / 120.0;
+    double xs[8];
+    ed_level_t lv;
+    object_t o;
+    long first = -1;
+    size_t n;
+
+    ed_level_new(&lv, "1");
+    CHECK(ed_beat_xs(&lv, &LIB, 0.0, 5000.0, xs, 8, &first) == 0);  /* no bpm */
+    lv.hdr.bpm = 120.0;
+    lv.hdr.first_beat = 0.25;
+    level_object_from_line("speed 1500 650 2 3", &o);
+    ed_add(&lv, &o, NULL);
+    n = ed_beat_xs(&lv, &LIB, PLAYER_SPAWN_X, PLAYER_SPAWN_X + 6.0 * gap,
+        xs, 8, &first);
+    CHECK(n == 5 && first == 0);                       /* faster after 1500 */
+    for (size_t k = 0; k < n; k++)
+        CHECK(fabs(xs[k] - ed_beat_x(&lv, &LIB, (long)k)) < 1e-9);
+    CHECK(ed_beat_xs(&lv, &LIB, PLAYER_SPAWN_X, PLAYER_SPAWN_X + 30.0 * gap,
+        xs, 8, &first) == 0);                          /* more than max */
+    ed_level_free(&lv);
+}
+
+/* With no offset of its own, the level plays the song from the song's. */
+static void test_own_offset(void)
+{
+    ed_level_t lv;
+    ed_level_t back;
+    char *text;
+
+    ed_level_new(&lv, "1");
+    snprintf(lv.hdr.music, sizeof(lv.hdr.music), "a.ogg");
+    CHECK(text_is(&lv, ED_SONG_OFFSET, "0.50 s, the song's"));
+    CHECK(ed_song_prop_step(&lv, &LIB, ED_SONG_OFFSET, 1, false));
+    CHECK(lv.hdr.music_offset == 0.55 && lv.hdr.music_offset_set);
+    CHECK(text_is(&lv, ED_SONG_OFFSET, "0.55 s"));    /* no jump to 0.05 */
+    CHECK(ed_song_prop_step(&lv, &LIB, ED_SONG_OFFSET, -1, true));
+    CHECK(ed_song_offset(&lv, &LIB) == 0.0);          /* 0 can be had */
+    CHECK(text_is(&lv, ED_SONG_OFFSET, "0.00 s"));
+    text = ed_level_text(&lv);
+    CHECK(strstr(text, "music_offset 0\n") != NULL);
+    ed_level_from_text(&back, text, strlen(text), "1");
+    CHECK(back.hdr.music_offset_set && ed_song_offset(&back, &LIB) == 0.0);
+    free(text);
+    ed_level_free(&back);
+    ed_level_free(&lv);
+    ed_level_new(&lv, "1");
+    snprintf(lv.hdr.music, sizeof(lv.hdr.music), "b.ogg");
+    CHECK(!ed_song_prop_step(&lv, &LIB, ED_SONG_OFFSET, -1, false));
+    CHECK(!lv.hdr.music_offset_set && !lv.dirty);     /* 0 already: nothing */
     ed_level_free(&lv);
 }
 
@@ -117,8 +175,8 @@ static void test_song_settings(void)
     CHECK(text_is(&lv, ED_SONG_BPM, "121"));
     CHECK(text_is(&lv, ED_SONG_FIRST_BEAT, "0.35 s"));
     text = ed_level_text(&lv);
-    CHECK(strcmp(text, "name LEVEL 1\nmusic b.ogg\nbpm 121\n"
-        "first_beat 0.35\n") == 0);
+    CHECK(strcmp(text, "name LEVEL 1\nmusic b.ogg\nmusic_offset 0\n"
+        "bpm 121\nfirst_beat 0.35\n") == 0);         /* 0 is its own now */
     free(text);
     snprintf(lv.hdr.music, sizeof(lv.hdr.music), "gone.ogg");
     CHECK(text_is(&lv, ED_SONG_FILE, "missing"));
@@ -131,5 +189,7 @@ void test_edmusic(void)
 {
     test_time_and_x();
     test_beats();
+    test_beat_xs();
+    test_own_offset();
     test_song_settings();
 }

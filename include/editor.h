@@ -83,6 +83,7 @@ typedef struct editor {
     ed_report_t report;           /* what looks wrong (11.13)                */
     int issue_at;                 /* the one N last went to                  */
     double song_short;            /* seconds the level outlasts its song by  */
+    double level_seconds;         /* how long it lasts, measured with it     */
     ed_dialog_t dialog;
     ui_screen_t dialog_ui;
     widget_t dialog_widgets[3];

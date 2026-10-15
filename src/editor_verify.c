@@ -26,6 +26,7 @@ void editor_measure(editor_t *ed, gd_t *gd)
     ed_level_measure(&ed->lv, &ed->end_x, &ed->kill_y);
     ed_check(&ed->lv, &ed->report);
     ed->song_short = ed_song_short_by(&ed->lv, &gd->library, ed->end_x);
+    ed->level_seconds = ed_level_seconds(&ed->lv, ed->end_x);
     ed->measured = true;
 }
 
@@ -134,7 +135,7 @@ static void times_text(editor_t *ed, gd_t *gd, char *out, size_t size)
 {
     song_choice_t c = music_choose(&gd->library, NULL, &ed->lv.hdr,
         SONG_LEVEL);
-    double level = ed_level_seconds(&ed->lv, ed->end_x);
+    double level = ed->level_seconds;
 
     if (c.song == NULL)
         snprintf(out, size, "Level %.1f s, no song", level);

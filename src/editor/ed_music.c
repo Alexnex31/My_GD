@@ -82,20 +82,66 @@ double ed_beat_x(const ed_level_t *lv, const library_t *lib, long k)
 }
 
 /* The formula turned around: the first beat at or after left, the last at
-** or before right. */
-bool ed_beats_between(const ed_level_t *lv, const library_t *lib, double left,
-    double right, long *first, long *last)
+** or before right. One speed map for both ends. */
+static bool beats_between(const ed_level_t *lv, const speed_map_t *m,
+    double offset, double left_right[2], long first_last[2])
 {
     double per_beat;
+    double from;
+    double to;
 
     if (lv->hdr.bpm <= 0.0)
         return false;
     per_beat = 60.0 / lv->hdr.bpm;
-    *first = (long)ceil((ed_time_at_x(lv, lib, left) - lv->hdr.first_beat)
-        / per_beat - 1e-9);
-    *last = (long)floor((ed_time_at_x(lv, lib, right) - lv->hdr.first_beat)
-        / per_beat + 1e-9);
-    return *last >= *first;
+    from = offset + speed_map_ticks(m, &lv->hdr.start, left_right[0])
+        / TICK_RATE;
+    to = offset + speed_map_ticks(m, &lv->hdr.start, left_right[1])
+        / TICK_RATE;
+    first_last[0] = (long)ceil((from - lv->hdr.first_beat) / per_beat - 1e-9);
+    first_last[1] = (long)floor((to - lv->hdr.first_beat) / per_beat + 1e-9);
+    return first_last[1] >= first_last[0];
+}
+
+bool ed_beats_between(const ed_level_t *lv, const library_t *lib, double left,
+    double right, long *first, long *last)
+{
+    speed_map_t m = speeds_of(lv);
+    double ends[2] = {left, right};
+    long beats[2] = {0, 0};
+    bool any = beats_between(lv, &m, ed_song_offset(lv, lib), ends, beats);
+
+    speed_map_free(&m);
+    *first = beats[0];
+    *last = beats[1];
+    return any;
+}
+
+/*
+** Every beat between two x, for the canvas each frame: the speed map is
+** built once for all of them, not once a beat. 0 when there are none, or
+** more than `max`.
+*/
+size_t ed_beat_xs(const ed_level_t *lv, const library_t *lib, double left,
+    double right, double *xs, size_t max, long *first)
+{
+    speed_map_t m = speeds_of(lv);
+    double offset = ed_song_offset(lv, lib);
+    double ends[2] = {left, right};
+    long beats[2] = {0, 0};
+    size_t n = 0;
+
+    if (beats_between(lv, &m, offset, ends, beats)
+        && beats[1] - beats[0] < (long)max) {
+        for (long k = beats[0]; k <= beats[1]; k++) {
+            double t = lv->hdr.first_beat + (double)k * 60.0 / lv->hdr.bpm;
+
+            xs[n] = speed_map_x(&m, &lv->hdr.start, (t - offset) * TICK_RATE);
+            n += 1;
+        }
+        *first = beats[0];
+    }
+    speed_map_free(&m);
+    return n;
 }
 
 double ed_level_seconds(const ed_level_t *lv, double end_x)
@@ -142,7 +188,9 @@ void ed_song_prop_text(const ed_level_t *lv, const library_t *lib,
     else if (p == ED_SONG_FILE)
         snprintf(out, size, "%s", lv->hdr.music[0] != '\0' ? "missing"
             : "none");
-    if (p == ED_SONG_OFFSET)
+    if (p == ED_SONG_OFFSET && !lv->hdr.music_offset_set)
+        snprintf(out, size, "%.2f s, the song's", ed_song_offset(lv, lib));
+    else if (p == ED_SONG_OFFSET)
         snprintf(out, size, "%.2f s", lv->hdr.music_offset);
     if (p == ED_SONG_BPM)
         snprintf(out, size, "%.10g", lv->hdr.bpm);
@@ -191,6 +239,23 @@ static double stepped(double v, double by)
     return v < 0.0 ? 0.0 : v;
 }
 
+/*
+** With no offset of its own the level plays the song from the song's
+** default: a step starts from there, so the song never jumps, and the
+** level then has its own, which can be 0.
+*/
+static void step_offset(ed_level_t *lv, const library_t *lib, double by)
+{
+    double from = lv->hdr.music_offset_set ? lv->hdr.music_offset
+        : ed_song_offset(lv, lib);
+    double to = stepped(from, by);
+
+    if (to == from)
+        return;
+    lv->hdr.music_offset = to;
+    lv->hdr.music_offset_set = true;
+}
+
 bool ed_song_prop_step(ed_level_t *lv, const library_t *lib, ed_song_prop_t p,
     int dir, bool big)
 {
@@ -199,8 +264,7 @@ bool ed_song_prop_step(ed_level_t *lv, const library_t *lib, ed_song_prop_t p,
     if (p == ED_SONG_FILE)
         step_song(lv, lib, dir);
     if (p == ED_SONG_OFFSET)
-        lv->hdr.music_offset = stepped(lv->hdr.music_offset,
-            dir * (big ? 1.0 : 0.05));
+        step_offset(lv, lib, dir * (big ? 1.0 : 0.05));
     if (p == ED_SONG_BPM)
         lv->hdr.bpm = fmin(stepped(lv->hdr.bpm, dir * (big ? 10.0 : 1.0)),
             LEVEL_BPM_MAX);                  /* what a file may say (7.2) */
@@ -209,6 +273,7 @@ bool ed_song_prop_step(ed_level_t *lv, const library_t *lib, ed_song_prop_t p,
             dir * (big ? 0.1 : 0.01));
     if (strcmp(before.music, lv->hdr.music) == 0
         && before.music_offset == lv->hdr.music_offset
+        && before.music_offset_set == lv->hdr.music_offset_set
         && before.bpm == lv->hdr.bpm
         && before.first_beat == lv->hdr.first_beat)
         return false;

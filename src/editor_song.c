@@ -7,6 +7,8 @@
 
 #include "editor.h"
 
+    #define BEATS_MAX 4001    /* more in view is a grey wash: none are drawn */
+
 static const sfColor BEAT = {255, 200, 80, 70};
 static const sfColor BAR = {255, 200, 80, 170};
 static const sfColor PLAYHEAD = {255, 90, 200, 255};
@@ -61,17 +63,14 @@ void editor_song_follow(editor_t *ed, gd_t *gd)
 static void beat_lines(editor_t *ed, gd_t *gd, double left, double right,
     double top, double bottom)
 {
+    static double xs[BEATS_MAX];
     long first = 0;
-    long last = 0;
+    size_t n = ed_beat_xs(&ed->lv, &gd->library, left, right, xs, BEATS_MAX,
+        &first);
 
-    if (!ed_beats_between(&ed->lv, &gd->library, left, right, &first, &last)
-        || last - first > 4000)
-        return;
-    for (long k = first; k <= last; k++) {
-        double x = ed_beat_x(&ed->lv, &gd->library, k);
-
-        editor_line(ed, x, top, x, bottom, k % 4 == 0 ? BAR : BEAT);
-    }
+    for (size_t i = 0; i < n; i++)
+        editor_line(ed, xs[i], top, xs[i], bottom,
+            (first + (long)i) % 4 == 0 ? BAR : BEAT);
 }
 
 /* Where the song is in the level while it plays: a line that moves. */

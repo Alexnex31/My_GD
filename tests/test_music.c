@@ -143,7 +143,8 @@ static void test_choice(void)
         {"mine.ogg", "Mine", "", "", 4.0f, 100.0f},
     };
     library_t lib = {songs, 3};
-    level_header_t hdr = {.music = "level.ogg", .music_offset = 1.5};
+    level_header_t hdr = {.music = "level.ogg", .music_offset = 1.5,
+        .music_offset_set = true};
     song_choice_t c;
 
     c = music_choose(&lib, "mine.ogg", &hdr, SONG_OVERRIDE);
@@ -154,7 +155,9 @@ static void test_choice(void)
     CHECK(c.source == SONG_LEVEL);
     c = music_choose(&lib, "mine.ogg", &hdr, SONG_LEVEL);     /* it failed */
     CHECK(c.source == SONG_LEVEL);
-    hdr.music_offset = 0.0;
+    hdr.music_offset = 0.0;                   /* set: 0 is the level's own */
+    CHECK(music_choose(&lib, NULL, &hdr, SONG_OVERRIDE).offset == 0.0);
+    hdr.music_offset_set = false;
     CHECK(music_choose(&lib, NULL, &hdr, SONG_OVERRIDE).offset == 3.0);
     snprintf(hdr.music, sizeof(hdr.music), "%s", "deleted.ogg");
     c = music_choose(&lib, NULL, &hdr, SONG_OVERRIDE);

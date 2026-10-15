@@ -125,7 +125,7 @@ static void put_header(text_buf_t *b, const level_header_t *h)
     put_text(b, "name", h->name);
     put_text(b, "author", h->author);
     put_text(b, "music", h->music);
-    if (h->music_offset != 0.0)
+    if (h->music_offset_set)
         put(b, "music_offset %s\n", num(n, h->music_offset));
     if (h->bpm != 0.0)
         put(b, "bpm %s\n", num(n, h->bpm));

@@ -106,6 +106,7 @@ typedef struct level_header { /* the level file's header fields (7.2) */
     char author[64];
     char music[64];           /* a file in music/ (FEATURES 4.5), "" = none     */
     double music_offset;      /* seconds of song skipped at the start           */
+    bool music_offset_set;    /* false: the song's default_offset (4.4)         */
     double bpm;               /* the editor's beat grid (FEATURES 11.11)        */
     double first_beat;        /* song time of beat 0, with bpm (FEATURES 11.11) */
     level_start_t start;

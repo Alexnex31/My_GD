@@ -86,6 +86,10 @@ static void test_twice(void)
     add(&lv, "block 1500 750 2 rot=90");         /* another turn */
     add(&lv, "block 1500 750 2 w=3");            /* another size */
     add(&lv, "block 1525 750 2");                /* another place */
+    add(&lv, "portal 1500 600 2 ship");
+    add(&lv, "portal 1500 600 2 cube");          /* another mode */
+    add(&lv, "speed 1500 450 2 1");
+    add(&lv, "speed 1500 450 2 2");              /* another speed */
     ed_check(&lv, &r);
     CHECK(count_of(&r, ED_ISSUE_TWICE) == 0);
     second = add(&lv, "block 1500 750 2");
@@ -312,12 +316,13 @@ static void test_song_length(void)
     snprintf(lv.hdr.music, sizeof(lv.hdr.music), "a.ogg");
     CHECK(fabs(ed_song_short_by(&lv, &lib, end) - 2.0) < 1e-6);
     lv.hdr.music_offset = 3.0;                               /* less song left */
+    lv.hdr.music_offset_set = true;
     CHECK(fabs(ed_song_short_by(&lv, &lib, end) - 5.0) < 1e-6);
     lv.hdr.start.speed = 4.0;                                /* a shorter level */
     CHECK(fabs(ed_level_seconds(&lv, end) - fast) < 1e-9);
     CHECK(ed_song_short_by(&lv, &lib, end) == 0.0);
     lv.hdr.start.speed = 1.0;
-    lv.hdr.music_offset = 0.0;
+    lv.hdr.music_offset_set = false;
     snprintf(lv.hdr.music, sizeof(lv.hdr.music), "b.ogg");   /* its own offset */
     CHECK(fabs(ed_song_short_by(&lv, &lib, end) - 7.0) < 1e-6);
     ed_level_free(&lv);

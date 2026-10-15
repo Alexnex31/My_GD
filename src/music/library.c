@@ -249,8 +249,9 @@ song_choice_t music_choose(const library_t *lib, const char *override,
         return (song_choice_t){s, SONG_OVERRIDE, s->default_offset};
     if (from <= SONG_LEVEL && hdr->music[0] != '\0'
         && (s = library_find(lib, hdr->music)) != NULL)
-        return (song_choice_t){s, SONG_LEVEL, hdr->music_offset > 0.0
-            ? hdr->music_offset : s->default_offset};
+        return (song_choice_t){s, SONG_LEVEL, hdr->music_offset_set
+            && hdr->music_offset >= 0.0 ? hdr->music_offset
+            : s->default_offset};
     if (from <= SONG_DEFAULT
         && (s = library_find(lib, DEFAULT_LEVEL_SONG)) != NULL)
         return (song_choice_t){s, SONG_DEFAULT, s->default_offset};
