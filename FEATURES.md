@@ -222,7 +222,7 @@ file    = { line }
 line    = blank | comment | pair
 comment = "#" { any char } newline
 pair    = key "=" value newline         (spaces around key and value are trimmed)
-key     = [a-z_]+
+key     = [a-z0-9_]+
 value   = any chars up to end of line
 ```
 
@@ -250,7 +250,7 @@ value   = any chars up to end of line
 ### 2.3 Loading rules
 
 1. Start from defaults (`settings_defaults`).
-2. Read line by line; spaces around the key and the value are trimmed, `#` lines and blank lines skipped. For each `pair`, find the key in a table; parse; validate against the range; if invalid, keep the default and log `save/settings.txt:7: fps_limit=75 invalid, using 0`. A key given twice: the last one wins. A line that isn't `key=value` with a `[a-z_]+` key is logged and dropped.
+2. Read line by line; spaces around the key and the value are trimmed, `#` lines and blank lines skipped. For each `pair`, find the key in a table; parse; validate against the range; if invalid, keep the default and log `save/settings.txt:7: fps_limit=75 invalid, using 0`. A key given twice: the last one wins. A line that isn't `key=value` with a `[a-z0-9_]+` key is logged and dropped. The file is read whole, so a line is never cut, however long (a long comment never applies the key at its end).
 3. Unknown keys: **keep them** in a list of raw lines and write them back unchanged on save. A newer version's settings survive being opened by an older build.
 4. Missing file: defaults, no warning. Unreadable file (no read permission, a read error, not a regular file): defaults, one warning, and the file is **never overwritten** (`unreadable`), so a permission problem can't turn into lost settings.
 5. Then the action keys, in table order (`restart_key`, `checkpoint_key`, `remove_checkpoint_key`): one that is also a jump binding, or the same as an earlier action key, falls back to its default, or is left unbound if the default is taken too; logged. This runs after the whole file, so the order of the lines doesn't matter.
@@ -287,7 +287,7 @@ What uses them today: the window (size, fullscreen, vsync, frame limit) at start
 
 - Save when leaving the options screen (not on every slider step: dragging a slider would write the file 100 times).
 - Save on quit. Until the options screen exists, that's what writes the file with its defaults the first time, so the player has something to edit.
-- Atomic: write `settings.txt.tmp`, `fsync`, `fclose` returns 0, `rename`, the folder made if needed. `src/sim/save_file.c` does it for both stores, the progress and the settings.
+- Atomic: write a temporary file beside it (`settings.txt.XXXXXX`, `mkstemp`: two writers never share one), check `ferror` (a failed buffer write can leave `fflush` and `fclose` returning 0), `fsync`, `fclose` returns 0, `rename`, the folder made if needed. A symlinked file writes its target, and the file keeps its permissions. `src/sim/save_file.c` does it for both stores, the progress and the settings, and reads both: `save_read` tells a missing file (`ENOENT`) from an unreadable one.
 - Written in the table's order, then the unknown keys; comments aren't kept.
 
 ### 2.5 What never goes in settings
@@ -774,7 +774,7 @@ The left mouse button is a jump binding by default like Space and Up, and can be
 ### 5.6 Reset progress
 
 1. Button opens a modal: "Delete all attempts and best percentages? This cannot be undone." Buttons: **Cancel** (focused by default) and Delete.
-2. Delete: copy `save/progress.txt` to `save/progress.bak` (overwrite), clear the store, save, show "Progress reset" for 2 s.
+2. Delete: copy `save/progress.txt` to `save/progress.txt.bak` (overwrite, unless the file is empty: a second reset never replaces the real progress with nothing), save the empty store, and only then clear it in memory, show "Progress reset" for 2 s. If the file can't be read, the backup or the save fails, nothing changes, on disk or in memory.
 3. Song overrides live in the same file: say so in the dialog ("…and per-level song choices"), or keep them (only reset `attempts` and `best`). Pick one and write it in the dialog text.
 
 ### 5.7 Saving

@@ -1137,7 +1137,7 @@ void handle_playing(gd_t *gd, level_t **level)
     while (lv->accumulator >= 1000000) {
         int64_t end = now * TICK_RATE - lv->accumulator + 1000000;   /* this tick's time */
 
-        lv->accumulator -= 1000000;               /* first: a respawn zeroes it */
+        lv->accumulator -= 1000000;               /* first: a respawn reads it */
         level_step(lv, gd, input_for_tick(gd, end - 1000000, end));
     }
     level_render(gd, lv);
@@ -1153,7 +1153,11 @@ Why:
 
 **Each tick has its own time.** What's left in the accumulator is how far `now` is past the last tick's end, so the tick about to run covers `[end - 1000000, end)` in microseconds x `TICK_RATE`. `input_for_tick` gives it the input of exactly that time: a thread polls the jump inputs every millisecond and stamps each change, and a tick is `pressed` only if an input went down inside its own 1/240 s (FEATURES 1). `now` is `input_now_us`, the time up to which the thread has published every change, not the clock: a tick never runs before its input is known.
 
-Set `lv->last_frame_us = input_now_us(gd)` at the very end of `level_start` (after the chunks are built: loading isn't play time), after respawn, and on `sfEvtGainedFocus`, so a pause doesn't dump a burst of ticks. Presses stamped before it fall in no tick's time and press nothing, so a click before `R` or during a pause is never replayed into the new attempt.
+Set `lv->last_frame_us = input_now_us(gd)` at the very end of `level_start` (after the chunks are built: loading isn't play time), after a respawn from an event (the restart key, a new start position, the pause menu), and on `sfEvtGainedFocus`, so a pause doesn't dump a burst of ticks. Presses stamped before it fall in no tick's time and press nothing, so a click before `R` or during a pause is never replayed into the new attempt.
+
+**A respawn inside the ticks keeps the clock.** The death delay ends on a tick, in the middle of a frame: zeroing the accumulator there would make the time between that tick and `now` belong to no tick, and a press in it would press nothing. So that respawn leaves the accumulator and `last_frame_us` alone: the next tick, the new attempt's first, covers the time right after the last one, and the song starts as far into it as `now` is past that tick.
+
+**A full queue holds the clock back.** The polling thread publishes `now` only once every change it saw is in the queue; while the queue is full, `input_now_us` waits, and so do the ticks, so a press is never counted in a later tick than its own. The pause menu's frames read the queue (`input_drain`), so its clicks never fill it.
 
 **The click that starts a level isn't a jump.** Play and Retry are left clicks, and the button is usually still down on the level's first tick; a hold carried into an attempt is fresh (3.4), so the cube would jump at tick 0. `level_start` calls `input_start`, which starts the polling thread with the mouse inputs latched: they count for nothing, neither held nor pressed, until they're seen up (the keyboard is never ignored).
 
@@ -1164,7 +1168,7 @@ void level_step(level_t *lv, gd_t *gd, input_t in)
 {
     if (lv->state == LEVEL_DYING) {
         if (--lv->death_ticks <= 0)
-            level_respawn(lv, gd);
+            respawn_tick(lv, gd);            /* the clock goes on (3.6) */
         return;
     }
     if (lv->state != LEVEL_PLAYING)
@@ -2041,10 +2045,13 @@ typedef struct progress {
     progress_entry_t *entries;
     size_t count;
     size_t cap;
+    char **kept;            /* lines that aren't a level of ours, written back */
+    size_t nb_kept;
+    bool unreadable;        /* there but not read: never saved over */
     char path[256];
 } progress_t;
 
-int progress_load(progress_t *p, const char *path);    /* missing file = empty store */
+int progress_load(progress_t *p, const char *path);    /* missing file = empty store, -1 unreadable */
 int progress_save(const progress_t *p);                 /* 0 on success */
 progress_entry_t *progress_get(progress_t *p, const char *id);   /* creates if missing */
 progress_entry_t *progress_find(const progress_t *p, const char *id);   /* never creates */
@@ -2060,9 +2067,11 @@ File format, one line per level, `key=value` fields after the id:
 ```
 
 - Using `key=value` from the start (instead of positional numbers) means new fields (the song override of FEATURES 4.6, practice best, anything later) never need a format migration. Missing fields take defaults; unknown fields are kept in `extra` and written back, so an older build doesn't destroy a newer build's data.
-- Load: read a line, take the id (first word), then split the rest on spaces and each field on the first `=`. Numbers with `strtof`/`strtol`, checking the end pointer.
+- Load: the file is read whole (`save_read`), so a line is never cut; take the id (first word), then split the rest on spaces and each field on the first `=`. Numbers with `strtof`/`strtoull`, checking the end pointer and the range: `attempts` 0 to `INT_MAX`, `best` and `practice_best` 0 to 100 (never `nan`, which could never be beaten), `hash` hex digits. A known field with a bad value is dropped and keeps its default; an unknown one is kept.
+- **A line that isn't a level of ours is kept.** A comment, an id this build refuses (a newer build's `o12345`, 19 digits) is written back as it was, before the levels.
+- **An unreadable file is never saved over.** Only `ENOENT` is a missing file; anything else (no permission, a folder, an I/O error) sets `unreadable`, warns once, and every save of the session returns -1. The settings follow the same rule (FEATURES 2.3).
 - **The id is the level file's name without `.gd`**, digits only (7.2), so it's always safe in a path and in this space-separated format. A file in `levels/` that isn't `<digits>.gd` is skipped by the level list with a warning ("rename it to play it").
-- Save: `mkdir` the store's own folder (`save/` for `SAVE_PATH`, ignore `EEXIST`), write `save/progress.txt.tmp`, `fflush`, `fsync(fileno(f))`, check that `fclose` returns 0 (that's when write errors surface), then `rename()` it over `save/progress.txt`. A crash or power loss mid-save leaves the old file intact (`fsync` makes sure the new content is on disk before the rename makes it visible).
+- Save: `mkdir` the store's own folder (`save/` for `SAVE_PATH`, ignore `EEXIST`), write a `mkstemp` file beside it (`save/progress.txt.XXXXXX`), check `ferror`, `fflush`, `fsync(fileno(f))`, check that `fclose` returns 0 (that's when write errors surface), then `rename()` it over `save/progress.txt`. A crash or power loss mid-save leaves the old file intact (`fsync` makes sure the new content is on disk before the rename makes it visible).
 - **Only playing creates an entry.** The level list and the end screen only read the store (`progress_find`); `progress_get` is for the flush when a level is left. A save skips an entry with nothing in it, so browsing the list never fills the file with `attempts=0 best=0.00` lines.
 - **`best` never rounds up to 100.** A death at 99.996% would print as `100.00` with `%.2f` and read back as a level beaten. `progress_printable` caps anything below 100 at 99.99 for the file and the level list.
 - Load once in `create_gd`, free in `free_gd`.

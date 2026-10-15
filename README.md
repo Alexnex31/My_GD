@@ -104,7 +104,7 @@ restart_key=R
 - **Key names** are SFML's: `A`–`Z`, `Num0`–`Num9`, `Space`, `Up`, `LShift`, `F1`–`F15`, `Numpad0`–`Numpad9` and the rest of `sfKeyCode`; `MouseLeft`, `MouseRight`, `MouseMiddle`; `Joy0`–`Joy15`. Case doesn't matter. Up to 6 jump inputs.
 - An empty `restart_key=` unbinds it. `Escape` can't be bound, and a key can't both jump and restart.
 - An invalid value keeps its default, with a warning naming the line. Unknown keys are kept and written back; comments aren't.
-- If the file exists but can't be read, the game uses the defaults and never overwrites it.
+- If the file exists but can't be read, the game uses the defaults and never overwrites it. The same goes for `save/progress.txt`: an unreadable one is left alone, and that session's progress isn't saved.
 - `sfx_volume`, `menu_song`, `checkpoint_key`, `remove_checkpoint_key` and `audio_offset_ms` are read and kept for the features that will use them. Gamepad buttons are read but not polled yet.
 
 The full list is in `FEATURES.md` 2.2. The **options screen** (the main menu's options button) edits them, with the keyboard or the mouse:
@@ -112,7 +112,7 @@ The full list is in `FEATURES.md` 2.2. The **options screen** (the main menu's o
 - **Sections:** Audio, Gameplay, Controls, Display and Data, switched with `Tab` / `Shift+Tab` or a click. `Up`/`Down` move through the rows, `Left`/`Right` change a value, `Enter` activates, `Escape` goes back and saves what changed.
 - **Controls:** activate a row, then press any key, mouse button or gamepad button. `Escape` cancels, `Backspace` clears. An input another row has swaps the two rows, and the last jump input can't be removed.
 - **Display:** a new fullscreen setting or window size asks to be kept, and reverts by itself after 10 s, so an unsupported mode fixes itself.
-- **Data:** Reset progress asks first, and keeps the old file as `save/progress.txt.bak`. Open save folder opens `save/` and prints its path.
+- **Data:** Reset progress asks first, and keeps the old file as `save/progress.txt.bak` (a reset of an empty store leaves the last `.bak` alone). Open save folder opens `save/` and prints its path.
 
 ## Level editor
 
