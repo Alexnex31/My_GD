@@ -13,7 +13,10 @@
 /* The selection is each object's own flag (FEATURES 11.1). */
 size_t ed_selected(const ed_level_t *lv);
 void ed_select_none(ed_level_t *lv);
-void ed_select_all(ed_level_t *lv);
+void ed_select_all(ed_level_t *lv);           /* of the layer worked in */
+/* The editor layer worked in, ED_LAYER_ALL to LEVEL_EDITOR_LAYER_MAX: what
+** was selected outside it is dropped (FEATURES 11.15). */
+void ed_set_layer(ed_level_t *lv, int layer);
 /* A click on object `id` (-1: on nothing). With shift it toggles that one. */
 void ed_select_click(ed_level_t *lv, int id, bool shift);
 /* Everything drawn inside or across the box; `add` keeps what already was. */

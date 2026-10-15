@@ -47,12 +47,11 @@ void level_header_defaults(level_header_t *hdr, const char *id);
 
 /*
 ** The file's text: the header fields that aren't at their default, the start
-** positions, then the objects by x then y, each with only the fields it
-** needs. Parsing it gives the same document back. malloc'd, NUL terminated.
+** positions, then the objects in the order they were placed, each with only
+** the fields it needs. Parsing it gives the same document back. malloc'd,
+** NUL terminated.
 */
 char *level_write_mem(const level_doc_t *doc, const level_header_t *hdr);
-/* The objects' indices in the order the file lists them: by x, then y. */
-void level_write_order(const level_doc_t *doc, size_t *order);
 /* A name, author or music as the reader takes it back: up to a '#', trimmed. */
 void level_clean_text(char *text);
 /*
@@ -69,6 +68,8 @@ int level_object_from_line(const char *line, object_t *o);
     #define LEVEL_ID_MAX 18      /* digits in an id: fits any GD-sized number */
     #define LEVEL_COORD_MAX 1e7  /* px: x, y, w and h, hours of level (7.2)   */
     #define LEVEL_ROT_MAX 1e6    /* degrees a rot= may say (7.2)              */
+    #define LEVEL_Z_ORDER_MAX 10000     /* z= either way (11.15)            */
+    #define LEVEL_EDITOR_LAYER_MAX 10000    /* el=, from 0 (11.15)          */
     #define LEVEL_BPM_MAX 1000.0 /* the beat grid's tempo, 0 for none (7.2)  */
     #define LEVEL_SECONDS_MAX 86400.0   /* music_offset, first_beat: a day   */
     #define LEVEL_OBJECTS_MAX 250000    /* GD's longest levels, three times  */

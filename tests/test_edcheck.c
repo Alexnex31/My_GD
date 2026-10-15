@@ -90,6 +90,9 @@ static void test_twice(void)
     add(&lv, "portal 1500 600 2 cube");          /* another mode */
     add(&lv, "speed 1500 450 2 1");
     add(&lv, "speed 1500 450 2 2");              /* another speed */
+    add(&lv, "block 1500 300 2");
+    add(&lv, "block 1500 300 2 zl=b1");          /* drawn elsewhere */
+    add(&lv, "block 1500 300 2 z=1");
     ed_check(&lv, &r);
     CHECK(count_of(&r, ED_ISSUE_TWICE) == 0);
     second = add(&lv, "block 1500 750 2");

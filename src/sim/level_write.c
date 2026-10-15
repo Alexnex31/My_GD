@@ -239,54 +239,32 @@ static void put_object(text_buf_t *b, const object_t *o, const char *extra)
         put(b, " w=%s", units(x, o->rect.w));
     if (o->rect.h != derived_h(o))
         put(b, " h=%s", units(x, o->rect.h));
+    if (o->z_layer != obj_default_z_layer(o->type))
+        put(b, " zl=%s", z_layer_name(o->z_layer));
+    if (o->z_order != 0)
+        put(b, " z=%d", o->z_order);
+    if (o->editor_layer != 0)
+        put(b, " el=%d", o->editor_layer);
     put(b, "%s\n", extra != NULL ? extra : "");
 }
 
-typedef struct placed {
-    vec2_t at;
-    size_t index;
-} placed_t;
-
-/* By x, then y, then the order they had: readable files, small diffs. */
-static int by_position(const void *a, const void *b)
-{
-    const placed_t *pa = a;
-    const placed_t *pb = b;
-
-    if (pa->at.x != pb->at.x)
-        return (pa->at.x > pb->at.x) - (pa->at.x < pb->at.x);
-    if (pa->at.y != pb->at.y)
-        return (pa->at.y > pb->at.y) - (pa->at.y < pb->at.y);
-    return (pa->index > pb->index) - (pa->index < pb->index);
-}
-
-void level_write_order(const level_doc_t *doc, size_t *order)
-{
-    placed_t *p = sim_xcalloc(doc->count + 1, sizeof(placed_t));
-
-    for (size_t i = 0; i < doc->count; i++)
-        p[i] = (placed_t){written_pos(&doc->objs[i]), i};
-    qsort(p, doc->count, sizeof(placed_t), by_position);
-    for (size_t i = 0; i < doc->count; i++)
-        order[i] = p[i].index;
-    free(p);
-}
-
+/*
+** The objects in the document's order, which is the order they were placed
+** in: of two on the same Z layer and Z order, the one placed last is drawn
+** on top (FEATURES 11.15), so the file must keep it.
+*/
 char *level_write_mem(const level_doc_t *doc, const level_header_t *hdr)
 {
     text_buf_t b = {sim_xcalloc(64, 1), 0, 64};
-    size_t *order = sim_xcalloc(doc->count + 1, sizeof(size_t));
 
     put_header(&b, hdr);
     put_kept(&b, doc);
     put_starts(&b, doc);
     if (b.len > 0 && doc->count > 0)
         put(&b, "\n");
-    level_write_order(doc, order);
     for (size_t i = 0; i < doc->count; i++)
-        put_object(&b, &doc->objs[order[i]],
-            doc->extras != NULL ? doc->extras[order[i]] : NULL);
-    free(order);
+        put_object(&b, &doc->objs[i],
+            doc->extras != NULL ? doc->extras[i] : NULL);
     return b.text;
 }
 

@@ -347,6 +347,30 @@ static void test_kept_with_warning(void)
     sim_free(&s);
 }
 
+/* Z: a layer by its name, an order and an editor layer in range (11.15). */
+static void test_z_fields(void)
+{
+    sim_t s;
+
+    load(&s, "block 1000 750 2 zl=b5 z=-10000 el=10000\n"
+        "spike 2000 750 2 zl=t4 z=10000\n");
+    CHECK(warnings == 0 && s.lvl.nb_objects == 2);
+    CHECK(s.lvl.objects[0].z_layer == Z_B5);
+    CHECK(s.lvl.objects[0].z_order == -10000);
+    CHECK(s.lvl.objects[0].editor_layer == 10000);
+    CHECK(s.lvl.objects[1].z_layer == Z_T4);
+    CHECK(s.lvl.objects[1].z_order == 10000);
+    sim_free(&s);
+    CHECK(said("block 1000 750 2 zl=t5\n",
+        "invalid value for zl= ('t5'), line skipped"));
+    CHECK(said("block 1000 750 2 z=10001\n",
+        "invalid value for z= ('10001'), line skipped"));
+    CHECK(said("block 1000 750 2 z=1.5\n",
+        "invalid value for z= ('1.5'), line skipped"));
+    CHECK(said("block 1000 750 2 el=-1\n",
+        "invalid value for el= ('-1'), line skipped"));
+}
+
 static void test_fields(void)
 {
     sim_t s;
@@ -543,6 +567,7 @@ static void test_read_header_only(void)
 
 void test_parser(void)
 {
+    test_z_fields();
     test_read_header_only();
     test_basic_level();
     test_whitespace_and_comments();

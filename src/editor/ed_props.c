@@ -5,6 +5,7 @@
 ** an object's properties: turn, size, kind; a start position's (FEATURES 11.4, 11.8)
 */
 
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -26,7 +27,8 @@ static double *speed_of(ed_object_t *o)
 const char *ed_prop_name(ed_prop_t p)
 {
     static const char *const NAMES[ED_PROP_COUNT] = {"Turn", "Width",
-        "Height", "Kind", "Gravity", "Speed", "Size"};
+        "Height", "Kind", "Gravity", "Speed", "Size", "Z layer", "Z order",
+        "Layer"};
 
     return NAMES[p];
 }
@@ -78,6 +80,13 @@ static void text_of(const ed_object_t *o, ed_prop_t p, char *out, size_t size)
         snprintf(out, size, "x%s", speed_word(*speed_of((ed_object_t *)o)));
     if (p == ED_PROP_SIZE)
         snprintf(out, size, "%s", o->start.mini ? "mini" : "normal");
+    if (p == ED_PROP_Z_LAYER)
+        snprintf(out, size, "%c%c", toupper(z_layer_name(o->obj.z_layer)[0]),
+            z_layer_name(o->obj.z_layer)[1]);
+    if (p == ED_PROP_Z_ORDER)
+        snprintf(out, size, "%d", o->obj.z_order);
+    if (p == ED_PROP_LAYER)
+        snprintf(out, size, "%d", o->obj.editor_layer);
 }
 
 bool ed_prop_applies(const ed_level_t *lv, ed_prop_t p)
@@ -156,9 +165,29 @@ static void step_speed(ed_object_t *o, int dir)
     *speed_of(o) = SPEED_NAMES[at];
 }
 
+static int clamped(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
+/* The Z settings stop at their ends: nothing is behind B5. */
+static void step_z(object_t *o, ed_prop_t p, int dir)
+{
+    if (p == ED_PROP_Z_LAYER)
+        o->z_layer = (z_layer_t)clamped((int)o->z_layer + dir, Z_LAYER_FIRST,
+            Z_LAYER_LAST);
+    if (p == ED_PROP_Z_ORDER)
+        o->z_order = clamped(o->z_order + dir, -LEVEL_Z_ORDER_MAX,
+            LEVEL_Z_ORDER_MAX);
+    if (p == ED_PROP_LAYER)
+        o->editor_layer = clamped(o->editor_layer + dir, 0,
+            LEVEL_EDITOR_LAYER_MAX);
+}
+
 /* A size never goes under one grid unit; the top left corner stays. */
 static void step_one(ed_object_t *o, ed_prop_t p, int dir)
 {
+    step_z(&o->obj, p, dir);
     if (p == ED_PROP_TURN)
         o->obj.rotation = turned(o->obj.rotation + dir * TURN_STEP);
     if (p == ED_PROP_W)
@@ -189,7 +218,7 @@ static bool commit_if_changed(ed_level_t *lv, ed_history_t *h, ed_grab_t *g)
     for (size_t i = 0; i < g->count && !changed; i++) {
         const ed_object_t *o = ed_find_from(lv, g->ids[i], &hint);
 
-        changed = o != NULL && !ed_same_object(o, &g->before[i]);
+        changed = o != NULL && !ed_same_object(o, &g->before[i], true);
     }
     if (changed)
         ed_grab_commit(lv, h, g);

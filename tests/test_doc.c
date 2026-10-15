@@ -92,7 +92,9 @@ static void test_lines(void)
         "portal 2100 750 2 ball w=3", "portal 2100 750 2 wave h=4",
         "gravity 4000 750 2 up", "gravity 4000.5 -120.25 1 down",
         "pad 1400 750 2 yellow", "pad 6300 350 2 blue rot=180",
-        "orb 1750 550 2 green", "orb 7700 320 3 black"};
+        "orb 1750 550 2 green", "orb 7700 320 3 black",
+        "block 1000 750 2 zl=b1", "spike 1000 750 2 rot=90 zl=t4 z=-3 el=2",
+        "orb 1750 550 2 green z=12"};
     level_doc_t doc = {0};
     level_header_t hdr;
     object_t o;
@@ -112,6 +114,37 @@ static void test_lines(void)
     }
     CHECK(level_object_from_line("name hello", &o) != 0);
     CHECK(level_object_from_line("pad 1000 750 2 black", &o) != 0);
+    CHECK(level_object_from_line("block 0 0 2 zl=T2 z=0 el=0", &o) == 0);
+    CHECK(o.z_layer == Z_T2 && o.z_order == 0 && o.editor_layer == 0);
+    text = level_write_mem(&doc, &hdr);
+    CHECK(strcmp(text, "block 0 0 2 zl=t2\n") == 0);   /* defaults unsaid */
+    free(text);
+    CHECK(level_object_from_line("block 0 0 2", &o) == 0 && o.z_layer == Z_T1);
+}
+
+/* The objects are saved in the order they were placed: it decides what is
+** drawn on top (FEATURES 11.15), so a save keeps it, x or no x. */
+static void test_placement_order(void)
+{
+    const char *text = "block 3000 750 2\nspike 1000 750 2\n"
+        "block 2000 750 2 zl=b1\nspike 1000 750 2 z=1\n";
+    level_doc_t doc;
+    level_header_t hdr;
+    sim_t s;
+    char *saved;
+
+    CHECK(parse(text, &doc, &hdr) == 0 && warnings == 0);
+    saved = level_write_mem(&doc, &hdr);
+    CHECK(strstr(saved, text) != NULL);
+    sim_init(&s, &doc, &hdr, "7");
+    CHECK(s.lvl.objects[0].line == 2 && s.lvl.objects[1].line == 4);
+    CHECK(s.lvl.objects[3].line == 1);           /* sorted by x, numbered */
+    CHECK(object_draw_cmp(&s.lvl.objects[0], 2, &s.lvl.objects[1], 4) < 0);
+    CHECK(object_draw_cmp(&s.lvl.objects[2], 3, &s.lvl.objects[0], 2) < 0);
+    CHECK(object_draw_cmp(&s.lvl.objects[3], 1, &s.lvl.objects[0], 2) < 0);
+    sim_free(&s);
+    free(saved);
+    level_doc_free(&doc);
 }
 
 /* The header: only what a file needs to say. */
@@ -207,7 +240,7 @@ static void check_round_trip(const char *path)
     sim_free(&from_doc);
     sim_reset(&from_file);
     sim_load_mem(&from_doc, text, strlen(text), "1", NULL);
-    CHECK(same_play(&from_file, &from_doc, false));   /* ties in x may swap */
+    CHECK(same_play(&from_file, &from_doc, true));    /* the order is kept */
     sim_free(&from_doc);
     sim_init(&from_doc, &doc, &hdr, "1");             /* but not once saved */
     sim_free(&from_file);
@@ -438,6 +471,7 @@ static void test_write_file(void)
 
 void test_doc(void)
 {
+    test_placement_order();
     test_survives_a_save();
     test_kept_lines();
     test_odd_bytes();

@@ -273,6 +273,39 @@ static void test_select(void)
     ed_level_free(&lv);
 }
 
+/* Only the layer worked in can be selected; switching drops the others. */
+static void test_select_in_layer(void)
+{
+    ed_clip_t clip = {0};
+    ed_level_t lv;
+    int a;
+    int b;
+
+    begin(&lv);
+    a = add(&lv, "block 100 700 2");
+    b = add(&lv, "block 300 700 2 el=2");
+    ed_set_layer(&lv, 2);
+    ed_select_all(&lv);
+    CHECK(ed_selected(&lv) == 1 && ed_find(&lv, b)->selected);
+    ed_select_box(&lv, (rect_t){0.0, 0.0, 1000.0, 1000.0}, false);
+    CHECK(ed_selected(&lv) == 1 && ed_find(&lv, b)->selected);
+    ed_set_layer(&lv, ED_LAYER_ALL);
+    ed_select_all(&lv);
+    CHECK(ed_selected(&lv) == 2);
+    ed_set_layer(&lv, 0);
+    CHECK(ed_selected(&lv) == 1 && ed_find(&lv, a)->selected);
+    CHECK(ed_copy(&lv, &clip));
+    ed_set_layer(&lv, 5);
+    CHECK(ed_paste(&lv, &H, &clip, (vec2_t){1000.0, 700.0}, 50.0));
+    CHECK(lv.objects[2].obj.editor_layer == 5 && lv.objects[2].selected);
+    ed_set_layer(&lv, -7);
+    CHECK(lv.layer == ED_LAYER_ALL);
+    ed_set_layer(&lv, LEVEL_EDITOR_LAYER_MAX + 1);
+    CHECK(lv.layer == LEVEL_EDITOR_LAYER_MAX);
+    ed_clip_free(&clip);
+    ed_level_free(&lv);
+}
+
 /* A drag: from where it was grabbed, the travel snapped, one command. */
 static void test_move(void)
 {
@@ -386,6 +419,7 @@ static void test_clipboard(void)
 
 void test_edit(void)
 {
+    test_select_in_layer();
     test_undo_redo();
     test_gestures();
     test_random();

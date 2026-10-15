@@ -107,25 +107,22 @@ int sim_load_mem(sim_t *s, const char *buf, size_t len, const char *id,
 /*
 ** The same level from a document in memory: what the editor playtests and
 ** verifies is built exactly like what the game loads (FEATURES 11.1). The
-** objects are numbered in the order the saved file will list them, which
-** decides ties in x: the game then breaks them the same way.
+** objects are numbered in the document's order, the one the saved file will
+** list them in, which decides ties in x and what is drawn on top: the game
+** then does both the same way.
 */
 int sim_init(sim_t *s, const level_doc_t *doc, const level_header_t *hdr,
     const char *id)
 {
-    size_t *order = sim_xcalloc(doc->count + 1, sizeof(size_t));
-
     memset(s, 0, sizeof(*s));
     snprintf(s->lvl.id, sizeof(s->lvl.id), "%s", id);
     s->lvl.hdr = *hdr;
     s->lvl.objects = sim_xcalloc(doc->count + 1, sizeof(object_t));
     s->lvl.nb_objects = doc->count;
-    level_write_order(doc, order);
     for (size_t k = 0; k < doc->count; k++) {
-        s->lvl.objects[k] = doc->objs[order[k]];
+        s->lvl.objects[k] = doc->objs[k];
         s->lvl.objects[k].line = (int)k + 1;
     }
-    free(order);
     s->lvl.starts = sim_xcalloc(doc->nb_starts + 1, sizeof(level_start_t));
     s->lvl.nb_starts = doc->nb_starts;
     if (doc->nb_starts > 0)

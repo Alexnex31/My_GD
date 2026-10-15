@@ -26,7 +26,7 @@ size_t ed_selected(const ed_level_t *lv)
 static void select_every(ed_level_t *lv, bool on)
 {
     for (size_t i = 0; i < lv->count; i++)
-        lv->objects[i].selected = on;
+        lv->objects[i].selected = on && ed_in_layer(lv, &lv->objects[i]);
 }
 
 void ed_select_none(ed_level_t *lv)
@@ -34,9 +34,20 @@ void ed_select_none(ed_level_t *lv)
     select_every(lv, false);
 }
 
+/* All of the layer worked in: those of the others can't be picked. */
 void ed_select_all(ed_level_t *lv)
 {
     select_every(lv, true);
+}
+
+/* What was selected in another layer is dropped: it can't be picked here. */
+void ed_set_layer(ed_level_t *lv, int layer)
+{
+    lv->layer = layer < ED_LAYER_ALL ? ED_LAYER_ALL
+        : (layer > LEVEL_EDITOR_LAYER_MAX ? LEVEL_EDITOR_LAYER_MAX : layer);
+    for (size_t i = 0; i < lv->count; i++)
+        lv->objects[i].selected = lv->objects[i].selected
+            && ed_in_layer(lv, &lv->objects[i]);
 }
 
 void ed_select_click(ed_level_t *lv, int id, bool shift)
@@ -109,7 +120,7 @@ void ed_select_box(ed_level_t *lv, rect_t box, bool add)
 {
     for (size_t i = 0; i < lv->count; i++) {
         ed_object_t *o = &lv->objects[i];
-        bool in = drawn_overlap(&o->obj, box);
+        bool in = ed_in_layer(lv, o) && drawn_overlap(&o->obj, box);
 
         o->selected = in || (add && o->selected);
     }
@@ -238,6 +249,7 @@ bool ed_copy(const ed_level_t *lv, ed_clip_t *clip)
     return true;
 }
 
+/* The copies go in the layer worked in, as a placed object does (11.15). */
 static bool paste_moved(ed_level_t *lv, ed_history_t *h, const ed_clip_t *clip,
     double dx, double dy)
 {
@@ -247,6 +259,8 @@ static bool paste_moved(ed_level_t *lv, ed_history_t *h, const ed_clip_t *clip,
 
         o.obj.rect.x += dx;
         o.obj.rect.y += dy;
+        if (lv->layer != ED_LAYER_ALL)
+            o.obj.editor_layer = lv->layer;
         ed_refresh(&o);
         ed_do_add_object(lv, h, &o);
         lv->objects[lv->count - 1].selected = true;

@@ -23,6 +23,32 @@ const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT] = {
     [OBJ_MINI] = CAT_INTERACTIVE,
 };
 
+/* Every type so far has a hitbox the player meets: a decoration, which is
+** only a picture, will be B1 (FEATURES 11.15). */
+z_layer_t obj_default_z_layer(obj_type_t type)
+{
+    (void)type;
+    return Z_T1;
+}
+
+int object_draw_cmp(const object_t *a, long placed_a, const object_t *b,
+    long placed_b)
+{
+    if (a->z_layer != b->z_layer)
+        return a->z_layer < b->z_layer ? -1 : 1;
+    if (a->z_order != b->z_order)
+        return a->z_order < b->z_order ? -1 : 1;
+    return (placed_a > placed_b) - (placed_a < placed_b);
+}
+
+const char *z_layer_name(z_layer_t z)
+{
+    static const char *const NAMES[] = {"b5", "b4", "b3", "b2", "b1", "t1",
+        "t2", "t3", "t4"};
+
+    return NAMES[z - Z_LAYER_FIRST];
+}
+
 /*
 ** GD's own numbers (FEATURES 10.1, 10.2, 6.9). Blue flips and throws the
 ** player at its new floor; green flips and makes it jump there, a yellow orb

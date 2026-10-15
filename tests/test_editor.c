@@ -141,6 +141,74 @@ static void test_hit(void)
     ed_level_free(&lv);
 }
 
+static int add_line(ed_level_t *lv, const char *line)
+{
+    object_t o;
+
+    level_object_from_line(line, &o);
+    return ed_add(lv, &o, NULL);
+}
+
+/*
+** What is drawn on top is the game's order: Z layer, Z order, then the later
+** placed. With a layer worked in, only its objects can be hit (11.15).
+*/
+static void test_hit_by_z(void)
+{
+    ed_level_t lv;
+    int behind;
+    int high;
+    int front;
+    int other;
+    vec2_t at = {1050.0, 750.0};
+
+    ed_level_new(&lv, "1");
+    CHECK(lv.layer == ED_LAYER_ALL);
+    front = add_line(&lv, "block 1000 700 2 zl=t2");
+    high = add_line(&lv, "spike 1000 700 2 z=5");
+    behind = add_line(&lv, "orb 1000 700 2 yellow zl=b1 z=9");
+    CHECK(ed_hit(&lv, at) == front);           /* the layer, before all */
+    ed_remove(&lv, front);
+    CHECK(ed_hit(&lv, at) == high);            /* then the order */
+    other = add_line(&lv, "block 1000 700 2 z=5");
+    CHECK(ed_hit(&lv, at) == other);           /* then the later placed */
+    ed_find(&lv, other)->obj.editor_layer = 3;
+    lv.layer = 3;
+    CHECK(ed_hit(&lv, at) == other);
+    lv.layer = 0;
+    CHECK(ed_hit(&lv, at) == high);            /* layer 3's can't be hit */
+    lv.layer = 7;
+    CHECK(ed_hit(&lv, at) == -1);
+    (void)behind;
+    ed_level_free(&lv);
+}
+
+/* A placed object goes in the layer worked in; one in another layer is the
+** same object in the game, so it isn't placed over it. */
+static void test_place_in_layer(void)
+{
+    ed_entry_t e[ED_MAX_ENTRIES];
+    int n = ed_entries(e, ED_MAX_ENTRIES);
+    ed_level_t lv;
+    char *text;
+
+    ed_level_new(&lv, "9");
+    lv.layer = 4;
+    CHECK(ed_place(&lv, find_entry(e, n, "block"), (vec2_t){1210.0, 760.0},
+        50.0) && lv.objects[0].obj.editor_layer == 4);
+    lv.layer = 0;
+    CHECK(!ed_place(&lv, find_entry(e, n, "block"), (vec2_t){1210.0, 760.0},
+        50.0));
+    lv.layer = ED_LAYER_ALL;
+    CHECK(ed_place(&lv, find_entry(e, n, "spike"), (vec2_t){1210.0, 760.0},
+        50.0) && lv.objects[1].obj.editor_layer == 0);
+    text = ed_level_text(&lv);
+    CHECK(strcmp(text, "name LEVEL 9\n\nblock 1200 750 2 el=4\n"
+        "spike 1200 750 2\n") == 0);
+    free(text);
+    ed_level_free(&lv);
+}
+
 /* The palette is the tables: every type, every mode, every colour. */
 static void test_entries(void)
 {
@@ -204,8 +272,8 @@ static void test_place(void)
     CHECK(lv.objects[2].obj.rect.h == same.rect.h);
     CHECK(lv.objects[2].obj.hitbox.aabb.y == same.hitbox.aabb.y);
     text = ed_level_text(&lv);
-    CHECK(strcmp(text, "name LEVEL 9\n\norb -50 500 2 green\n"
-        "block 1200 750 2\nspike 1200 750 2\nportal 2000 650 2 ship\n") == 0);
+    CHECK(strcmp(text, "name LEVEL 9\n\nblock 1200 750 2\nspike 1200 750 2\n"
+        "portal 2000 650 2 ship\norb -50 500 2 green\n") == 0);  /* as placed */
     free(text);
     CHECK(ed_place(&lv, find_entry(e, n, "speed 1"),
         (vec2_t){3010.0, 660.0}, 50.0));
@@ -261,6 +329,8 @@ static void test_next_id(void)
 
 void test_editor(void)
 {
+    test_hit_by_z();
+    test_place_in_layer();
     test_new();
     test_ids();
     test_open_and_save();

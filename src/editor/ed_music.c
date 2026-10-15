@@ -25,28 +25,18 @@ double ed_song_offset(const ed_level_t *lv, const library_t *lib)
 /*
 ** The level's speed portals, in x order: time along the level isn't one
 ** division once the speed changes (FEATURES 10.3). Built at each call from
-** the objects as they are now; the caller frees it. Added in the order the
-** saved file lists them, as the game adds them: two at the same x then end
-** the same way here as in the game.
+** the objects as they are now; the caller frees it. Added in the list's
+** order, the one the saved file keeps and the game adds them in: two at the
+** same x then end the same way here as in the game.
 */
 static speed_map_t speeds_of(const ed_level_t *lv)
 {
     speed_map_t m = {0};
-    level_doc_t doc = {.objs = sim_xcalloc(lv->count + 1, sizeof(object_t))};
-    size_t *order;
 
     for (size_t i = 0; i < lv->count; i++)
-        if (!lv->objects[i].is_start && lv->objects[i].obj.type == OBJ_SPEED) {
-            doc.objs[doc.count] = lv->objects[i].obj;
-            doc.count += 1;
-        }
-    order = sim_xcalloc(doc.count + 1, sizeof(size_t));
-    level_write_order(&doc, order);
-    for (size_t k = 0; k < doc.count; k++)
-        speed_map_add(&m, &doc.objs[order[k]]);
+        if (!lv->objects[i].is_start && lv->objects[i].obj.type == OBJ_SPEED)
+            speed_map_add(&m, &lv->objects[i].obj);
     speed_map_sort(&m);
-    free(order);
-    free(doc.objs);
     return m;
 }
 

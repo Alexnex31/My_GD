@@ -45,6 +45,21 @@ typedef enum launch_kind {    /* the colours of pads and orbs (FEATURES 10.1, 10
 typedef enum obj_category { CAT_NEUTRAL, CAT_HARM, CAT_INTERACTIVE } obj_category_t;
 extern const obj_category_t OBJ_CATEGORY[OBJ_TYPE_COUNT];
 
+/*
+** GD's Z layers (FEATURES 11.15): B5 to B1 are drawn behind the player, T1
+** to T4 in front of it, each over the one before. T1 is 0, so an object
+** made in code is on the layer of everything with a hitbox.
+*/
+typedef enum z_layer {
+    Z_B5 = -5, Z_B4, Z_B3, Z_B2, Z_B1, Z_T1, Z_T2, Z_T3, Z_T4,
+    Z_LAYER_FIRST = Z_B5, Z_LAYER_LAST = Z_T4
+} z_layer_t;
+
+/* T1 for what has a hitbox the player meets, B1 for a picture only. */
+z_layer_t obj_default_z_layer(obj_type_t type);
+/* "b5" .. "t4", as a level file writes it. */
+const char *z_layer_name(z_layer_t z);
+
 typedef enum gamemode { MODE_CUBE, MODE_SHIP, MODE_UFO, MODE_WAVE, MODE_BALL, MODE_ROBOT, MODE_SWING, MODE_SPIDER, MODE_COUNT } gamemode_t;
 
 typedef enum hold_state {     /* 3.4: GD's buffered clicks and orb locking */
@@ -89,8 +104,19 @@ typedef struct object {       /* level data: never modified after load */
     launch_kind_t launch;     /* OBJ_PAD, OBJ_ORB: its colour                   */
     double speed;             /* OBJ_SPEED only: its name, 0.5 to 4 (10.3)      */
     bool portal_mini;         /* OBJ_MINI only: on makes the player mini (10.4) */
-    int line;                 /* source line, for messages and stable sort      */
+    z_layer_t z_layer;        /* behind or in front of the player (11.15)       */
+    int z_order;              /* drawn over the lower ones of its Z layer       */
+    int editor_layer;         /* the editor's only: the layer it is shown in    */
+    int line;                 /* source line: placement order, messages, sort   */
 } object_t;
+
+/*
+** The draw order, the game's and the editor's: by Z layer, then Z order,
+** then the order they were placed in (`placed_a`, `placed_b`), the later
+** on top. < 0 when a is drawn under b.
+*/
+int object_draw_cmp(const object_t *a, long placed_a, const object_t *b,
+    long placed_b);
 
 typedef struct level_start {  /* where and how an attempt starts (7.2) */
     vec2_t pos;               /* start_x, start_y: the player's center           */

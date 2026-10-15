@@ -301,6 +301,41 @@ static void test_rotate(void)
     ed_level_free(&lv);
 }
 
+/* Z layer, Z order and editor layer: steps with ends, one undo each. */
+static void test_z_props(void)
+{
+    ed_object_t start;
+    ed_level_t lv;
+    int a;
+    int s;
+
+    begin(&lv);
+    a = add(&lv, "block 1000 600 2");
+    ed_select_click(&lv, a, false);
+    CHECK(prop_is(&lv, ED_PROP_Z_LAYER, "T1") && prop_is(&lv, ED_PROP_Z_ORDER,
+        "0") && prop_is(&lv, ED_PROP_LAYER, "0"));
+    CHECK(ed_prop_step(&lv, &H, ED_PROP_Z_LAYER, -1));
+    CHECK(prop_is(&lv, ED_PROP_Z_LAYER, "B1"));
+    for (int i = 0; i < 10; i++)
+        ed_prop_step(&lv, &H, ED_PROP_Z_LAYER, -1);
+    CHECK(prop_is(&lv, ED_PROP_Z_LAYER, "B5"));
+    CHECK(!ed_prop_step(&lv, &H, ED_PROP_Z_LAYER, -1));   /* nothing under */
+    CHECK(ed_prop_step(&lv, &H, ED_PROP_Z_ORDER, -1));
+    CHECK(ed_prop_step(&lv, &H, ED_PROP_LAYER, 1));        /* a change too */
+    CHECK(saves_as(&lv, "name LEVEL 1\n\nblock 1000 600 2 zl=b5 z=-1 el=1\n"));
+    CHECK(ed_undo(&lv, &H) && ed_find(&lv, a)->obj.editor_layer == 0);
+    CHECK(ed_undo(&lv, &H) && ed_find(&lv, a)->obj.z_order == 0);
+    CHECK(ed_undo(&lv, &H) && ed_find(&lv, a)->obj.z_layer == Z_B4);
+    ed_level_free(&lv);
+    begin(&lv);
+    ed_start_object(&start, &lv.hdr.start);
+    s = ed_add_object(&lv, &start);
+    ed_select_click(&lv, s, false);
+    CHECK(!ed_prop_applies(&lv, ED_PROP_Z_LAYER));        /* a start has none */
+    CHECK(!ed_prop_applies(&lv, ED_PROP_LAYER));
+    ed_level_free(&lv);
+}
+
 static bool at(ed_level_t *lv, int id, double x, double y)
 {
     const rect_t *r = &ed_find(lv, id)->obj.rect;
@@ -439,6 +474,7 @@ static void test_rotate_random(void)
 
 void test_props(void)
 {
+    test_z_props();
     test_start_objects();
     test_start_lines();
     test_applies();

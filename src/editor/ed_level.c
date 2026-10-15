@@ -21,7 +21,7 @@
 
 void ed_level_new(ed_level_t *lv, const char *id)
 {
-    *lv = (ed_level_t){.next_id = 1};
+    *lv = (ed_level_t){.next_id = 1, .layer = ED_LAYER_ALL};
     snprintf(lv->id, sizeof(lv->id), "%s", id);
     level_header_defaults(&lv->hdr, id);
     snprintf(lv->hdr.name, sizeof(lv->hdr.name), "LEVEL %s", id);
@@ -164,7 +164,7 @@ void ed_level_from_text(ed_level_t *lv, const char *buf, size_t len,
     ed_object_t start;
     level_doc_t doc;
 
-    *lv = (ed_level_t){.next_id = 1};
+    *lv = (ed_level_t){.next_id = 1, .layer = ED_LAYER_ALL};
     snprintf(lv->id, sizeof(lv->id), "%s", id);
     level_header_defaults(&lv->hdr, id);
     level_parse_doc(buf, len, id, &doc, &lv->hdr, NULL);
@@ -293,16 +293,35 @@ static bool rect_holds(const object_t *o, vec2_t at)
         && y >= o->rect.y && y < o->rect.y + o->rect.h;
 }
 
-/*
-** The one the canvas draws on top: by layer (blocks, hazards, interactive
-** objects, which is the category's own order), then the later in the list.
-** The list is walked in order, so a tie goes to `a`, the later one.
-*/
-static bool drawn_over(const object_t *a, const object_t *b)
+bool ed_in_layer(const ed_level_t *lv, const ed_object_t *o)
 {
-    return OBJ_CATEGORY[a->type] >= OBJ_CATEGORY[b->type];
+    return lv->layer == ED_LAYER_ALL || o->is_start
+        || o->obj.editor_layer == lv->layer;
 }
 
+static const ed_level_t *g_drawn;
+
+/* The list's order is the order they were placed in (11.15). */
+static int by_drawn(const void *a, const void *b)
+{
+    size_t i = *(const size_t *)a;
+    size_t j = *(const size_t *)b;
+
+    return object_draw_cmp(&g_drawn->objects[i].obj, (long)i,
+        &g_drawn->objects[j].obj, (long)j);
+}
+
+void ed_sort_drawn(const ed_level_t *lv, size_t *idx, size_t n)
+{
+    g_drawn = lv;
+    qsort(idx, n, sizeof(size_t), by_drawn);
+}
+
+/*
+** The one drawn on top: start positions over the level's objects, which
+** are drawn by Z layer, then Z order, then the later placed (11.15). The
+** list is walked in order, so a tie goes to `o`, the later one.
+*/
 int ed_hit(const ed_level_t *lv, vec2_t at)
 {
     const ed_object_t *top = NULL;
@@ -310,11 +329,11 @@ int ed_hit(const ed_level_t *lv, vec2_t at)
     for (size_t i = 0; i < lv->count; i++) {
         const ed_object_t *o = &lv->objects[i];
 
-        if (!rect_holds(&o->obj, at))
+        if (!ed_in_layer(lv, o) || !rect_holds(&o->obj, at))
             continue;
         if (top == NULL || (o->is_start && !top->is_start)
-            || (o->is_start == top->is_start
-            && drawn_over(&o->obj, &top->obj)))
+            || (o->is_start == top->is_start && object_draw_cmp(&o->obj,
+            (long)i, &top->obj, (long)(top - lv->objects)) > 0))
             top = o;
     }
     return top != NULL ? top->id : -1;
@@ -363,9 +382,10 @@ int ed_entries(ed_entry_t *out, int max)
 }
 
 /*
-** Everything an object is but its id, extras and selection: the placement's
-** "the very same object", a property step's "nothing changed" and the level
-** check's "twice in the same place" are one test.
+** Everything an object is in the game: the placement's "the very same
+** object" and the level check's "twice in the same place" are one test,
+** and a property step's "nothing changed" is the same with the editor
+** layer too.
 */
 bool ed_same_obj(const object_t *a, const object_t *b)
 {
@@ -374,15 +394,19 @@ bool ed_same_obj(const object_t *a, const object_t *b)
         && a->rect.h == b->rect.h && a->rotation == b->rotation
         && a->portal_mode == b->portal_mode
         && a->portal_gravity == b->portal_gravity && a->launch == b->launch
-        && a->speed == b->speed && a->portal_mini == b->portal_mini;
+        && a->speed == b->speed && a->portal_mini == b->portal_mini
+        && a->z_layer == b->z_layer && a->z_order == b->z_order;
 }
 
-bool ed_same_object(const ed_object_t *a, const ed_object_t *b)
+bool ed_same_object(const ed_object_t *a, const ed_object_t *b,
+    bool layer_too)
 {
     const level_start_t *sa = &a->start;
     const level_start_t *sb = &b->start;
 
     if (a->is_start != b->is_start || !ed_same_obj(&a->obj, &b->obj))
+        return false;
+    if (layer_too && a->obj.editor_layer != b->obj.editor_layer)
         return false;
     return !a->is_start || (sa->mode == sb->mode
         && sa->gravity_dir == sb->gravity_dir && sa->speed == sb->speed
@@ -406,8 +430,9 @@ bool ed_place_object(const ed_level_t *lv, const ed_entry_t *e, vec2_t at,
         e->word != NULL ? " " : "", e->word != NULL ? e->word : "");
     if (!e->start && level_object_from_line(line, &out->obj) != 0)
         return false;
+    out->obj.editor_layer = lv->layer == ED_LAYER_ALL ? 0 : lv->layer;
     for (size_t i = 0; i < lv->count; i++)
-        if (ed_same_object(&lv->objects[i], out))
+        if (ed_same_object(&lv->objects[i], out, false))
             return false;
     return true;
 }

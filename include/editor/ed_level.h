@@ -38,7 +38,11 @@ typedef struct ed_level {
     bool dirty;               /* changed since it was opened or saved         */
     char **kept;              /* lines the loader couldn't use, saved as they */
     size_t nb_kept;           /* were (7.2): nothing edits them               */
+    int layer;                /* the editor layer worked in, or ED_LAYER_ALL: */
+                              /* the others fade and can't be picked (11.15)  */
 } ed_level_t;
+
+    #define ED_LAYER_ALL (-1)
 
 /* One thing the palette can place: a type and the word its line needs. */
 typedef struct ed_entry {
@@ -82,25 +86,36 @@ ed_object_t *ed_find_from(ed_level_t *lv, int id, size_t *hint);
 /* Puts an object back where it was, with the id it had: an undo (11.7). */
 void ed_insert(ed_level_t *lv, const ed_object_t *o, size_t at);
 
+/* In the editor layer worked in: start positions are in all of them. */
+bool ed_in_layer(const ed_level_t *lv, const ed_object_t *o);
+/* Indices of level objects, sorted as the canvas and the game draw them. */
+void ed_sort_drawn(const ed_level_t *lv, size_t *idx, size_t n);
+
 /* The cell a point is in: floor, so it is the cell under the mouse (11.4). */
 double ed_snap(double v, double grid);
-/* The object the canvas draws on top at a point, or -1 (11.5). */
+/* The object the canvas draws on top at a point, of the layer worked in,
+** or -1 (11.5). */
 int ed_hit(const ed_level_t *lv, vec2_t at);
 
 /* Every entry, from the object, mode and colour tables (11.14, E4). */
 int ed_entries(ed_entry_t *out, int max);
 /*
-** Places an entry in the cell under `at`. false when that cell already holds
-** the very same object, so a dragged click doesn't stack copies (11.13).
+** Places an entry in the cell under `at`, in the layer worked in. false when
+** that cell already holds the very same object, so a dragged click doesn't
+** stack copies (11.13).
 */
 bool ed_place(ed_level_t *lv, const ed_entry_t *e, vec2_t at, double grid);
 /* The object that would be placed, without placing it; false as above. */
 bool ed_place_object(const ed_level_t *lv, const ed_entry_t *e, vec2_t at,
     double grid, ed_object_t *out);
 
-/* Two objects that are the same but for their id: place, kind and settings. */
+/*
+** Two objects the game can't tell apart: place, kind, settings, Z. The
+** editor layer is the editor's only: `layer_too` asks for it as well.
+*/
 bool ed_same_obj(const object_t *a, const object_t *b);
-bool ed_same_object(const ed_object_t *a, const ed_object_t *b);
+bool ed_same_object(const ed_object_t *a, const ed_object_t *b,
+    bool layer_too);
 
 /* The id a new level takes: one past the highest of those that exist, or
 ** the smallest free one when that one wouldn't fit `size`. */

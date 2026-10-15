@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "sim/alloc.h"
 #include "sim/hitbox.h"
@@ -166,6 +167,26 @@ static bool parse_rotation(const char *val, double *deg)
     return parse_double(val, deg) && fabs(*deg) <= LEVEL_ROT_MAX;
 }
 
+static bool parse_z_layer(const char *val, z_layer_t *z)
+{
+    for (int k = Z_LAYER_FIRST; k <= Z_LAYER_LAST; k++)
+        if (strcasecmp(val, z_layer_name((z_layer_t)k)) == 0) {
+            *z = (z_layer_t)k;
+            return true;
+        }
+    return false;
+}
+
+static bool parse_bounded(const char *val, int lo, int hi, int *out)
+{
+    int v = 0;
+
+    if (!parse_int(val, &v) || v < lo || v > hi)
+        return false;
+    *out = v;
+    return true;
+}
+
 typedef enum field_result {
     FIELD_OK, FIELD_UNKNOWN, FIELD_BAD_VALUE, FIELD_NOT_A_FIELD
 } field_result_t;
@@ -189,6 +210,14 @@ static field_result_t parse_field(object_t *o, char *tok, parse_ctx_t *ctx)
         return parse_units(val, &o->rect.w) == 0 ? FIELD_OK : FIELD_BAD_VALUE;
     if (strcmp(tok, "h") == 0)
         return parse_units(val, &o->rect.h) == 0 ? FIELD_OK : FIELD_BAD_VALUE;
+    if (strcmp(tok, "zl") == 0)
+        return parse_z_layer(val, &o->z_layer) ? FIELD_OK : FIELD_BAD_VALUE;
+    if (strcmp(tok, "z") == 0)
+        return parse_bounded(val, -LEVEL_Z_ORDER_MAX, LEVEL_Z_ORDER_MAX,
+            &o->z_order) ? FIELD_OK : FIELD_BAD_VALUE;
+    if (strcmp(tok, "el") == 0)
+        return parse_bounded(val, 0, LEVEL_EDITOR_LAYER_MAX,
+            &o->editor_layer) ? FIELD_OK : FIELD_BAD_VALUE;
     keep_extra(ctx, tok, val);
     return strcmp(tok, "group") == 0 ? FIELD_OK : FIELD_UNKNOWN;
 }
@@ -379,7 +408,8 @@ static int parse_object(char *line, object_t *o, parse_ctx_t *ctx)
         first_field = 5;
     }
     *o = (object_t){.type = o->type, .line = ctx->lineno, .size = size,
-        .rect = {x, y, size * UNIT, size * UNIT}};
+        .rect = {x, y, size * UNIT, size * UNIT},
+        .z_layer = obj_default_z_layer(o->type)};
     for (int i = first_field; i < n; i++) {
         given_h = given_h || strncmp(tok[i], "h=", 2) == 0;
         given_w = given_w || strncmp(tok[i], "w=", 2) == 0;

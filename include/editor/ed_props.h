@@ -23,6 +23,9 @@ typedef enum ed_prop {
     ED_PROP_GRAVITY,          /* a start position's                           */
     ED_PROP_SPEED,
     ED_PROP_SIZE,             /* a start position's: normal or mini (10.4)    */
+    ED_PROP_Z_LAYER,          /* B5 to T4 (11.15)                             */
+    ED_PROP_Z_ORDER,
+    ED_PROP_LAYER,            /* the editor layer it is in                    */
     ED_PROP_COUNT
 } ed_prop_t;
 
