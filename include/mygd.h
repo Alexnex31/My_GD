@@ -83,6 +83,8 @@ void draw_vertex_buffer(gd_t *gd, const sfVertexBuffer *buf,
     const sfRenderStates *rs);
 void draw_vertex_array(gd_t *gd, const sfVertexArray *array,
     const sfRenderStates *rs);
+void draw_triangles(gd_t *gd, const sfVertex *v, size_t n,
+    const sfRenderStates *rs);
 
 /* One texture for every object image, built at startup (9.2). */
 void atlas_build(gd_t *gd);

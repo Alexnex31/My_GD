@@ -2,8 +2,10 @@
 ** ALEXNEX PROJECT, 2026
 ** level_chunks
 ** File description:
-** the level's static geometry: chunks of vertices, built once (9.0, 9.2)
+** the level's objects: their vertices and draw order, built once (9.2, 11.15)
 */
+
+#include <string.h>
 
 #include "mygd.h"
 #include "sim/hitbox.h"
@@ -13,19 +15,10 @@
 #define VERTS_PER_OBJECT 6        /* two triangles; a slope's second is empty */
 #define SAW_SPIN 1.5              /* degrees per tick: one turn a second    */
 
-/* What turns on screen can't live in a static buffer: drawn each frame. */
+/* What turns on screen is drawn from its turned self each frame. */
 static bool spins(const object_t *o)
 {
     return o->type == OBJ_SAW;
-}
-
-static draw_layer_t layer_of(const object_t *o)
-{
-    if (OBJ_CATEGORY[o->type] == CAT_HARM)
-        return LAYER_HAZARD;
-    if (OBJ_CATEGORY[o->type] == CAT_INTERACTIVE)
-        return LAYER_INTERACTIVE;
-    return LAYER_BLOCK;
 }
 
 /* One row per mode, like MODES[] (FEATURES 6.1): a new mode adds its own. */
@@ -136,9 +129,22 @@ void object_vertices(gd_t *gd, const object_t *o, sfVertex *v)
     append_object(v, o, gd->atlas_rect[o->type], object_color(o));
 }
 
-int object_layer(const object_t *o)
+static const object_t *g_sorting;
+
+static int by_draw_order(const void *a, const void *b)
 {
-    return (int)layer_of(o);
+    const object_t *oa = &g_sorting[*(const size_t *)a];
+    const object_t *ob = &g_sorting[*(const size_t *)b];
+
+    return object_draw_cmp(oa, oa->line, ob, ob->line);
+}
+
+static int by_rank(const void *a, const void *b)
+{
+    size_t ra = *(const size_t *)a;
+    size_t rb = *(const size_t *)b;
+
+    return (ra > rb) - (ra < rb);
 }
 
 static size_t chunk_index(const object_t *o)
@@ -149,170 +155,140 @@ static size_t chunk_index(const object_t *o)
     return (size_t)(x / CHUNK_W);
 }
 
-/* One pass to size every chunk's layers, so each is allocated exactly once. */
-static void count_objects(level_t *lv, size_t *counts)
+/* Each chunk sized first, so its list is allocated once; filled by rank,
+** so it is already in the draw order. */
+static void build_chunks(draw_order_t *d, const level_data_t *lvl)
 {
-    for (size_t i = 0; i < lv->sim.lvl.nb_objects; i++) {
-        const object_t *o = &lv->sim.lvl.objects[i];
+    size_t *filled = sim_xcalloc(d->nb_chunks, sizeof(size_t));
 
-        if (!spins(o))
-            counts[chunk_index(o) * LAYER_COUNT + layer_of(o)] += 1;
+    for (size_t i = 0; i < lvl->nb_objects; i++)
+        d->chunks[chunk_index(&lvl->objects[i])].count += 1;
+    for (size_t c = 0; c < d->nb_chunks; c++)
+        d->chunks[c].ranks = sim_xcalloc(d->chunks[c].count + 1,
+            sizeof(size_t));
+    for (size_t k = 0; k < lvl->nb_objects; k++) {
+        const object_t *o = &lvl->objects[d->by_rank[k]];
+        render_chunk_t *ch = &d->chunks[chunk_index(o)];
+        rect_t b = object_drawn_bounds(o);
+
+        ch->ranks[filled[ch - d->chunks]++] = k;
+        ch->left = fminf(ch->left, (float)b.x);
+        ch->right = fmaxf(ch->right, (float)(b.x + b.w));
     }
-}
-
-static void fill_chunk_bounds(render_chunk_t *ch, const object_t *o)
-{
-    rect_t d = object_drawn_bounds(o);
-
-    ch->left = fminf(ch->left, (float)d.x);
-    ch->right = fmaxf(ch->right, (float)(d.x + d.w));
-}
-
-static void build_vertices(level_t *lv, gd_t *gd, size_t *counts,
-    sfVertex **buf)
-{
-    size_t *filled = sim_xcalloc(lv->nb_chunks * LAYER_COUNT, sizeof(size_t));
-
-    for (size_t i = 0; i < lv->sim.lvl.nb_objects; i++) {
-        const object_t *o = &lv->sim.lvl.objects[i];
-        size_t k = chunk_index(o) * LAYER_COUNT + layer_of(o);
-
-        if (spins(o))
-            continue;
-        append_object(buf[k] + filled[k] * VERTS_PER_OBJECT, o,
-            gd->atlas_rect[o->type], object_color(o));
-        filled[k] += 1;
-        fill_chunk_bounds(&lv->chunks[chunk_index(o)], o);
-    }
-    (void)counts;
     free(filled);
 }
 
-static void upload_one(render_chunk_t *ch, int l, sfVertex *v, size_t n)
-{
-    ch->layer[l] = sfVertexBuffer_create((unsigned int)n, sfTriangles,
-        sfVertexBufferStatic);
-    if (ch->layer[l] != NULL) {
-        sfVertexBuffer_update(ch->layer[l], v, (unsigned int)n, 0);
-        return;
-    }
-    ch->array[l] = sfVertexArray_create();   /* no vertex buffers: same data */
-    sfVertexArray_setPrimitiveType(ch->array[l], sfTriangles);
-    for (size_t i = 0; i < n; i++)
-        sfVertexArray_append(ch->array[l], v[i]);
-}
-
-static void upload(level_t *lv, size_t *counts, sfVertex **buf)
-{
-    for (size_t c = 0; c < lv->nb_chunks; c++)
-        for (int l = 0; l < LAYER_COUNT; l++)
-            if (counts[c * LAYER_COUNT + l] > 0)
-                upload_one(&lv->chunks[c], l, buf[c * LAYER_COUNT + l],
-                    counts[c * LAYER_COUNT + l] * VERTS_PER_OBJECT);
-}
-
 /*
-** Objects never move (Principle 1), so their vertices are computed once per
-** level and live on the GPU from then on. The vertex arrays are kept as a
-** fallback for drivers without vertex buffers.
+** Objects never move (Principle 1): their vertices are computed once per
+** level, and their place in the draw order too. A frame only copies those
+** of the objects in view, in that order.
 */
 void level_build_chunks(level_t *lv, gd_t *gd)
 {
+    const level_data_t *lvl = &lv->sim.lvl;
+    draw_order_t *d = &lv->draw;
     double right = 0.0;
-    size_t *counts = NULL;
-    sfVertex **buf = NULL;
 
-    for (size_t i = 0; i < lv->sim.lvl.nb_objects; i++) {
-        rect_t d = object_drawn_bounds(&lv->sim.lvl.objects[i]);
+    *d = (draw_order_t){0};
+    d->by_rank = sim_xcalloc(lvl->nb_objects + 1, sizeof(size_t));
+    d->verts = sim_xcalloc(lvl->nb_objects * VERTS_PER_OBJECT + 1,
+        sizeof(sfVertex));
+    d->visible = sim_xcalloc(lvl->nb_objects + 1, sizeof(size_t));
+    for (size_t i = 0; i < lvl->nb_objects; i++) {
+        const object_t *o = &lvl->objects[i];
+        rect_t b = object_drawn_bounds(o);
 
-        right = fmax(right, d.x + d.w);
+        d->by_rank[i] = i;
+        append_object(d->verts + i * VERTS_PER_OBJECT, o,
+            gd->atlas_rect[o->type], object_color(o));
+        right = fmax(right, b.x + b.w);
     }
-    lv->spinning = sfVertexArray_create();
-    sfVertexArray_setPrimitiveType(lv->spinning, sfTriangles);
-    lv->nb_chunks = (size_t)(right / CHUNK_W) + 1;
-    lv->chunks = sim_xcalloc(lv->nb_chunks, sizeof(render_chunk_t));
-    for (size_t c = 0; c < lv->nb_chunks; c++)
-        lv->chunks[c] = (render_chunk_t){INFINITY, -INFINITY, {NULL}, {NULL}};
-    counts = sim_xcalloc(lv->nb_chunks * LAYER_COUNT, sizeof(size_t));
-    count_objects(lv, counts);
-    buf = sim_xcalloc(lv->nb_chunks * LAYER_COUNT, sizeof(sfVertex *));
-    for (size_t k = 0; k < lv->nb_chunks * LAYER_COUNT; k++)
-        if (counts[k] > 0)
-            buf[k] = sim_xcalloc(counts[k] * VERTS_PER_OBJECT,
-                sizeof(sfVertex));
-    build_vertices(lv, gd, counts, buf);
-    upload(lv, counts, buf);
-    for (size_t k = 0; k < lv->nb_chunks * LAYER_COUNT; k++)
-        free(buf[k]);
-    free(buf);
-    free(counts);
+    g_sorting = lvl->objects;
+    qsort(d->by_rank, lvl->nb_objects, sizeof(size_t), by_draw_order);
+    d->nb_chunks = (size_t)(right / CHUNK_W) + 1;
+    d->chunks = sim_xcalloc(d->nb_chunks, sizeof(render_chunk_t));
+    for (size_t c = 0; c < d->nb_chunks; c++)
+        d->chunks[c] = (render_chunk_t){INFINITY, -INFINITY, NULL, 0};
+    build_chunks(d, lvl);
 }
 
 void level_free_chunks(level_t *lv)
 {
-    for (size_t c = 0; c < lv->nb_chunks; c++)
-        for (int l = 0; l < LAYER_COUNT; l++) {
-            if (lv->chunks[c].layer[l] != NULL)
-                sfVertexBuffer_destroy(lv->chunks[c].layer[l]);
-            if (lv->chunks[c].array[l] != NULL)
-                sfVertexArray_destroy(lv->chunks[c].array[l]);
-        }
-    if (lv->spinning != NULL)
-        sfVertexArray_destroy(lv->spinning);
-    lv->spinning = NULL;
-    free(lv->chunks);
-    lv->chunks = NULL;
-    lv->nb_chunks = 0;
+    draw_order_t *d = &lv->draw;
+
+    for (size_t c = 0; c < d->nb_chunks; c++)
+        free(d->chunks[c].ranks);
+    free(d->chunks);
+    free(d->by_rank);
+    free(d->verts);
+    free(d->visible);
+    free(d->frame);
+    *d = (draw_order_t){0};
+}
+
+/* The objects of the chunks in view, in the draw order. */
+static void gather(level_t *lv, float cam_x)
+{
+    draw_order_t *d = &lv->draw;
+    const object_t *objs = lv->sim.lvl.objects;
+
+    d->nb_visible = 0;
+    for (size_t c = 0; c < d->nb_chunks; c++) {
+        const render_chunk_t *ch = &d->chunks[c];
+
+        if (ch->right < cam_x || ch->left > cam_x + VIEW_W)
+            continue;
+        memcpy(d->visible + d->nb_visible, ch->ranks,
+            ch->count * sizeof(size_t));
+        d->nb_visible += ch->count;
+    }
+    qsort(d->visible, d->nb_visible, sizeof(size_t), by_rank);
+    d->nb_behind = 0;
+    while (d->nb_behind < d->nb_visible
+        && objs[d->by_rank[d->visible[d->nb_behind]]].z_layer < Z_T1)
+        d->nb_behind += 1;
 }
 
 /*
-** The saws in view, each turned by how long the attempt has run. Decoration
-** only: the sim's disc doesn't turn, and never reads this (FEATURES 10.6).
+** A saw turns by how long the attempt has run. Decoration only: the sim's
+** disc doesn't turn, and never reads this (FEATURES 10.6).
 */
-static void render_spinning(gd_t *gd, level_t *lv, float cam_x,
-    sfRenderStates *rs)
+static void put_one(level_t *lv, gd_t *gd, size_t index, sfVertex *out)
 {
-    const level_data_t *lvl = &lv->sim.lvl;
-    double turn = fmod((double)lv->sim.st.tick * SAW_SPIN, 360.0);
-    sfVertex six[VERTS_PER_OBJECT];
+    object_t o = lv->sim.lvl.objects[index];
 
-    sfVertexArray_clear(lv->spinning);
-    for (size_t i = 0; i < lvl->nb_objects; i++) {
-        object_t o = lvl->objects[i];
-        rect_t d = object_drawn_bounds(&o);
-
-        if (o.hitbox.aabb.x > cam_x + VIEW_W)
-            break;                           /* sorted by x: none further is in */
-        if (!spins(&o) || d.x + d.w < cam_x)
-            continue;
-        o.rotation += turn;
-        append_object(six, &o, gd->atlas_rect[o.type], object_color(&o));
-        for (int k = 0; k < VERTS_PER_OBJECT; k++)
-            sfVertexArray_append(lv->spinning, six[k]);
+    if (!spins(&o)) {
+        memcpy(out, lv->draw.verts + index * VERTS_PER_OBJECT,
+            VERTS_PER_OBJECT * sizeof(sfVertex));
+        return;
     }
-    if (sfVertexArray_getVertexCount(lv->spinning) > 0)
-        draw_vertex_array(gd, lv->spinning, rs);
+    o.rotation += fmod((double)lv->sim.st.tick * SAW_SPIN, 360.0);
+    append_object(out, &o, gd->atlas_rect[o.type], object_color(&o));
 }
 
-/* Layer by layer, only the chunks the view touches: a few draw calls (9.0). */
-void render_objects(gd_t *gd, level_t *lv, float cam_x)
+/*
+** Behind the player: finds what is in view first. In front: what the
+** behind call found, so it comes after it in the same frame.
+*/
+void render_objects(gd_t *gd, level_t *lv, float cam_x, bool front)
 {
     sfRenderStates rs = {sfBlendAlpha, sfTransform_Identity, gd->atlas, NULL};
+    draw_order_t *d = &lv->draw;
+    size_t from = front ? d->nb_behind : 0;
+    size_t to;
 
-    for (int l = 0; l < LAYER_COUNT; l++) {
-        if (l == LAYER_HAZARD + 1)
-            render_spinning(gd, lv, cam_x, &rs);
-        for (size_t c = 0; c < lv->nb_chunks; c++) {
-            render_chunk_t *ch = &lv->chunks[c];
-
-            if (ch->right < cam_x || ch->left > cam_x + VIEW_W)
-                continue;
-            if (ch->layer[l] != NULL)
-                draw_vertex_buffer(gd, ch->layer[l], &rs);
-            else if (ch->array[l] != NULL)
-                draw_vertex_array(gd, ch->array[l], &rs);
-        }
+    if (!front)
+        gather(lv, cam_x);
+    to = front ? d->nb_visible : d->nb_behind;
+    if (to == from)
+        return;
+    if ((to - from) * VERTS_PER_OBJECT > d->frame_cap) {
+        free(d->frame);
+        d->frame_cap = (to - from) * VERTS_PER_OBJECT * 2;
+        d->frame = sim_xcalloc(d->frame_cap, sizeof(sfVertex));
     }
-    if (LAYER_HAZARD + 1 == LAYER_COUNT)
-        render_spinning(gd, lv, cam_x, &rs);
+    for (size_t k = from; k < to; k++)
+        put_one(lv, gd, d->by_rank[d->visible[k]],
+            d->frame + (k - from) * VERTS_PER_OBJECT);
+    draw_triangles(gd, d->frame, (to - from) * VERTS_PER_OBJECT, &rs);
 }

@@ -20,13 +20,33 @@
 
 typedef struct gd gd_t;
 
-/* One slice of the level's static geometry, built once at load (9.2). */
+/*
+** One slice of the level along x, for what is in view (9.2): the objects
+** whose drawn left edge is in it, by their place in the draw order.
+*/
 typedef struct render_chunk {
     float left;                   /* the leftmost drawn x of its objects  */
     float right;                  /* the rightmost: a sprite can stick out */
-    sfVertexBuffer *layer[LAYER_COUNT];
-    sfVertexArray *array[LAYER_COUNT];   /* the fallback, same vertices    */
+    size_t *ranks;
+    size_t count;
 } render_chunk_t;
+
+/*
+** The draw order (FEATURES 11.15): by Z layer, then Z order, then the order
+** objects were placed in, the later on top. Built once per level; each frame
+** draws the objects in view in that order, those behind the player first.
+*/
+typedef struct draw_order {
+    size_t *by_rank;              /* the object drawn k-th, of all of them */
+    sfVertex *verts;              /* six per object, in the world, at load */
+    render_chunk_t *chunks;
+    size_t nb_chunks;
+    size_t *visible;              /* this frame's: ranks, sorted           */
+    size_t nb_visible;
+    size_t nb_behind;             /* the first ones: B5 to B1              */
+    sfVertex *frame;              /* what is drawn, rebuilt each frame     */
+    size_t frame_cap;
+} draw_order_t;
 
     #define PAUSE_ITEMS 4
 
@@ -54,9 +74,7 @@ typedef struct level {
     sfInt64 accumulator;          /* microseconds x TICK_RATE (3.6)           */
     int64_t last_frame_us;        /* input_now_us at the last frame's ticks   */
     level_stats_t stats;
-    render_chunk_t *chunks;       /* the level's static geometry (9.2)        */
-    size_t nb_chunks;
-    sfVertexArray *spinning;      /* the saws in view, turned each frame      */
+    draw_order_t draw;            /* the objects, in the order drawn (11.15)  */
     sfSprite *player_sprite;
     sfSprite *ground_sprite;
     sfSprite *background_sprite;  /* parallax, in the UI view (9.3)           */
@@ -168,12 +186,15 @@ bool practice_restore(level_t *lv);          /* false: no checkpoint */
 void practice_draw_world(gd_t *gd, level_t *lv);
 void practice_draw_bar(gd_t *gd, level_t *lv, sfVector2f bar, sfVector2f size);
 
-/* The static geometry: built once per level, drawn a few calls per frame. */
+/*
+** The objects, built once per level, drawn in two calls a frame: those
+** behind the player (front false, which also finds what is in view), then
+** after the player those in front of it (front true).
+*/
 void level_build_chunks(level_t *lv, gd_t *gd);
 void level_free_chunks(level_t *lv);
-void render_objects(gd_t *gd, level_t *lv, float cam_x);
+void render_objects(gd_t *gd, level_t *lv, float cam_x, bool front);
 void object_vertices(gd_t *gd, const object_t *o, sfVertex *v);   /* 6 of them */
-int object_layer(const object_t *o);
 
 /* The camera the renderer uses: the player's x, the sim's y, pixel snapped. */
 vec2_t level_camera(gd_t *gd, const level_t *lv);

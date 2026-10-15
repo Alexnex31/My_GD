@@ -83,29 +83,51 @@ static void limit_lines(editor_t *ed, span_t v)
     editor_line(ed, v.left, ed->kill_y, v.right, ed->kill_y, KILL_LINE);
 }
 
-/* The game's own vertices for each object in view, layer by layer (11.4). */
+/* The objects in view, of any layer: their indices, in the list's order. */
+static size_t in_view(editor_t *ed, span_t v)
+{
+    size_t n = 0;
+
+    if (ed->drawn_cap < ed->lv.count + 1) {
+        free(ed->drawn);
+        ed->drawn_cap = (ed->lv.count + 1) * 2;
+        ed->drawn = sim_xcalloc(ed->drawn_cap, sizeof(size_t));
+    }
+    for (size_t i = 0; i < ed->lv.count; i++) {
+        rect_t d = object_drawn_bounds(&ed->lv.objects[i].obj);
+
+        if (ed->lv.objects[i].is_start || d.x > v.right
+            || d.x + d.w < v.left || d.y > v.bottom || d.y + d.h < v.top)
+            continue;
+        ed->drawn[n++] = i;
+    }
+    return n;
+}
+
+/*
+** The game's own vertices for each object in view, in the game's order:
+** Z layer, Z order, then the later placed on top (11.15). Those of other
+** editor layers than the one worked in are faint.
+*/
 static void draw_objects(editor_t *ed, gd_t *gd, span_t v)
 {
     sfRenderStates rs = {sfBlendAlpha, sfTransform_Identity, gd->atlas, NULL};
+    size_t n = in_view(ed, v);
     sfVertex six[6];
 
-    for (int l = 0; l < LAYER_COUNT; l++)
-        sfVertexArray_clear(ed->objects[l]);
-    for (size_t i = 0; i < ed->lv.count; i++) {
-        const object_t *o = &ed->lv.objects[i].obj;
-        rect_t d = object_drawn_bounds(o);
+    ed_sort_drawn(&ed->lv, ed->drawn, n);
+    sfVertexArray_clear(ed->objects);
+    for (size_t k = 0; k < n; k++) {
+        const ed_object_t *o = &ed->lv.objects[ed->drawn[k]];
+        bool faint = !ed_in_layer(&ed->lv, o);
 
-        if (ed->lv.objects[i].is_start)
-            continue;
-        if (d.x > v.right || d.x + d.w < v.left || d.y > v.bottom
-            || d.y + d.h < v.top)
-            continue;
-        object_vertices(gd, o, six);
-        for (int k = 0; k < 6; k++)
-            sfVertexArray_append(ed->objects[object_layer(o)], six[k]);
+        object_vertices(gd, &o->obj, six);
+        for (int j = 0; j < 6; j++) {
+            six[j].color.a = faint ? six[j].color.a / 5 : six[j].color.a;
+            sfVertexArray_append(ed->objects, six[j]);
+        }
     }
-    for (int l = 0; l < LAYER_COUNT; l++)
-        draw_vertex_array(gd, ed->objects[l], &rs);
+    draw_vertex_array(gd, ed->objects, &rs);
 }
 
 /* A selected object's own rect, turned as it is, in lines over everything. */
@@ -133,7 +155,7 @@ static void tint(editor_t *ed, gd_t *gd, const object_t *o)
     object_vertices(gd, o, six);
     for (int k = 0; k < 6; k++) {
         six[k].color = (sfColor){90, 255, 140, 90};
-        sfVertexArray_append(ed->objects[0], six[k]);
+        sfVertexArray_append(ed->objects, six[k]);
     }
 }
 
@@ -142,13 +164,13 @@ static void draw_selection(editor_t *ed, gd_t *gd)
     rect_t box = editor_box(ed, gd);
 
     sfVertexArray_clear(ed->lines);
-    sfVertexArray_clear(ed->objects[0]);
+    sfVertexArray_clear(ed->objects);
     for (size_t i = 0; i < ed->lv.count; i++)
         if (ed->lv.objects[i].selected) {
             tint(ed, gd, &ed->lv.objects[i].obj);
             outline(ed, &ed->lv.objects[i].obj);
         }
-    draw_vertex_array(gd, ed->objects[0], NULL);
+    draw_vertex_array(gd, ed->objects, NULL);
     draw_vertex_array(gd, ed->lines, NULL);
     if (ed->mouse == ED_BOXING)
         editor_fill(gd, ed, (sfFloatRect){(float)box.x, (float)box.y, (float)box.w,
@@ -284,17 +306,20 @@ static void draw_toolbar(editor_t *ed, gd_t *gd)
         "move   ZQSD: a block   R: turn   Del   Ctrl+A C V D",
     };
     char text[320];
+    char layer[16] = "All";
 
+    if (ed->lv.layer != ED_LAYER_ALL)
+        snprintf(layer, sizeof(layer), "%d", ed->lv.layer);
     editor_fill(gd, ed, (sfFloatRect){0.0f, 0.0f, VIEW_W, ED_TOOLBAR_H}, PANEL_FILL,
         sfTransparent);
     snprintf(text, sizeof(text), "%s%s   -   level %s   -   %zu objects, "
-        "%zu selected   -   Grid %.0f   -   Zoom %.0f%%", ed->lv.hdr.name,
-        ed->lv.dirty ? " *" : "", ed->lv.id, ed->lv.count,
-        ed_selected(&ed->lv), ed->grid, 100.0f / ed->zoom);
+        "%zu selected   -   Grid %.0f   -   Zoom %.0f%%   -   Layer %s",
+        ed->lv.hdr.name, ed->lv.dirty ? " *" : "", ed->lv.id, ed->lv.count,
+        ed_selected(&ed->lv), ed->grid, 100.0f / ed->zoom, layer);
     editor_label(ed, gd, text, 20.0f, 8.0f, 28, sfWhite);
     snprintf(text, sizeof(text), "%s   Ctrl+Z / Ctrl+Y: undo, redo   Wheel, "
-        "Ctrl+wheel: view   G: grid   L: song   P: hear it   Enter: play   "
-        "V: verify   Ctrl+S",
+        "Ctrl+wheel: view   G: grid   , .: layer   L: song   P: hear it   "
+        "Enter: play   V: verify   Ctrl+S",
         HELP[ed->tool]);
     editor_label(ed, gd, text, 20.0f, 48.0f, 18, (sfColor){180, 190, 210, 255});
     if (ui_now_ms() < ed->notice_until_ms)

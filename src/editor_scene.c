@@ -35,10 +35,8 @@ editor_t *editor_open(gd_t *gd, const char *id, const char *new_name)
     ed->cam = (vec2_t){ED_CANVAS_W / 2.0 - 100.0, GROUND_Y - 300.0};
     ed->view = sfView_create();
     ed->nb_entries = ed_entries(ed->entries, ED_MAX_ENTRIES);
-    for (int l = 0; l < LAYER_COUNT; l++) {
-        ed->objects[l] = sfVertexArray_create();
-        sfVertexArray_setPrimitiveType(ed->objects[l], sfTriangles);
-    }
+    ed->objects = sfVertexArray_create();
+    sfVertexArray_setPrimitiveType(ed->objects, sfTriangles);
     ed->lines = sfVertexArray_create();
     sfVertexArray_setPrimitiveType(ed->lines, sfLines);
     ed->box = sfRectangleShape_create();
@@ -57,8 +55,8 @@ void editor_free(editor_t *ed)
 {
     if (ed == NULL)
         return;
-    for (int l = 0; l < LAYER_COUNT; l++)
-        sfVertexArray_destroy(ed->objects[l]);
+    sfVertexArray_destroy(ed->objects);
+    free(ed->drawn);
     sfVertexArray_destroy(ed->lines);
     sfRectangleShape_destroy(ed->box);
     sfText_destroy(ed->text);
@@ -212,6 +210,8 @@ static void plain_key(editor_t *ed, gd_t *gd, sfKeyCode k)
     }
     if (k == sfKeyG)
         ed->grid = ed->grid == 50.0 ? 25.0 : 50.0;
+    if (k == sfKeyComma || k == sfKeyPeriod)        /* All, 0, 1, ... (11.15) */
+        ed_set_layer(&ed->lv, ed->lv.layer + (k == sfKeyPeriod ? 1 : -1));
     if (k == sfKeyHome)
         ed->cam = (vec2_t){ED_CANVAS_W / 2.0 * ed->zoom - 100.0,
             GROUND_Y - 300.0};

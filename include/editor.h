@@ -101,7 +101,9 @@ typedef struct editor {
     ed_entry_t entries[ED_MAX_ENTRIES];
     int nb_entries;
     int entry;                    /* what a left click places                */
-    sfVertexArray *objects[LAYER_COUNT];
+    sfVertexArray *objects;       /* the objects in view, in the draw order  */
+    size_t *drawn;                /* their indices, sorted each frame        */
+    size_t drawn_cap;
     sfVertexArray *lines;         /* the grid and the level's limits         */
     sfRectangleShape *box;
     sfText *text;

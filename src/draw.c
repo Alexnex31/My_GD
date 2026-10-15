@@ -38,3 +38,10 @@ void draw_vertex_array(gd_t *gd, const sfVertexArray *array,
     gd->draw_calls += 1;
     sfRenderWindow_drawVertexArray(gd->w, array, rs);
 }
+
+void draw_triangles(gd_t *gd, const sfVertex *v, size_t n,
+    const sfRenderStates *rs)
+{
+    gd->draw_calls += 1;
+    sfRenderWindow_drawPrimitives(gd->w, v, n, sfTriangles, rs);
+}

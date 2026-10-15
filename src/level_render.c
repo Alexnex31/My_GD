@@ -245,7 +245,7 @@ static void render_player(gd_t *gd, level_t *lv)
     render_trail(gd, lv, lv->state == LEVEL_DYING ? lv->death_pos : pos,
         (float)level_camera(gd, lv).x);
     if (lv->state == LEVEL_DYING)
-        return render_explosion(gd, lv);     /* it takes the player's place */
+        return;                              /* the explosion is its place */
     setup_player_sprite(gd, lv);
     sfSprite_setRotation(lv->player_sprite, p->rotation);
     sfSprite_setPosition(lv->player_sprite,
@@ -340,7 +340,7 @@ static void render_end_sequence(gd_t *gd, level_t *lv, vec2_t cam)
     render_background(gd, lv, cam);
     sfRenderWindow_setView(gd->w, gd->level_view);
     render_ground(gd, lv, (float)cam.x);
-    render_objects(gd, lv, (float)cam.x);
+    render_objects(gd, lv, (float)cam.x, false);
     draw_end_wall(gd, lv, cam);
     render_trail(gd, lv, (vec2_t){x, p->pos.y}, (float)cam.x);
     setup_player_sprite(gd, lv);
@@ -349,6 +349,7 @@ static void render_end_sequence(gd_t *gd, level_t *lv, vec2_t cam)
     sfSprite_setRotation(lv->player_sprite,
         p->rotation + fminf(t, flight) * (float)CUBE_SPIN);
     draw_sprite(gd, lv->player_sprite, NULL);
+    render_objects(gd, lv, (float)cam.x, true);
     sfRenderWindow_setView(gd->w, gd->ui_view);
     if (t < flight)
         return;
@@ -380,10 +381,13 @@ void level_render(gd_t *gd, level_t *lv)
     sfRenderWindow_setView(gd->w, gd->level_view);
     render_ground(gd, lv, (float)cam.x);
     render_ship_bounds(gd, lv, (float)cam.x);
-    render_objects(gd, lv, (float)cam.x);
+    render_objects(gd, lv, (float)cam.x, false);   /* B5 to B1 (11.15) */
+    render_player(gd, lv);
+    render_objects(gd, lv, (float)cam.x, true);    /* T1 to T4 */
+    if (lv->state == LEVEL_DYING)
+        render_explosion(gd, lv);            /* over everything it hit */
     practice_draw_world(gd, lv);             /* its checkpoints (13.1) */
     render_spent_flashes(gd, lv);
-    render_player(gd, lv);
     render_attempt(gd, lv);
     if (gd->debug_overlay)
         render_debug_overlay(gd, lv, cam);
