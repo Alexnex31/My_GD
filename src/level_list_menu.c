@@ -154,6 +154,7 @@ static void fill_level_info(level_button_t *lb, gd_t *gd)
         return;
     lb->attempts = pe->attempts;
     lb->best = pe->best;
+    lb->practice_best = pe->practice_best;
     lb->edited = pe->level_hash != 0 && pe->level_hash != hash;
 }
 
@@ -189,8 +190,13 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     sfText_setPosition(lb->attempts_text, text_pos);
     lb->best_text = sfText_create();
     best_str = sim_xcalloc(64, 1);
-    snprintf(best_str, 64, "Best: %.2f%%%s", progress_printable(lb->best),
-        lb->edited ? " (edited)" : "");
+    if (lb->practice_best > 0.0f)
+        snprintf(best_str, 64, "Best: %.2f%%%s   Practice: %.0f%%",
+            progress_printable(lb->best), lb->edited ? " (edited)" : "",
+            progress_printable(lb->practice_best));
+    else
+        snprintf(best_str, 64, "Best: %.2f%%%s", progress_printable(lb->best),
+            lb->edited ? " (edited)" : "");
     text_pos = (sfVector2f){x, y + 80};
     sfText_setString(lb->best_text, best_str);
     sfText_setFont(lb->best_text, gd->main_font);

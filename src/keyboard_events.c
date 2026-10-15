@@ -287,6 +287,10 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
         if (input_event_is(gd->event, gd->settings.restart_key)
             && (*level)->state != LEVEL_COMPLETE)
             level_restart(*level, gd);       /* 6.5, any key or button */
+        if (input_event_is(gd->event, gd->settings.checkpoint_key))
+            practice_place(*level);          /* practice only (13.1) */
+        if (input_event_is(gd->event, gd->settings.remove_checkpoint_key))
+            practice_remove(*level);
         if (gd->event->type == sfEvtMouseButtonPressed
             && (*level)->state == LEVEL_COMPLETE
             && (*level)->end_time >= level_end_flight(*level) + END_FLASH) {

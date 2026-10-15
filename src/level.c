@@ -41,13 +41,15 @@ void level_count_attempt(level_t *lv)
     sfText_setString(lv->attempt_text, text);
 }
 
+/* A practice run's percentage is practice's own: it never sets the best (13.1). */
 void level_record_best(level_t *lv)
 {
     float pct = sim_percent(&lv->sim);
+    float *best = lv->practice ? &lv->stats.practice_best : &lv->stats.best;
 
-    if (pct <= lv->stats.best || !run_counts(lv))
+    if (pct <= *best || !run_counts(lv))
         return;
-    lv->stats.best = pct;
+    *best = pct;
     lv->stats.dirty = true;
 }
 
@@ -208,6 +210,7 @@ static level_t *level_setup(level_t *lv, gd_t *gd, const char *id)
     sfRectangleShape_setFillColor(lv->bar_fill, (sfColor){80, 220, 120, 255});
     sfRectangleShape_setPosition(lv->bar_fill,
         (sfVector2f){(VIEW_W - BAR_W) / 2.0f, 30.0f});
+    practice_create(lv);
     level_count_attempt(lv);
     input_start(gd);
     level_music_start(lv, gd);
@@ -222,6 +225,7 @@ void level_free(level_t *lv, gd_t *gd)
     level_flush_stats(lv, gd);               /* every way out goes through here */
     if (lv->end_screen != NULL)
         free_end_level_screen(lv->end_screen);
+    practice_free(lv);
     level_free_chunks(lv);
     sfSprite_destroy(lv->flash_sprite);
     free(lv->seen_spent);
@@ -254,15 +258,18 @@ void level_on_death(level_t *lv, gd_t *gd)
     music_stop(&gd->music);                  /* GD stops it on death (4.8) */
 }
 
+/* From the start, or in practice from the last checkpoint (13.1). */
 void level_respawn(level_t *lv, gd_t *gd)
 {
-    sim_reset_at(&lv->sim, level_current_start(lv));
+    if (!practice_restore(lv)) {
+        sim_reset_at(&lv->sim, level_current_start(lv));
+        memset(lv->seen_spent, 0, lv->sim.st.spent_words * sizeof(uint64_t));
+    }
     lv->path_len = 0;                        /* a playtest's line: one attempt */
     trail_reset(&lv->trail, &lv->sim.st.player);
     lv->state = LEVEL_PLAYING;
     lv->fade_left = 0.0f;
     lv->drawn_bounds = lv->sim.st.bounds;
-    memset(lv->seen_spent, 0, lv->sim.st.spent_words * sizeof(uint64_t));
     for (int i = 0; i < MAX_FLASHES; i++)
         lv->flash_left[i] = 0.0f;
     lv->accumulator = 0;
@@ -287,6 +294,7 @@ void level_change_start(level_t *lv, gd_t *gd, int dir)
         return;
     if (lv->state == LEVEL_PLAYING)
         level_record_best(lv);
+    practice_clear(lv);                      /* they belong to the old start */
     lv->start_at = (lv->start_at + dir + n) % n;
     level_respawn(lv, gd);
     snprintf(text, sizeof(text), "<%d/%d>", lv->start_at, n - 1);

@@ -48,6 +48,7 @@ typedef struct level_button {
     uint64_t file_hash;           /* the level's current version (6.4)      */
     bool edited;                  /* the best was set on another version    */
     float best;
+    float practice_best;          /* a statistic, beside the best (PLAN 13.1) */
     int attempts;
     button_t *play_button;
     sfText *name_text;

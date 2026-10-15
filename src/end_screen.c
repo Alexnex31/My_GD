@@ -51,6 +51,7 @@ end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd)
     end_level_screen_t *es = sim_xcalloc(1, sizeof(end_level_screen_t));
     const song_t *song = level->song.song;
     bool counts = level_current_start(level) == &level->sim.lvl.hdr.start;
+    bool practice = level->practice;
     char attempts[100];
     char credit[200];
 
@@ -60,13 +61,17 @@ end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd)
             sfTrue);
     snprintf(attempts, sizeof(attempts), "Attempts: %d",
         level->stats.attempts);
-    es->title_text = end_text(gd, counts ? "LEVEL COMPLETE!"
-        : "END REACHED", 80, (sfVector2f){600.0f, 200.0f});
+    es->title_text = end_text(gd, practice ? "PRACTICE COMPLETE"
+        : counts ? "LEVEL COMPLETE!" : "END REACHED", 80,
+        (sfVector2f){practice ? 560.0f : 600.0f, 200.0f});
     es->attempts_text = end_text(gd, attempts, 50,
         (sfVector2f){700.0f, 400.0f});
-    es->percent_text = end_text(gd, counts ? "Completion: 100%"
-        : "From a start position: it doesn't count", 50,
-        (sfVector2f){counts ? 680.0f : 420.0f, 500.0f});   /* (11.8) */
+    es->percent_text = end_text(gd, !counts
+        ? "From a start position: it doesn't count"
+        : practice ? "Practice: 100%, the best is untouched"
+        : "Completion: 100%", 50,
+        (sfVector2f){counts && !practice ? 680.0f : 420.0f, 500.0f});
+                                             /* 11.8, 13.1 */
     if (song != NULL)                        /* CC BY wants the credit (4.11) */
         snprintf(credit, sizeof(credit), "Song: %s \xe2\x80\x94 %s (%s)",
             song->title, song->artist, song->license);

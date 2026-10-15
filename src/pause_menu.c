@@ -2,7 +2,7 @@
 ** ALEXNEX PROJECT, 2026
 ** pause_menu
 ** File description:
-** the pause menu: the level stops, its song waits, Resume, Restart, Quit (PLAN 10.4)
+** the pause menu: the level stops, its song waits, Resume, Restart, Practice, Quit (PLAN 10.4)
 */
 
 #include "mygd.h"
@@ -11,12 +11,13 @@ enum {
     PAUSE_NONE,
     PAUSE_RESUME,
     PAUSE_RESTART,
+    PAUSE_PRACTICE,
     PAUSE_QUIT
 };
 
 #define BUTTON_W 420.0f
 #define BUTTON_H 90.0f
-#define FIRST_Y 470.0f
+#define FIRST_Y 440.0f
 #define GAP_Y 115.0f
 
 static void resume_button(void *ctx, widget_t *w)
@@ -29,6 +30,12 @@ static void restart_button(void *ctx, widget_t *w)
 {
     (void)w;
     ((level_t *)ctx)->pause_action = PAUSE_RESTART;
+}
+
+static void practice_button(void *ctx, widget_t *w)
+{
+    (void)w;
+    ((level_t *)ctx)->pause_action = PAUSE_PRACTICE;
 }
 
 static void quit_button(void *ctx, widget_t *w)
@@ -61,11 +68,13 @@ void level_pause(level_t *lv, gd_t *gd)
     lv->pause_action = PAUSE_NONE;
     lv->pause_widgets[0] = button("Resume", 0, resume_button);
     lv->pause_widgets[1] = button("Restart", 1, restart_button);
-    lv->pause_widgets[2] = button("Quit", 2, quit_button);
+    lv->pause_widgets[2] = button(lv->practice ? "Practice: on"
+        : "Practice: off", 2, practice_button);
+    lv->pause_widgets[3] = button("Quit", 3, quit_button);
     ui_init(&lv->pause_ui, lv->pause_widgets, PAUSE_ITEMS, lv);
     lv->pause_ui.on_back = pause_back;
-    lv->pause_ui.panel = (ui_rect_t){(VIEW_W - 760.0f) / 2.0f, 250.0f,
-        760.0f, 600.0f};
+    lv->pause_ui.panel = (ui_rect_t){(VIEW_W - 760.0f) / 2.0f, 230.0f,
+        760.0f, 690.0f};
     music_pause(&gd->music);
 }
 
@@ -109,6 +118,13 @@ void pause_act(level_t **level, gd_t *gd)
         resume(lv, gd, false);               /* the respawn starts the song */
         level_restart(lv, gd);               /* 6.5: the attempt ends there */
     }
+    if (action == PAUSE_PRACTICE && !lv->practice) {
+        practice_set(lv, gd, true);          /* the run goes on as it is */
+        lv->pause_widgets[2].label = "Practice: on";
+    } else if (action == PAUSE_PRACTICE) {
+        resume(lv, gd, false);               /* from the start, its song too */
+        practice_set(lv, gd, false);
+    }
     if (action == PAUSE_QUIT)
         go_back_playing_level_list(gd, level);
 }
@@ -121,9 +137,9 @@ void pause_draw(gd_t *gd, level_t *lv)
     ui_dim(gd);
     ui_update(&lv->pause_ui, ui_now_ms());
     ui_draw(gd, &lv->pause_ui);
-    ui_caption(gd, lv->sim.lvl.hdr.name, VIEW_W / 2.0f, 315.0f);
-    snprintf(line, sizeof(line), "Attempt %d  -  %.0f%%", lv->stats.attempts,
-        sim_percent(&lv->sim));
-    ui_caption(gd, line, VIEW_W / 2.0f, 385.0f);
+    ui_caption(gd, lv->sim.lvl.hdr.name, VIEW_W / 2.0f, 295.0f);
+    snprintf(line, sizeof(line), "Attempt %d  -  %.0f%%%s", lv->stats.attempts,
+        sim_percent(&lv->sim), lv->practice ? "  -  practice" : "");
+    ui_caption(gd, line, VIEW_W / 2.0f, 365.0f);
     print_cursor(gd->cursor, gd->w);
 }

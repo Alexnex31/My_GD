@@ -266,9 +266,13 @@ static void render_hud(gd_t *gd, level_t *lv)
     }
     sfRectangleShape_setSize(lv->bar_fill,
         (sfVector2f){BAR_W * pct / 100.0f, BAR_H});
+    sfRectangleShape_setFillColor(lv->bar_fill, lv->practice
+        ? (sfColor){90, 190, 255, 255} : (sfColor){80, 220, 120, 255});
     if (gd->settings.show_progress_bar) {
         draw_rect(gd, lv->bar_back);
         draw_rect(gd, lv->bar_fill);
+        practice_draw_bar(gd, lv, (sfVector2f){(VIEW_W - BAR_W) / 2.0f,
+            30.0f}, (sfVector2f){BAR_W, BAR_H});
     }
     sfText_setPosition(lv->hud_text,
         (sfVector2f){(VIEW_W + BAR_W) / 2.0f + 20.0f, 28.0f});
@@ -377,6 +381,7 @@ void level_render(gd_t *gd, level_t *lv)
     render_ground(gd, lv, (float)cam.x);
     render_ship_bounds(gd, lv, (float)cam.x);
     render_objects(gd, lv, (float)cam.x);
+    practice_draw_world(gd, lv);             /* its checkpoints (13.1) */
     render_spent_flashes(gd, lv);
     render_player(gd, lv);
     render_attempt(gd, lv);

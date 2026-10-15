@@ -28,7 +28,7 @@ typedef struct render_chunk {
     sfVertexArray *array[LAYER_COUNT];   /* the fallback, same vertices    */
 } render_chunk_t;
 
-    #define PAUSE_ITEMS 3
+    #define PAUSE_ITEMS 4
 
 typedef enum level_state {
     LEVEL_PLAYING,
@@ -92,6 +92,12 @@ typedef struct level {
     size_t path_cap;
     trail_t trail;                /* the wave's path, corners only (FEATURES 8.5) */
     sfVertexArray *trail_va;      /* its strip, built again each frame         */
+    bool practice;                /* practice mode (PLAN 13.1)                 */
+    sim_snapshot_t *checkpoints;  /* its checkpoints, the last one respawns    */
+    size_t nb_checkpoints;
+    size_t cap_checkpoints;
+    sfRectangleShape *diamond;    /* a checkpoint in the level                 */
+    sfRectangleShape *bar_tick;   /* and on the progress bar                   */
     bool paused;                  /* the pause menu is open: no tick (PLAN 10.4) */
     ui_screen_t pause_ui;
     widget_t pause_widgets[PAUSE_ITEMS];
@@ -145,6 +151,21 @@ void level_pause(level_t *lv, gd_t *gd);
 void pause_event(level_t *lv, gd_t *gd);     /* one event, while it's open */
 void pause_act(level_t **lv, gd_t *gd);      /* what its buttons asked */
 void pause_draw(gd_t *gd, level_t *lv);
+
+/*
+** Practice mode (PLAN 13.1): the checkpoint keys place and remove run-state
+** snapshots, a death or a restart goes back to the last one, and the run's
+** percentage is practice's only.
+*/
+void practice_create(level_t *lv);
+void practice_free(level_t *lv);
+void practice_set(level_t *lv, gd_t *gd, bool on);
+void practice_place(level_t *lv);
+void practice_remove(level_t *lv);
+void practice_clear(level_t *lv);
+bool practice_restore(level_t *lv);          /* false: no checkpoint */
+void practice_draw_world(gd_t *gd, level_t *lv);
+void practice_draw_bar(gd_t *gd, level_t *lv, sfVector2f bar, sfVector2f size);
 
 /* The static geometry: built once per level, drawn a few calls per frame. */
 void level_build_chunks(level_t *lv, gd_t *gd);
