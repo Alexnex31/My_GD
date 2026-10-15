@@ -11,6 +11,7 @@
 
 #include "editor/ed_props.h"
 #include "sim/constants.h"
+#include "sim/hitbox.h"
 #include "sim/modes.h"
 #include "sim/speed.h"
 
@@ -179,27 +180,17 @@ static void step_one(ed_object_t *o, ed_prop_t p, int dir)
     ed_refresh(o);
 }
 
-static bool same(const ed_object_t *a, const ed_object_t *b)
-{
-    return a->obj.rotation == b->obj.rotation
-        && a->obj.rect.x == b->obj.rect.x && a->obj.rect.y == b->obj.rect.y
-        && a->obj.rect.w == b->obj.rect.w && a->obj.rect.h == b->obj.rect.h
-        && a->obj.portal_mode == b->obj.portal_mode
-        && a->obj.portal_gravity == b->obj.portal_gravity
-        && a->obj.launch == b->obj.launch && a->start.mode == b->start.mode
-        && a->start.gravity_dir == b->start.gravity_dir
-        && a->start.speed == b->start.speed && a->obj.speed == b->obj.speed
-        && a->obj.portal_mini == b->obj.portal_mini
-        && a->start.mini == b->start.mini;
-}
-
 /* One command if any grabbed object is no longer what it was. */
 static bool commit_if_changed(ed_level_t *lv, ed_history_t *h, ed_grab_t *g)
 {
     bool changed = false;
+    size_t hint = 0;
 
-    for (size_t i = 0; i < g->count; i++)
-        changed = changed || !same(ed_find(lv, g->ids[i]), &g->before[i]);
+    for (size_t i = 0; i < g->count && !changed; i++) {
+        const ed_object_t *o = ed_find_from(lv, g->ids[i], &hint);
+
+        changed = o != NULL && !ed_same_object(o, &g->before[i]);
+    }
     if (changed)
         ed_grab_commit(lv, h, g);
     else
@@ -210,18 +201,19 @@ static bool commit_if_changed(ed_level_t *lv, ed_history_t *h, ed_grab_t *g)
 bool ed_prop_step(ed_level_t *lv, ed_history_t *h, ed_prop_t p, int dir)
 {
     ed_grab_t g;
+    size_t hint = 0;
 
     ed_grab(lv, &g);
     for (size_t i = 0; i < g.count; i++) {
-        ed_object_t *o = ed_find(lv, g.ids[i]);
+        ed_object_t *o = ed_find_from(lv, g.ids[i], &hint);
 
-        if (has(o, p))
+        if (o != NULL && has(o, p))
             step_one(o, p, dir);
     }
     return commit_if_changed(lv, h, &g);
 }
 
-/* The middle of everything grabbed: what a piece turns around. */
+/* The middle of everything grabbed, each as it is drawn: turned. */
 static vec2_t middle(const ed_grab_t *g)
 {
     double lo_x = INFINITY;
@@ -230,7 +222,7 @@ static vec2_t middle(const ed_grab_t *g)
     double hi_y = -INFINITY;
 
     for (size_t i = 0; i < g->count; i++) {
-        rect_t r = g->before[i].obj.rect;
+        rect_t r = object_drawn_bounds(&g->before[i].obj);
 
         lo_x = fmin(lo_x, r.x);
         lo_y = fmin(lo_y, r.y);
@@ -240,35 +232,82 @@ static vec2_t middle(const ed_grab_t *g)
     return (vec2_t){(lo_x + hi_x) / 2.0, (lo_y + hi_y) / 2.0};
 }
 
-/* Its center goes around `c`, clockwise on screen like `rot=` (PLAN 4.2). */
-static void swing(ed_object_t *o, vec2_t c, double deg, double grid)
+/*
+** The grid corner or cell center nearest the middle. A quarter turn around
+** one takes the grid onto itself: in half cells they are the (a, b) with
+** a + b even. Half a turn around the middle itself is already on the grid.
+*/
+static vec2_t pivot(vec2_t c, double deg, double grid)
+{
+    double half = grid / 2.0;
+    double a = round(c.x / half);
+    double b = round(c.y / half);
+    double turns = fmod(fmod(deg, 360.0) + 360.0, 360.0);
+    double fx = c.x / half - a;
+    double fy = c.y / half - b;
+
+    if (turns != 90.0 && turns != 270.0)
+        return c;
+    if (fmod(fabs(a + b), 2.0) == 0.0)
+        return (vec2_t){a * half, b * half};
+    if (fabs(fx) >= fabs(fy))
+        return (vec2_t){(a + (fx < 0.0 ? -1.0 : 1.0)) * half, b * half};
+    return (vec2_t){a * half, (b + (fy < 0.0 ? -1.0 : 1.0)) * half};
+}
+
+/* Its center goes around `p`, clockwise on screen like `rot=` (PLAN 4.2). */
+static void swing(ed_object_t *o, vec2_t p, double cs, double sn)
 {
     rect_t *r = &o->obj.rect;
-    double rad = deg * M_PI / 180.0;
-    double dx = r->x + r->w / 2.0 - c.x;
-    double dy = r->y + r->h / 2.0 - c.y;
-    double x = c.x + dx * cos(rad) - dy * sin(rad) - r->w / 2.0;
-    double y = c.y + dx * sin(rad) + dy * cos(rad) - r->h / 2.0;
+    double dx = r->x + r->w / 2.0 - p.x;
+    double dy = r->y + r->h / 2.0 - p.y;
 
-    r->x = round(x / grid) * grid;
-    r->y = round(y / grid) * grid;
+    r->x = p.x + dx * cs - dy * sn - r->w / 2.0 + 0.0;   /* never -0 */
+    r->y = p.y + dx * sn + dy * cs - r->h / 2.0 + 0.0;
+}
+
+/* The same piece again, nothing changed since the last turn: its pivot. */
+static vec2_t turn_around(const ed_history_t *h, const ed_grab_t *g,
+    double deg, double grid)
+{
+    vec2_t c = middle(g);
+
+    if (h->pivot_edits != 0 && h->pivot_edits == h->edits
+        && c.x == h->pivot_middle.x && c.y == h->pivot_middle.y)
+        return h->pivot;
+    return pivot(c, deg, grid);
 }
 
 bool ed_rotate(ed_level_t *lv, ed_history_t *h, double deg, double grid)
 {
     ed_grab_t g;
-    vec2_t c;
+    vec2_t p;
+    double cs = 0.0;
+    double sn = 0.0;
+    size_t hint = 0;
+    bool done;
 
     ed_grab(lv, &g);
-    c = middle(&g);
+    p = turn_around(h, &g, deg, grid);
+    hitbox_rotation(deg, &cs, &sn);
     for (size_t i = 0; i < g.count; i++) {
-        ed_object_t *o = ed_find(lv, g.ids[i]);
+        ed_object_t *o = ed_find_from(lv, g.ids[i], &hint);
 
+        if (o == NULL)
+            continue;
         if (g.count > 1)
-            swing(o, c, deg, grid);
+            swing(o, p, cs, sn);
         if (!o->is_start)
             o->obj.rotation = turned(o->obj.rotation + deg);
         ed_refresh(o);
     }
-    return commit_if_changed(lv, h, &g);
+    done = commit_if_changed(lv, h, &g);
+    if (done) {
+        ed_grab(lv, &g);
+        h->pivot = p;
+        h->pivot_middle = middle(&g);
+        h->pivot_edits = h->edits;
+        ed_grab_cancel(lv, &g);
+    }
+    return done;
 }

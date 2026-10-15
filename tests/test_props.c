@@ -5,11 +5,13 @@
 ** start positions as editor objects, the properties, turning (FEATURES 11.4, 11.8)
 */
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "editor/ed_props.h"
+#include "sim/hitbox.h"
 #include "sim/modes.h"
 #include "sim/sim.h"
 #include "test.h"
@@ -299,6 +301,142 @@ static void test_rotate(void)
     ed_level_free(&lv);
 }
 
+static bool at(ed_level_t *lv, int id, double x, double y)
+{
+    const rect_t *r = &ed_find(lv, id)->obj.rect;
+
+    return r->x == x && r->y == y && !signbit(r->x) && !signbit(r->y);
+}
+
+static void turn(ed_level_t *lv, double deg, int times)
+{
+    for (int i = 0; i < times; i++)
+        ed_rotate(lv, &H, deg, 50.0);
+}
+
+/* A piece turns back to where it was, on the grid, its shape kept (11.4). */
+static void test_rotate_back(void)
+{
+    ed_level_t lv;
+    rect_t ra;
+    rect_t rb;
+    int a;
+    int b;
+
+    begin(&lv);
+    a = add(&lv, "block 1000 600 2");          /* 3 half cells wide, 4 high */
+    b = add(&lv, "block 1050 700 2");
+    ed_select_all(&lv);
+    turn(&lv, 90.0, 1);
+    CHECK(at(&lv, a, 1100.0, 600.0) && at(&lv, b, 1000.0, 650.0));
+    turn(&lv, -90.0, 1);
+    CHECK(at(&lv, a, 1000.0, 600.0) && at(&lv, b, 1050.0, 700.0));
+    turn(&lv, 90.0, 4);
+    CHECK(at(&lv, a, 1000.0, 600.0) && at(&lv, b, 1050.0, 700.0));
+    turn(&lv, -90.0, 4);
+    CHECK(at(&lv, a, 1000.0, 600.0) && at(&lv, b, 1050.0, 700.0));
+    turn(&lv, 180.0, 2);
+    CHECK(at(&lv, a, 1000.0, 600.0) && at(&lv, b, 1050.0, 700.0));
+    ed_level_free(&lv);
+    begin(&lv);
+    a = add(&lv, "block 0 0 2");               /* across y = 0 and x = 0 */
+    b = add(&lv, "block 50 100 2");
+    ed_select_all(&lv);
+    turn(&lv, 90.0, 1);
+    ra = object_drawn_bounds(&ed_find(&lv, a)->obj);
+    rb = object_drawn_bounds(&ed_find(&lv, b)->obj);
+    CHECK(rb.x + rb.w == ra.x && ra.y + 50.0 == rb.y);  /* no gap, no overlap */
+    turn(&lv, -90.0, 1);
+    CHECK(at(&lv, a, 0.0, 0.0) && at(&lv, b, 50.0, 100.0));
+    turn(&lv, 90.0, 4);
+    CHECK(at(&lv, a, 0.0, 0.0) && at(&lv, b, 50.0, 100.0));
+    ed_level_free(&lv);
+    begin(&lv);
+    a = add(&lv, "block 1000 600 2 w=1");      /* 50 x 100 */
+    b = add(&lv, "block 1050 600 2");          /* beside it */
+    ed_select_all(&lv);
+    turn(&lv, 90.0, 1);
+    ra = object_drawn_bounds(&ed_find(&lv, a)->obj);
+    rb = object_drawn_bounds(&ed_find(&lv, b)->obj);
+    CHECK(ra.x == 1050.0 && ra.y == 550.0 && ra.w == 100.0 && ra.h == 50.0);
+    CHECK(rb.x == 1050.0 && rb.y == 600.0);   /* a column: a on top of b */
+    turn(&lv, -90.0, 1);
+    CHECK(at(&lv, a, 1000.0, 600.0) && at(&lv, b, 1050.0, 600.0));
+    ed_find(&lv, a)->obj.rect.x += 1.0;        /* off the grid by Shift+arrow */
+    ed_refresh(ed_find(&lv, a));
+    turn(&lv, 90.0, 1);
+    ra = object_drawn_bounds(&ed_find(&lv, a)->obj);
+    rb = object_drawn_bounds(&ed_find(&lv, b)->obj);
+    CHECK(ra.x == rb.x && ra.y + ra.h == rb.y + 1.0);   /* the pixel turned */
+    turn(&lv, -90.0, 1);
+    CHECK(at(&lv, a, 1001.0, 600.0) && at(&lv, b, 1050.0, 600.0));
+    ed_level_free(&lv);
+}
+
+static unsigned int rnd(unsigned int *seed, unsigned int n)
+{
+    *seed = *seed * 1664525u + 1013904223u;
+    return (*seed >> 8) % n;
+}
+
+/* Every object of the piece as it is drawn, on the 50 px grid. */
+static bool on_grid(const ed_level_t *lv)
+{
+    for (size_t i = 0; i < lv->count; i++) {
+        rect_t r = object_drawn_bounds(&lv->objects[i].obj);
+
+        if (fmod(r.x, 50.0) != 0.0 || fmod(r.y, 50.0) != 0.0)
+            return false;
+    }
+    return true;
+}
+
+static bool same_rects(const ed_level_t *lv, const rect_t *was)
+{
+    for (size_t i = 0; i < lv->count; i++)
+        if (lv->objects[i].obj.rect.x != was[i].x
+            || lv->objects[i].obj.rect.y != was[i].y)
+            return false;
+    return true;
+}
+
+/* Random pieces of blocks of any size, some turned, on both sides of 0. */
+static void test_rotate_random(void)
+{
+    static const double TURNS[] = {90.0, -90.0, 180.0};
+    rect_t was[6];
+    char line[96];
+    ed_level_t lv;
+    unsigned int seed = 7;
+    bool grid;
+    int on = 0;
+
+    for (int run = 0; run < 300; run++) {
+        int n = 2 + (int)rnd(&seed, 5);
+        double deg = TURNS[rnd(&seed, 3)];
+
+        begin(&lv);
+        for (int i = 0; i < n; i++) {
+            snprintf(line, sizeof(line), "block %d %d 2 w=%u h=%u rot=%u",
+                ((int)rnd(&seed, 12) - 6) * 50, ((int)rnd(&seed, 12) - 6) * 50,
+                1 + rnd(&seed, 4), 1 + rnd(&seed, 4), 90 * rnd(&seed, 4));
+            add(&lv, line);
+            was[i] = lv.objects[i].obj.rect;
+        }
+        ed_select_all(&lv);
+        grid = on_grid(&lv);       /* a 50 x 100 turned a quarter isn't */
+        turn(&lv, deg, 1);
+        CHECK(on_grid(&lv) == grid);
+        on += grid;
+        turn(&lv, -deg, 1);
+        CHECK(same_rects(&lv, was));
+        turn(&lv, deg, deg == 180.0 ? 2 : 4);
+        CHECK(same_rects(&lv, was));
+        ed_level_free(&lv);
+    }
+    CHECK(on > 30);                    /* enough pieces were on the grid */
+}
+
 void test_props(void)
 {
     test_start_objects();
@@ -308,5 +446,7 @@ void test_props(void)
     test_kinds();
     test_start_props();
     test_rotate();
+    test_rotate_back();
+    test_rotate_random();
     ed_history_free(&H);
 }

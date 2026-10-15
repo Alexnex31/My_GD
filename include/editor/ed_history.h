@@ -44,6 +44,9 @@ typedef struct ed_history {
     int gesture;
     unsigned int edits;       /* goes up at each change: what was computed
                                  from the level before is then out of date */
+    vec2_t pivot;             /* the last turn's (ed_rotate), while nothing   */
+    vec2_t pivot_middle;      /* else changed: the piece's middle it left and */
+    unsigned int pivot_edits; /* `edits` then. 0: none                        */
 } ed_history_t;
 
 /* A new action of the user's begins: a press, a key. */

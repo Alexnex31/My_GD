@@ -36,9 +36,12 @@ void ed_prop_text(const ed_level_t *lv, ed_prop_t p, char *out, size_t size);
 bool ed_prop_step(ed_level_t *lv, ed_history_t *h, ed_prop_t p, int dir);
 
 /*
-** Turns the selection by `deg`. Several objects also turn around their
-** common center, like one piece, and land on the grid; start positions move
-** with the piece but have nothing to turn.
+** Turns the selection by `deg`. Several objects also turn like one piece,
+** around a grid corner or a cell's center by their middle: a piece on the
+** grid stays on it, and keeps its shape. The next turn of the same piece,
+** with nothing changed between, goes around the same point, so the turn
+** back, or four quarters, put it back exactly. Start positions move with
+** the piece but have nothing to turn.
 */
 bool ed_rotate(ed_level_t *lv, ed_history_t *h, double deg, double grid);
 
