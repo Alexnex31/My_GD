@@ -308,8 +308,8 @@ void editor_events(editor_t *ed, gd_t *gd)
             wheel(ed, gd, ev);
         if (ev->type == sfEvtMouseButtonReleased)
             editor_mouse_release(ed, gd);
-        if (ev->type == sfEvtLostFocus && !editor_mouse_cancel(ed))
-            ed->mouse = ED_IDLE;
+        if (ev->type == sfEvtLostFocus)
+            editor_mouse_cancel(ed);
     }
     key_repeat(ed, gd);
 }

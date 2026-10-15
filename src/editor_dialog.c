@@ -142,9 +142,13 @@ void editor_dialog_draw(editor_t *ed, gd_t *gd)
 /*
 ** Every minute while there are unsaved changes, and when asked (before a
 ** playtest, when the window is closed): beside the level, never over it.
+** Never while the Restore question is up: the autosave is what it offers,
+** and a new level, unsaved from the start, would write over it.
 */
 void editor_autosave(editor_t *ed, bool now)
 {
+    if (ed->dialog == ED_DIALOG_RESTORE)
+        return;
     if (!now && ui_now_ms() < ed->autosave_at_ms)
         return;
     ed->autosave_at_ms = ui_now_ms() + ED_AUTOSAVE_EVERY_MS;

@@ -164,15 +164,19 @@ void editor_mouse_release(editor_t *ed, gd_t *gd)
     ed->measured = false;
 }
 
-/* Escape, or the window losing the mouse: the drag never happened. */
+/*
+** Escape, or the window losing the mouse: the drag never happened. A stroke
+** of painting or erasing ends with what it did (one undo step), and a pan
+** where it is: the button's release would never come to end them.
+*/
 bool editor_mouse_cancel(editor_t *ed)
 {
-    if (ed->mouse != ED_DRAGGING && ed->mouse != ED_BOXING
-        && ed->mouse != ED_DRAG_PENDING)
+    if (ed->mouse == ED_IDLE)
         return false;
     if (ed->mouse == ED_DRAGGING)
         ed_grab_cancel(&ed->lv, &ed->grab);
     ed->mouse = ED_IDLE;
     ed->measured = false;
+    ed_gesture(&ed->hist);
     return true;
 }
