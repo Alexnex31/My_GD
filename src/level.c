@@ -5,6 +5,8 @@
 ** the level scene: the fixed-timestep loop, death, respawn (3.6, 6.1)
 */
 
+#include <limits.h>
+
 #include "mygd.h"
 
 static void log_level_warning(const char *msg)
@@ -63,7 +65,8 @@ void level_flush_stats(level_t *lv, gd_t *gd)
     pe = progress_get(&gd->progress, lv->id);
     if (pe == NULL)
         return;
-    pe->attempts += lv->stats.attempts;
+    pe->attempts = lv->stats.attempts > INT_MAX - pe->attempts ? INT_MAX
+        : pe->attempts + lv->stats.attempts;
     if (lv->stats.best > pe->best) {
         pe->best = lv->stats.best;
         pe->level_hash = lv->file_hash;      /* the version it was set on */
@@ -258,8 +261,19 @@ void level_on_death(level_t *lv, gd_t *gd)
     music_stop(&gd->music);                  /* GD stops it on death (4.8) */
 }
 
-/* From the start, or in practice from the last checkpoint (13.1). */
-void level_respawn(level_t *lv, gd_t *gd)
+/* The song where the run is, `ahead` seconds past its tick (4.8). */
+static void song_from_run(level_t *lv, gd_t *gd, double ahead)
+{
+    if (lv->song.song != NULL)
+        music_play_from(&gd->music, music_expected(lv->song.offset,
+            lv->sim.st.tick, gd->music.audio_offset) + ahead);
+}
+
+/*
+** From the start, or in practice from the last checkpoint (13.1). The clock
+** is the caller's.
+*/
+static void respawn_run(level_t *lv)
 {
     if (!practice_restore(lv)) {
         sim_reset_at(&lv->sim, level_current_start(lv));
@@ -272,12 +286,16 @@ void level_respawn(level_t *lv, gd_t *gd)
     lv->drawn_bounds = lv->sim.st.bounds;
     for (int i = 0; i < MAX_FLASHES; i++)
         lv->flash_left[i] = 0.0f;
+    level_count_attempt(lv);
+}
+
+/* Out of the ticks (a restart, a new start): the run starts now. */
+void level_respawn(level_t *lv, gd_t *gd)
+{
+    respawn_run(lv);
     lv->accumulator = 0;
     lv->last_frame_us = input_now_us(gd);
-    level_count_attempt(lv);
-    if (lv->song.song != NULL)               /* where this start is in it (4.8) */
-        music_play_from(&gd->music, music_expected(lv->song.offset,
-            lv->sim.st.tick, gd->music.audio_offset));
+    song_from_run(lv, gd, 0.0);
 }
 
 /*
@@ -336,6 +354,18 @@ static void remember_position(level_t *lv)
     lv->path_len += 1;
 }
 
+/*
+** The death delay ends inside the frame's ticks: the clock goes on, so the
+** next tick, the run's first, has the input of its own time (FEATURES 1).
+** What's left in the accumulator is how far now is past this tick's end, and
+** the song is that far in.
+*/
+static void respawn_tick(level_t *lv, gd_t *gd)
+{
+    respawn_run(lv);
+    song_from_run(lv, gd, (double)lv->accumulator / (TICK_RATE * 1e6));
+}
+
 void level_step(level_t *lv, gd_t *gd, input_t in)
 {
     if (lv->state == LEVEL_DYING) {
@@ -343,7 +373,7 @@ void level_step(level_t *lv, gd_t *gd, input_t in)
         if (lv->death_ticks <= 0 && lv->playtest)
             lv->playtest_over = true;        /* the editor shows where (11.9) */
         else if (lv->death_ticks <= 0)
-            level_respawn(lv, gd);
+            respawn_tick(lv, gd);
         return;
     }
     if (lv->state != LEVEL_PLAYING || lv->playtest_over)
@@ -389,6 +419,7 @@ static void paused_frame(gd_t *gd, level_t *lv, int64_t now)
 {
     lv->last_frame_us = now;
     lv->frame_us = 0;
+    input_drain(gd);
     level_render(gd, lv);
     pause_draw(gd, lv);
 }
@@ -412,7 +443,7 @@ void level_frame(gd_t *gd, level_t *lv)
     while (lv->accumulator >= 1000000) {
         int64_t end = now * TICK_RATE - lv->accumulator + 1000000;
 
-        lv->accumulator -= 1000000;          /* first: a respawn zeroes it */
+        lv->accumulator -= 1000000;          /* first: a respawn reads it */
         level_step(lv, gd, input_for_tick(gd, end - 1000000, end));
     }
     if (lv->state == LEVEL_PLAYING && lv->song.song != NULL)

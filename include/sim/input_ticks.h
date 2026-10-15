@@ -47,6 +47,14 @@ bool input_queue_push(input_queue_t *q, input_change_t c);
 void input_queue_publish(input_queue_t *q, int64_t polled_us);
 
 /*
+** One poll at `now` saw `down`; `*queued` is the last state pushed. Its
+** change is pushed, then `now` published, but only once the change is in:
+** while the queue is full, `polled_us` waits, and so do the ticks.
+*/
+void input_queue_poll(input_queue_t *q, int64_t now, unsigned int down,
+    unsigned int *queued);
+
+/*
 ** The input of the tick that covers [start, end), in microseconds x TICK_RATE
 ** (3.6). Pressed only if a button went down inside it: a change before it
 ** updates the hold but presses nothing, and two presses in it are one.

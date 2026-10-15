@@ -106,12 +106,8 @@ static void *poll_loop(void *arg)
     clock_gettime(CLOCK_MONOTONIC, &t);
     while (atomic_load(&ip->running)) {
         int64_t now = input_clock_us();
-        unsigned int down = buttons_down(&ip->jump);
 
-        if (down != queued
-            && input_queue_push(&ip->queue, (input_change_t){now, down}))
-            queued = down;
-        input_queue_publish(&ip->queue, now);
+        input_queue_poll(&ip->queue, now, buttons_down(&ip->jump), &queued);
         sleep_until(&t);
     }
     return NULL;
@@ -141,16 +137,26 @@ void input_start(gd_t *gd)
 }
 
 /*
-** Out of the pause menu (PLAN 10.4): what happened while it was open is read
-** and pressed nothing, and the mouse button that clicked Resume is no jump
-** until it is released, as at a level's start.
+** Everything up to now is read and pressed nothing: the pause menu's frames,
+** so its clicks never fill the queue (a full one holds the clock back).
+*/
+void input_drain(gd_t *gd)
+{
+    int64_t now = input_now_us(gd) * TICK_RATE;
+
+    input_read_tick(&gd->input.reader, &gd->input.queue, now, now);
+}
+
+/*
+** Out of the pause menu (PLAN 10.4): what happened while it was open pressed
+** nothing, and the mouse button that clicked Resume is no jump until it is
+** released, as at a level's start.
 */
 void input_resume(gd_t *gd)
 {
     input_poll_t *ip = &gd->input;
-    int64_t now = input_now_us(gd) * TICK_RATE;
 
-    input_read_tick(&ip->reader, &ip->queue, now, now);
+    input_drain(gd);
     ip->reader.latched |= ip->reader.down & mouse_inputs(&ip->jump);
 }
 

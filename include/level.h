@@ -141,6 +141,7 @@ bool input_event_is(const sfEvent *ev, binding_t b);
 /* Per level. The click that started it isn't a jump: ignored until it's up. */
 void input_start(gd_t *gd);
 void input_resume(gd_t *gd);                 /* out of the pause menu */
+void input_drain(gd_t *gd);                  /* the pause menu's frames */
 void input_stop(gd_t *gd);
 
 /*

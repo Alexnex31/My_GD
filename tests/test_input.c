@@ -231,6 +231,29 @@ static void test_full_queue(void)
     free(q);
 }
 
+/*
+** A change that can't be queued holds the clock back: ticks never run past a
+** press the queue hasn't got, and it lands in its own tick once there's room.
+*/
+static void test_full_queue_holds_the_clock(void)
+{
+    input_queue_t *q = new_queue();
+    input_reader_t r = {0};
+    unsigned int queued = 0;
+
+    for (int i = 0; i < INPUT_QUEUE_SIZE; i++)
+        push(q, in_tick(0, i), 0);
+    input_queue_poll(q, in_tick(0, 10), 0, &queued);
+    CHECK(atomic_load(&q->polled_us) == in_tick(0, 10));   /* nothing new */
+    input_queue_poll(q, in_tick(1, 5), SPACE, &queued);
+    CHECK(atomic_load(&q->polled_us) == in_tick(0, 10) && queued == 0);
+    tick(&r, q, 0);                          /* the reader makes room */
+    input_queue_poll(q, in_tick(1, 6), SPACE, &queued);
+    CHECK(queued == SPACE && atomic_load(&q->polled_us) == in_tick(1, 6));
+    CHECK(tick(&r, q, 1).pressed);
+    free(q);
+}
+
 void test_input(void)
 {
     test_press_counts_in_its_tick_only();
@@ -244,4 +267,5 @@ void test_input(void)
     test_latched_click();
     test_other_button_while_held();
     test_full_queue();
+    test_full_queue_holds_the_clock();
 }

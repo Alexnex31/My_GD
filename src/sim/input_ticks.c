@@ -26,6 +26,15 @@ void input_queue_publish(input_queue_t *q, int64_t polled_us)
     atomic_store_explicit(&q->polled_us, polled_us, memory_order_release);
 }
 
+void input_queue_poll(input_queue_t *q, int64_t now, unsigned int down,
+    unsigned int *queued)
+{
+    if (down != *queued && input_queue_push(q, (input_change_t){now, down}))
+        *queued = down;
+    if (down == *queued)
+        input_queue_publish(q, now);
+}
+
 /* The oldest change not read yet, if it happened before `end`. */
 static bool next_change(input_queue_t *q, int64_t end, input_change_t *out)
 {
