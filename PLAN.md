@@ -2139,7 +2139,7 @@ portal 2100 750 2 ship
 | `name` | the level's prose name, shown in the list and on the end screen | the id |
 | `author` | who made it | empty |
 | `music` | a file in `res/songs/`, as `songs.txt` names it (FEATURES 4.3, 4.5) | empty: the menu default |
-| `music_offset` | seconds of song to skip at the start (FEATURES 4.4) | 0 |
+| `music_offset` | seconds of song to skip at the start (FEATURES 4.4); a line, 0 included, is the level's own | the song's `default_offset` |
 | `bpm` | the editor's beat grid (FEATURES 11.11) | 0: no grid |
 | `first_beat` | song time in seconds of beat 0, which the grid counts from | 0 |
 | `start_gamemode` | `cube`, `ship`, … : the mode the attempt starts in | `cube` |

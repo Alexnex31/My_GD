@@ -148,7 +148,7 @@ Two tools, `Tab` switches between them: **Place** and **Select**.
 | V | Verify: the bot looks for a way through the level (Escape stops it) |
 | N, or a click on the strip at the bottom | Go to the next object that looks wrong |
 | Ctrl+S | Save |
-| Escape | Cancel a drag, then drop the selection, then leave (asks to save, discard or cancel if there are unsaved changes) |
+| Escape | Cancel a drag or end a stroke, then drop the selection, then leave (asks to save, discard or cancel if there are unsaved changes) |
 
 Holding a move key, Ctrl+Z or Ctrl+Y repeats it.
 
