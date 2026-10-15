@@ -18,11 +18,28 @@
 #include "test.h"
 
 static int warnings;
+static char last[256];
 
 static void count_warning(const char *msg)
 {
-    (void)msg;
+    snprintf(last, sizeof(last), "%s", msg);
     warnings += 1;
+}
+
+static int load(sim_t *s, const char *text);
+
+/* The one warning a text gives: its message, without the file and line. */
+static bool said(const char *text, const char *what)
+{
+    sim_t s;
+    const char *colon;
+
+    last[0] = '\0';
+    load(&s, text);
+    sim_free(&s);
+    colon = strchr(last, ':');
+    colon = colon != NULL ? strchr(colon + 1, ':') : NULL;
+    return warnings == 1 && colon != NULL && strcmp(colon + 2, what) == 0;
 }
 
 static int load(sim_t *s, const char *text)
@@ -173,6 +190,133 @@ static void test_rejections(void)
     check_rejected("block 1000 -2e7 2");
     check_rejected("block 1000 700 2 w=300000");
     check_rejected("block 1000 700 300000");
+    check_rejected("block 1000 700 2 rot=1e308");  /* finite, no angle (7.2) */
+    check_rejected("block 1000 700 2 rot=-2e6");
+    check_rejected("block 1000 700 2 w=0.01");     /* half a pixel */
+    check_rejected("start 2e7 300 cube");
+}
+
+/*
+** Each message says what is wrong with the line, and a skipped line says
+** nothing else first (7.3).
+*/
+static void test_messages(void)
+{
+    CHECK(said("start 2e7 300 cube\n",
+        "start out of range (10000000 px), line skipped"));
+    CHECK(said("start 100 300\n",
+        "start needs x y and a gamemode, line skipped"));
+    CHECK(said("portal 100 750 2 ship extra\n",
+        "unexpected word 'extra', line skipped"));
+    CHECK(said("block 1 2 3 foo=1 w=0\n",
+        "invalid value for w= ('0'), line skipped"));
+    CHECK(said("block 1 2 3 rot=1e308\n",
+        "invalid value for rot= ('1e308'), line skipped"));
+    CHECK(said("block 1 2 3 foo=1\n", "unknown field foo=, ignored"));
+    CHECK(said("difficulty hard\n",
+        "unknown header field 'difficulty', ignored"));
+    CHECK(said("start_x -1e300\n", "start_x out of range, ignored"));
+    CHECK(said("bpm 1001\n", "bpm out of range, ignored"));
+    CHECK(said("music_offset 1e6\n", "music_offset out of range, ignored"));
+    CHECK(said("bpm 12000000000000000000000000000000000000000000000000000000000"
+        "0000000000000000\n", "header field value too long, ignored"));
+}
+
+/* A huge turn is no angle, a big one is still its own (7.2, 4.2). */
+static void test_rotation_range(void)
+{
+    sim_t a;
+    sim_t b;
+
+    load(&a, "block 1000 700 2 rot=100045\n");
+    load(&b, "block 1000 700 2 rot=325\n");
+    CHECK(warnings == 0 && a.lvl.nb_objects == 1);
+    for (int i = 0; i < a.lvl.objects[0].hitbox.nverts; i++) {
+        CHECK(a.lvl.objects[0].hitbox.verts[i].x
+            == b.lvl.objects[0].hitbox.verts[i].x);
+        CHECK(a.lvl.objects[0].hitbox.verts[i].y
+            == b.lvl.objects[0].hitbox.verts[i].y);
+    }
+    sim_free(&a);
+    sim_free(&b);
+    load(&a, "block 3000 700 2\nblock 100 700 2 rot=1e308\nblock 1000 700 2\n");
+    CHECK(a.lvl.nb_objects == 2 && a.lvl.skipped_lines == 1);
+    CHECK(a.lvl.objects[0].rect.x == 1000.0 && a.lvl.objects[1].rect.x == 3000.0);
+    sim_free(&a);
+}
+
+/* w and h take decimals: a portal is 1.2 blocks, widened by whole ones. */
+static void test_decimal_sizes(void)
+{
+    sim_t s;
+
+    load(&s, "portal 990 750 2 ship w=3.4\nblock 100 700 2 h=0.5\n");
+    CHECK(warnings == 0 && s.lvl.nb_objects == 2);
+    CHECK(s.lvl.objects[0].rect.h == 25.0);
+    CHECK(s.lvl.objects[1].rect.w == 170.0);
+    sim_free(&s);
+}
+
+/*
+** A line is read whole or not at all: too many words or too many characters
+** skip it, they never drop its end (7.3). Below that, every field counts.
+*/
+static void test_long_lines(void)
+{
+    char text[3000] = "block 100 750 2";
+    sim_t s;
+
+    for (int i = 0; i < 20; i++)
+        snprintf(text + strlen(text), sizeof(text) - strlen(text), " k%d=1", i);
+    strcat(text, " rot=90 w=4\n");
+    load(&s, text);
+    CHECK(s.lvl.nb_objects == 1 && s.lvl.skipped_lines == 0);
+    CHECK(s.lvl.objects[0].rotation == 90.0 && s.lvl.objects[0].rect.w == 200.0);
+    sim_free(&s);
+    strcpy(text, "block 100 750 2");
+    for (int i = 0; i < 70; i++)
+        snprintf(text + strlen(text), sizeof(text) - strlen(text), " k%d=1", i);
+    strcat(text, "\nblock 500 750 2\n");
+    load(&s, text);
+    CHECK(s.lvl.nb_objects == 1 && s.lvl.skipped_lines == 1);
+    sim_free(&s);
+    strcpy(text, "block 100 750 2 group=");
+    for (int i = 0; i < 1100; i++)
+        strcat(text, "7");
+    strcat(text, " rot=90\nblock 500 750 2\n");
+    load(&s, text);
+    CHECK(s.lvl.nb_objects == 1 && s.lvl.skipped_lines == 1);
+    CHECK(s.lvl.objects[0].rect.x == 500.0);
+    sim_free(&s);
+}
+
+/* Blanks before a key, and the mark some editors write first, are nothing. */
+static void test_leading_blanks(void)
+{
+    sim_t s;
+
+    load(&s, "\xEF\xBB\xBF" "block 100 750 2\n  name Foo\n\tauthor Me\n");
+    CHECK(warnings == 0 && s.lvl.nb_objects == 1);
+    CHECK(strcmp(s.lvl.hdr.name, "Foo") == 0);
+    CHECK(strcmp(s.lvl.hdr.author, "Me") == 0);
+    sim_free(&s);
+}
+
+/* Header numbers stay where nothing downstream overflows on them (7.2). */
+static void test_header_ranges(void)
+{
+    sim_t s;
+
+    load(&s, "start_x -1e300\nbpm 1e300\nfirst_beat 1e9\nstart 100 800 cube\n");
+    CHECK(warnings == 3);
+    CHECK(s.lvl.hdr.start.pos.x == PLAYER_SPAWN_X && s.lvl.hdr.bpm == 0.0);
+    sim_reset_at(&s, &s.lvl.starts[0]);
+    CHECK(s.st.tick == 0);
+    sim_free(&s);
+    load(&s, "start_x 9999999\nbpm 1000\nmusic_offset -3\n");
+    CHECK(warnings == 0 && s.lvl.hdr.bpm == 1000.0);
+    CHECK(s.lvl.hdr.start.pos.x == 9999999.0 && s.lvl.hdr.music_offset == -3.0);
+    sim_free(&s);
 }
 
 /* The range is wide: two hours of level still load (7.2). */
@@ -405,6 +549,12 @@ void test_parser(void)
     test_header_fields();
     test_name_rules();
     test_rejections();
+    test_messages();
+    test_rotation_range();
+    test_decimal_sizes();
+    test_long_lines();
+    test_leading_blanks();
+    test_header_ranges();
     test_far_object_kept();
     test_kept_with_warning();
     test_fields();

@@ -25,7 +25,9 @@ int level_parse_mem(const char *buf, size_t len, const char *source,
 ** A level as a document, for what edits one (FEATURES 11.1): its objects in
 ** file order, what each line carried that nothing here edits (group=, keys
 ** from a newer version) to be written back unchanged, and its other start
-** positions. The header is kept beside it.
+** positions. The lines it couldn't use, a header field it doesn't know or a
+** line it skipped, are kept as they were, so a save loses nothing (7.2).
+** The header is kept beside it.
 */
 typedef struct level_doc {
     object_t *objs;
@@ -33,6 +35,8 @@ typedef struct level_doc {
     size_t count;
     level_start_t *starts;
     size_t nb_starts;
+    char **kept;              /* whole lines, as written, in file order */
+    size_t nb_kept;
 } level_doc_t;
 
 /* Returns the lines it skipped, like level_parse_mem. hdr holds its defaults. */
@@ -47,7 +51,14 @@ void level_header_defaults(level_header_t *hdr, const char *id);
 ** needs. Parsing it gives the same document back. malloc'd, NUL terminated.
 */
 char *level_write_mem(const level_doc_t *doc, const level_header_t *hdr);
-/* To <path>.tmp, then renamed over path: a crash never leaves half a level. */
+/* The objects' indices in the order the file lists them: by x, then y. */
+void level_write_order(const level_doc_t *doc, size_t *order);
+/* A name, author or music as the reader takes it back: up to a '#', trimmed. */
+void level_clean_text(char *text);
+/*
+** To <path>.tmp, synced, then renamed over path: a crash never leaves half a
+** level, and a failure never touches the level itself.
+*/
 int level_write(const char *path, const level_doc_t *doc,
     const level_header_t *hdr);
 
@@ -57,6 +68,11 @@ int level_object_from_line(const char *line, object_t *o);
 
     #define LEVEL_ID_MAX 18      /* digits in an id: fits any GD-sized number */
     #define LEVEL_COORD_MAX 1e7  /* px: x, y, w and h, hours of level (7.2)   */
+    #define LEVEL_ROT_MAX 1e6    /* degrees a rot= may say (7.2)              */
+    #define LEVEL_BPM_MAX 1000.0 /* the beat grid's tempo, 0 for none (7.2)  */
+    #define LEVEL_SECONDS_MAX 86400.0   /* music_offset, first_beat: a day   */
+    #define LEVEL_OBJECTS_MAX 250000    /* GD's longest levels, three times  */
+    #define LEVEL_FILE_MAX (16L * 1024 * 1024)   /* bytes read from a file (7.3) */
 
 /* "levels/10280.gd" -> "10280"; false when the name isn't <digits>.gd (7.2) */
 bool level_id_from_path(const char *path, char *id, size_t size);

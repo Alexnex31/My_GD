@@ -139,7 +139,7 @@ static void rotation_of(double deg, double *cs, double *sn)
         *sn = quarter[(int)(turns / 90.0)][1];
         return;
     }
-    rad = deg * M_PI / 180.0;
+    rad = turns * M_PI / 180.0;              /* the reduced angle: finite */
     *cs = cos(rad);
     *sn = sin(rad);
 }

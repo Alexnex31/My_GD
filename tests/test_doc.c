@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "sim/level.h"
 #include "sim/modes.h"
@@ -207,6 +209,11 @@ static void check_round_trip(const char *path)
     sim_load_mem(&from_doc, text, strlen(text), "1", NULL);
     CHECK(same_play(&from_file, &from_doc, false));   /* ties in x may swap */
     sim_free(&from_doc);
+    sim_init(&from_doc, &doc, &hdr, "1");             /* but not once saved */
+    sim_free(&from_file);
+    sim_load_mem(&from_file, text, strlen(text), "1", NULL);
+    CHECK(same_play(&from_file, &from_doc, true));
+    sim_free(&from_doc);
     sim_free(&from_file);
     level_doc_free(&doc);
     level_doc_free(&again);
@@ -235,6 +242,181 @@ static void test_every_level(void)
     CHECK(seen >= 12);
 }
 
+/*
+** Written, read and written again, a text no longer changes: what a save
+** writes reads back as the very same document (7.2, FEATURES 11.12).
+*/
+static char *settled(const char *text, level_doc_t *doc, level_header_t *hdr)
+{
+    level_doc_t first;
+    level_header_t h1;
+    char *t1;
+    char *t2;
+
+    parse(text, &first, &h1);
+    t1 = level_write_mem(&first, &h1);
+    parse(t1, doc, hdr);
+    t2 = level_write_mem(doc, hdr);
+    CHECK(strcmp(t1, t2) == 0);
+    level_doc_free(&first);
+    free(t1);
+    return t2;
+}
+
+/*
+** What the editor can make, or a person can write, survives a save: a
+** widened portal, long extra fields, a name with a '#', exact numbers.
+*/
+static void test_survives_a_save(void)
+{
+    char text[2048] = "block 100 750 2";
+    level_doc_t doc;
+    level_header_t hdr;
+    char *out;
+
+    out = settled("portal 990 750 2 ship w=3.4 h=6.6\n", &doc, &hdr);
+    CHECK(doc.count == 1 && doc.objs[0].rect.w == 170.0);
+    CHECK(doc.objs[0].rect.h == 330.0 && strstr(out, " w=3.4 h=6.6") != NULL);
+    free(out);
+    level_doc_free(&doc);
+    for (int i = 0; i < 9; i++)
+        snprintf(text + strlen(text), sizeof(text) - strlen(text),
+            " k%02d=aaaaaaaaaaaaaaaaaaaaaaa", i);
+    strcat(text, " averyverylongkeyname=1 group=1,2,3,4,5,6,7,8,9,10,11,12\n");
+    out = settled(text, &doc, &hdr);
+    CHECK(doc.count == 1 && strstr(out, "averyverylongkeyname=1 group="
+        "1,2,3,4,5,6,7,8,9,10,11,12\n") != NULL);
+    free(out);
+    level_doc_free(&doc);
+    out = settled("block 1000.123456789 700.5 2 rot=33.333333333333\n"
+        "bpm 128.123456789012\n", &doc, &hdr);
+    CHECK(doc.objs[0].rect.x == 1000.123456789);
+    CHECK(doc.objs[0].rotation == 33.333333333333 && hdr.bpm == 128.123456789012);
+    CHECK(strstr(out, "block 1000.123456789 700.5 2 rot=33.333333333333") != NULL);
+    free(out);
+    level_doc_free(&doc);
+    level_header_defaults(&hdr, "7");
+    parse("block 1 750 2\n", &doc, &hdr);
+    snprintf(hdr.name, sizeof(hdr.name), "  Level #1  ");
+    out = level_write_mem(&doc, &hdr);
+    CHECK(strncmp(out, "name Level\n", 11) == 0);
+    free(out);
+    snprintf(hdr.name, sizeof(hdr.name), "   ");
+    out = level_write_mem(&doc, &hdr);
+    CHECK(strncmp(out, "name", 4) != 0);       /* nothing a reader would take */
+    free(out);
+    level_doc_free(&doc);
+}
+
+/*
+** What the fuzzer found: a \r is a blank around a value, wherever it is, and
+** a NUL ends a line's text, for the kept copy as for the reader.
+*/
+static void test_odd_bytes(void)
+{
+    const char nul[] = "\r\0\n/\nblock 1 750 2\n";
+    level_doc_t doc;
+    level_header_t hdr;
+    char *t1;
+    char *t2;
+
+    free(settled("name\t\t\t\r\t\t\t\t\nblock 1 750 2\n", &doc, &hdr));
+    CHECK(strcmp(hdr.name, "7") == 0);
+    level_doc_free(&doc);
+    level_header_defaults(&hdr, "7");
+    level_parse_doc(nul, sizeof(nul) - 1, "7", &doc, &hdr, NULL);
+    t1 = level_write_mem(&doc, &hdr);
+    level_doc_free(&doc);
+    level_header_defaults(&hdr, "7");
+    level_parse_doc(t1, strlen(t1), "7", &doc, &hdr, NULL);
+    t2 = level_write_mem(&doc, &hdr);
+    CHECK(strcmp(t1, t2) == 0 && doc.count == 1);
+    free(t1);
+    free(t2);
+    level_doc_free(&doc);
+}
+
+/*
+** The lines a build can't use are kept as they were, where the header ends:
+** a field from a newer build, a line it skipped (7.2).
+*/
+static void test_kept_lines(void)
+{
+    char longline[1200] = "block 1 2 3 group=";
+    char text[1600];
+    level_doc_t doc;
+    level_header_t hdr;
+    char *out;
+
+    for (int i = 0; i < 1050; i++)
+        strcat(longline, "7");
+    snprintf(text, sizeof(text), "name Kept\ndifficulty hard  # a comment\n"
+        "block 100 750 2\nblock 1 2 3 w=0\n%s\n", longline);
+    out = settled(text, &doc, &hdr);
+    CHECK(doc.count == 1 && doc.nb_kept == 3);
+    CHECK(strcmp(doc.kept[0], "difficulty hard  # a comment") == 0);
+    CHECK(strcmp(doc.kept[1], "block 1 2 3 w=0") == 0);
+    CHECK(strcmp(doc.kept[2], longline) == 0);
+    CHECK(strncmp(out, "name Kept\ndifficulty hard  # a comment\n", 39) == 0);
+    free(out);
+    level_doc_free(&doc);
+}
+
+/* A level, saved: the order the file lists ties in is the editor's too. */
+static void test_ties_as_saved(void)
+{
+    level_doc_t doc;
+    level_header_t hdr;
+    sim_t from_doc;
+    sim_t from_file;
+    char *text;
+
+    parse("speed 1500 950 2 4\nspeed 1500 650 2 0.5\nblock 9000 750 2\n",
+        &doc, &hdr);
+    text = level_write_mem(&doc, &hdr);
+    sim_init(&from_doc, &doc, &hdr, "7");
+    sim_load_mem(&from_file, text, strlen(text), "7", NULL);
+    for (size_t i = 0; i < from_doc.lvl.speeds.n; i++)
+        CHECK(from_doc.lvl.speeds.at[i].step == from_file.lvl.speeds.at[i].step);
+    for (size_t i = 0; i < from_doc.lvl.nb_objects; i++)
+        CHECK(from_doc.lvl.objects[i].rect.y == from_file.lvl.objects[i].rect.y);
+    sim_free(&from_doc);
+    sim_free(&from_file);
+    free(text);
+    level_doc_free(&doc);
+}
+
+/* A path too long for any fixed buffer: the level and nothing else. */
+static void test_long_path(void)
+{
+    char dir[600] = "/tmp/";
+    char path[700];
+    level_doc_t doc;
+    level_header_t hdr;
+    size_t len = 0;
+    char *back;
+
+    for (int d = 0; d < 2; d++) {
+        for (int i = 0; i < 255; i++)
+            strcat(dir, d == 0 ? "a" : "b");
+        mkdir(dir, 0700);
+        strcat(dir, "/");
+    }
+    snprintf(path, sizeof(path), "%s1.gd", dir);
+    CHECK(strlen(path) > 512);
+    parse("block 100 750 2\n", &doc, &hdr);
+    CHECK(level_write(path, &doc, &hdr) == 0);
+    back = read_file(path, &len);
+    CHECK(back != NULL && strcmp(back, "name 7\n\nblock 100 750 2\n") == 0);
+    free(back);
+    remove(path);
+    dir[strlen(dir) - 1] = '\0';
+    rmdir(dir);
+    dir[strlen(dir) - 256] = '\0';
+    rmdir(dir);
+    level_doc_free(&doc);
+}
+
 /* A file is written whole or not at all, and reads back. */
 static void test_write_file(void)
 {
@@ -256,6 +438,11 @@ static void test_write_file(void)
 
 void test_doc(void)
 {
+    test_survives_a_save();
+    test_kept_lines();
+    test_odd_bytes();
+    test_ties_as_saved();
+    test_long_path();
     test_starts();
     test_extras();
     test_lines();

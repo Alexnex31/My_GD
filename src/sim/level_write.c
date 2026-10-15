@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "sim/alloc.h"
 #include "sim/level.h"
@@ -45,46 +46,126 @@ static void put(text_buf_t *b, const char *fmt, ...)
     b->len += (size_t)n;
 }
 
+/*
+** The shortest text that reads back as exactly v: a hand-tuned 1000.123456789
+** stays itself, and 0.1 is still written 0.1 (7.2).
+*/
+static const char *num(char *out, double v)
+{
+    for (int digits = 10; digits <= 17; digits++) {
+        snprintf(out, 32, "%.*g", digits, v);
+        if (strtod(out, NULL) == v)
+            break;
+    }
+    return out;
+}
+
+/*
+** A width or height in grid units that reads back as exactly px: the reader
+** multiplies by 50, so the units written are the double whose product is px,
+** found next to px / 50 when that one rounds the other way.
+*/
+static const char *units(char *out, double px)
+{
+    double u = px / UNIT;
+    double down = u;
+    double up = u;
+
+    for (int i = 0; i < 8 && u * UNIT != px; i++) {
+        down = nextafter(down, -INFINITY);
+        up = nextafter(up, INFINITY);
+        u = down * UNIT == px ? down : up * UNIT == px ? up : u;
+    }
+    return num(out, u);
+}
+
+static bool is_trim(char c)
+{
+    return c == ' ' || c == '\t' || c == '\r';
+}
+
+/*
+** A text field as the reader will take it back: up to a '#', which starts a
+** comment (7.2), without the blanks around it, \r included (written last on
+** its line, it would be read as the line's end). Empty: nothing to write.
+*/
+void level_clean_text(char *text)
+{
+    size_t len;
+    size_t lead = 0;
+    char *hash = strchr(text, '#');
+
+    if (hash != NULL)
+        *hash = '\0';
+    while (is_trim(text[lead]))
+        lead += 1;
+    len = strlen(text + lead);
+    memmove(text, text + lead, len + 1);
+    while (len > 0 && is_trim(text[len - 1]))
+        len -= 1;
+    text[len] = '\0';
+}
+
+static void put_text(text_buf_t *b, const char *key, const char *value)
+{
+    char clean[256];
+
+    snprintf(clean, sizeof(clean), "%s", value);
+    level_clean_text(clean);
+    if (clean[0] != '\0')
+        put(b, "%s %s\n", key, clean);
+}
+
 /* Only what differs from the defaults a file without it gets (7.2). */
 static void put_header(text_buf_t *b, const level_header_t *h)
 {
     const level_start_t *st = &h->start;
+    char n[32];
 
-    if (h->name[0] != '\0')
-        put(b, "name %s\n", h->name);
-    if (h->author[0] != '\0')
-        put(b, "author %s\n", h->author);
-    if (h->music[0] != '\0')
-        put(b, "music %s\n", h->music);
+    put_text(b, "name", h->name);
+    put_text(b, "author", h->author);
+    put_text(b, "music", h->music);
     if (h->music_offset != 0.0)
-        put(b, "music_offset %.10g\n", h->music_offset);
+        put(b, "music_offset %s\n", num(n, h->music_offset));
     if (h->bpm != 0.0)
-        put(b, "bpm %.10g\n", h->bpm);
+        put(b, "bpm %s\n", num(n, h->bpm));
     if (h->first_beat != 0.0)
-        put(b, "first_beat %.10g\n", h->first_beat);
+        put(b, "first_beat %s\n", num(n, h->first_beat));
     if (st->pos.x != PLAYER_SPAWN_X)
-        put(b, "start_x %.10g\n", st->pos.x);
+        put(b, "start_x %s\n", num(n, st->pos.x));
     if (st->pos.y != PLAYER_SPAWN_Y)
-        put(b, "start_y %.10g\n", st->pos.y);
+        put(b, "start_y %s\n", num(n, st->pos.y));
     if (st->mode != MODE_CUBE)
         put(b, "start_gamemode %s\n", MODES[st->mode].name);
     if (st->gravity_dir < 0)
         put(b, "start_gravity flipped\n");
     if (st->speed != 1.0)
-        put(b, "start_speed %.10g\n", st->speed);
+        put(b, "start_speed %s\n", speed_word(st->speed));
     if (st->mini)
         put(b, "start_size mini\n");
 }
 
+/* What the reader couldn't use, as it was, after what it could (7.2). */
+static void put_kept(text_buf_t *b, const level_doc_t *doc)
+{
+    for (size_t i = 0; doc->kept != NULL && i < doc->nb_kept; i++) {
+        put(b, "%s", doc->kept[i]);
+        put(b, "\n");
+    }
+}
+
 static void put_starts(text_buf_t *b, const level_doc_t *doc)
 {
+    char x[32];
+    char y[32];
+
     for (size_t i = 0; i < doc->nb_starts; i++) {
         const level_start_t *st = &doc->starts[i];
 
-        put(b, "start %.10g %.10g %s%s", st->pos.x, st->pos.y,
+        put(b, "start %s %s %s%s", num(x, st->pos.x), num(y, st->pos.y),
             MODES[st->mode].name, st->gravity_dir < 0 ? " up" : "");
         if (st->speed != 1.0)
-            put(b, " %.10g", st->speed);
+            put(b, " %s", speed_word(st->speed));
         if (st->mini)
             put(b, " mini");
         put(b, "\n");
@@ -145,34 +226,50 @@ static void put_object(text_buf_t *b, const object_t *o, const char *extra)
 {
     vec2_t at = written_pos(o);
     const char *word = object_word(o);
+    char x[32];
+    char y[32];
 
-    put(b, "%s %.10g %.10g %d", obj_type_name(o->type), at.x, at.y, o->size);
+    put(b, "%s %s %s %d", obj_type_name(o->type), num(x, at.x), num(y, at.y),
+        o->size);
     if (word != NULL)
         put(b, " %s", word);
     if (o->rotation != 0.0)
-        put(b, " rot=%.10g", o->rotation);
+        put(b, " rot=%s", num(x, o->rotation));
     if (o->rect.w != derived_w(o))
-        put(b, " w=%.10g", o->rect.w / UNIT);
+        put(b, " w=%s", units(x, o->rect.w));
     if (o->rect.h != derived_h(o))
-        put(b, " h=%.10g", o->rect.h / UNIT);
+        put(b, " h=%s", units(x, o->rect.h));
     put(b, "%s\n", extra != NULL ? extra : "");
 }
 
-static const level_doc_t *sorting;
+typedef struct placed {
+    vec2_t at;
+    size_t index;
+} placed_t;
 
 /* By x, then y, then the order they had: readable files, small diffs. */
 static int by_position(const void *a, const void *b)
 {
-    size_t ia = *(const size_t *)a;
-    size_t ib = *(const size_t *)b;
-    vec2_t pa = written_pos(&sorting->objs[ia]);
-    vec2_t pb = written_pos(&sorting->objs[ib]);
+    const placed_t *pa = a;
+    const placed_t *pb = b;
 
-    if (pa.x != pb.x)
-        return (pa.x > pb.x) - (pa.x < pb.x);
-    if (pa.y != pb.y)
-        return (pa.y > pb.y) - (pa.y < pb.y);
-    return (ia > ib) - (ia < ib);
+    if (pa->at.x != pb->at.x)
+        return (pa->at.x > pb->at.x) - (pa->at.x < pb->at.x);
+    if (pa->at.y != pb->at.y)
+        return (pa->at.y > pb->at.y) - (pa->at.y < pb->at.y);
+    return (pa->index > pb->index) - (pa->index < pb->index);
+}
+
+void level_write_order(const level_doc_t *doc, size_t *order)
+{
+    placed_t *p = sim_xcalloc(doc->count + 1, sizeof(placed_t));
+
+    for (size_t i = 0; i < doc->count; i++)
+        p[i] = (placed_t){written_pos(&doc->objs[i]), i};
+    qsort(p, doc->count, sizeof(placed_t), by_position);
+    for (size_t i = 0; i < doc->count; i++)
+        order[i] = p[i].index;
+    free(p);
 }
 
 char *level_write_mem(const level_doc_t *doc, const level_header_t *hdr)
@@ -181,13 +278,11 @@ char *level_write_mem(const level_doc_t *doc, const level_header_t *hdr)
     size_t *order = sim_xcalloc(doc->count + 1, sizeof(size_t));
 
     put_header(&b, hdr);
+    put_kept(&b, doc);
     put_starts(&b, doc);
     if (b.len > 0 && doc->count > 0)
         put(&b, "\n");
-    for (size_t i = 0; i < doc->count; i++)
-        order[i] = i;
-    sorting = doc;
-    qsort(order, doc->count, sizeof(size_t), by_position);
+    level_write_order(doc, order);
     for (size_t i = 0; i < doc->count; i++)
         put_object(&b, &doc->objs[order[i]],
             doc->extras != NULL ? doc->extras[order[i]] : NULL);
@@ -195,27 +290,39 @@ char *level_write_mem(const level_doc_t *doc, const level_header_t *hdr)
     return b.text;
 }
 
+/*
+** The text on disk before the name points at it: written, flushed and
+** synced, so the rename never publishes a file the disk doesn't hold yet.
+*/
+static bool write_all(const char *tmp, const char *text, size_t len)
+{
+    FILE *f = fopen(tmp, "wb");
+    bool ok;
+
+    if (f == NULL)
+        return false;
+    ok = fwrite(text, 1, len, f) == len;
+    ok = fflush(f) == 0 && ok;
+    ok = fsync(fileno(f)) == 0 && ok;
+    return fclose(f) == 0 && ok;
+}
+
 int level_write(const char *path, const level_doc_t *doc,
     const level_header_t *hdr)
 {
-    char tmp[512];
+    char *tmp = sim_xcalloc(strlen(path) + 5, 1);
     char *text = level_write_mem(doc, hdr);
-    size_t len = strlen(text);
-    FILE *f;
     bool ok;
 
-    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
-    f = fopen(tmp, "wb");
-    if (f == NULL) {
-        free(text);
-        return -1;
-    }
-    ok = fwrite(text, 1, len, f) == len;
-    ok = fclose(f) == 0 && ok;
+    memcpy(tmp, path, strlen(path));
+    memcpy(tmp + strlen(path), ".tmp", 4);     /* never cut: its own size */
+    ok = write_all(tmp, text, strlen(text));
     free(text);
     if (!ok || rename(tmp, path) != 0) {
         remove(tmp);
+        free(tmp);
         return -1;
     }
+    free(tmp);
     return 0;
 }
