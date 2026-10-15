@@ -7,10 +7,13 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "editor/ed_music.h"
+#include "sim/alloc.h"
 #include "sim/constants.h"
+#include "sim/level.h"
 #include "sim/speed.h"
 
 /* The offset the game will start the level's song at (4.4). */
@@ -22,16 +25,28 @@ double ed_song_offset(const ed_level_t *lv, const library_t *lib)
 /*
 ** The level's speed portals, in x order: time along the level isn't one
 ** division once the speed changes (FEATURES 10.3). Built at each call from
-** the objects as they are now; the caller frees it.
+** the objects as they are now; the caller frees it. Added in the order the
+** saved file lists them, as the game adds them: two at the same x then end
+** the same way here as in the game.
 */
 static speed_map_t speeds_of(const ed_level_t *lv)
 {
     speed_map_t m = {0};
+    level_doc_t doc = {.objs = sim_xcalloc(lv->count + 1, sizeof(object_t))};
+    size_t *order;
 
     for (size_t i = 0; i < lv->count; i++)
-        if (!lv->objects[i].is_start)
-            speed_map_add(&m, &lv->objects[i].obj);
+        if (!lv->objects[i].is_start && lv->objects[i].obj.type == OBJ_SPEED) {
+            doc.objs[doc.count] = lv->objects[i].obj;
+            doc.count += 1;
+        }
+    order = sim_xcalloc(doc.count + 1, sizeof(size_t));
+    level_write_order(&doc, order);
+    for (size_t k = 0; k < doc.count; k++)
+        speed_map_add(&m, &doc.objs[order[k]]);
     speed_map_sort(&m);
+    free(order);
+    free(doc.objs);
     return m;
 }
 
@@ -135,11 +150,32 @@ void ed_song_prop_text(const ed_level_t *lv, const library_t *lib,
         snprintf(out, size, "%.2f s", lv->hdr.first_beat);
 }
 
-/* "none", then each song of the library, and round again. */
+/*
+** A song a level can name: its file fits the field and reads back the same,
+** with no '#' and no blanks around it (7.2).
+*/
+static bool nameable(const ed_level_t *lv, const char *file)
+{
+    char clean[sizeof(lv->hdr.music)];
+
+    if (strlen(file) >= sizeof(clean))
+        return false;
+    snprintf(clean, sizeof(clean), "%s", file);
+    level_clean_text(clean);
+    return strcmp(clean, file) == 0;
+}
+
+/* "none", then each song of the library a level can name, and round again. */
 static void step_song(ed_level_t *lv, const library_t *lib, int dir)
 {
     long n = (long)lib->count + 1;
-    long at = (song_index(lv, lib) + 1 + dir + n) % n;
+    long at = song_index(lv, lib) + 1;
+
+    for (long tries = 0; tries < n; tries++) {
+        at = (at + dir + n) % n;
+        if (at == 0 || nameable(lv, lib->songs[at - 1].file))
+            break;
+    }
 
     if (at == 0)
         lv->hdr.music[0] = '\0';
@@ -166,7 +202,8 @@ bool ed_song_prop_step(ed_level_t *lv, const library_t *lib, ed_song_prop_t p,
         lv->hdr.music_offset = stepped(lv->hdr.music_offset,
             dir * (big ? 1.0 : 0.05));
     if (p == ED_SONG_BPM)
-        lv->hdr.bpm = stepped(lv->hdr.bpm, dir * (big ? 10.0 : 1.0));
+        lv->hdr.bpm = fmin(stepped(lv->hdr.bpm, dir * (big ? 10.0 : 1.0)),
+            LEVEL_BPM_MAX);                  /* what a file may say (7.2) */
     if (p == ED_SONG_FIRST_BEAT)
         lv->hdr.first_beat = stepped(lv->hdr.first_beat,
             dir * (big ? 0.1 : 0.01));

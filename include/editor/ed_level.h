@@ -36,6 +36,8 @@ typedef struct ed_level {
     size_t cap;
     int next_id;
     bool dirty;               /* changed since it was opened or saved         */
+    char **kept;              /* lines the loader couldn't use, saved as they */
+    size_t nb_kept;           /* were (7.2): nothing edits them               */
 } ed_level_t;
 
 /* One thing the palette can place: a type and the word its line needs. */

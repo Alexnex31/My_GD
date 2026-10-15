@@ -22,6 +22,9 @@ editor_t *editor_open(gd_t *gd, const char *id, const char *new_name)
         ed_level_new(&ed->lv, id);
         if (new_name[0] != '\0')
             snprintf(ed->lv.hdr.name, sizeof(ed->lv.hdr.name), "%s", new_name);
+        level_clean_text(ed->lv.hdr.name);   /* as a save reads back (7.2) */
+        if (ed->lv.hdr.name[0] == '\0')
+            snprintf(ed->lv.hdr.name, sizeof(ed->lv.hdr.name), "LEVEL %s", id);
         ed->lv.dirty = true;                 /* it exists nowhere yet */
     } else if (ed_level_open(&ed->lv, ed->path) != 0) {
         free(ed);

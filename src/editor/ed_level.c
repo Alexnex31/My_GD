@@ -30,6 +30,9 @@ void ed_level_free(ed_level_t *lv)
 {
     for (size_t i = 0; i < lv->count; i++)
         free(lv->objects[i].extra);
+    for (size_t i = 0; i < lv->nb_kept; i++)
+        free(lv->kept[i]);
+    free(lv->kept);
     free(lv->objects);
     *lv = (ed_level_t){0};
 }
@@ -151,6 +154,10 @@ void ed_level_from_text(ed_level_t *lv, const char *buf, size_t len,
         ed_start_object(&start, &doc.starts[i]);
         ed_add_object(lv, &start);
     }
+    lv->kept = doc.kept;                     /* written back as they were */
+    lv->nb_kept = doc.nb_kept;
+    doc.kept = NULL;
+    doc.nb_kept = 0;
     level_doc_free(&doc);
     lv->dirty = false;
 }
@@ -164,7 +171,7 @@ static char *read_file(const char *path, size_t *len)
     if (f == NULL)
         return NULL;
     if (fseek(f, 0, SEEK_END) != 0 || (size = ftell(f)) < 0
-        || size > 64L * 1024 * 1024) {
+        || size > LEVEL_FILE_MAX) {
         fclose(f);
         return NULL;
     }
@@ -192,8 +199,9 @@ int ed_level_open(ed_level_t *lv, const char *path)
 }
 
 /*
-** Arrays of its own, pointing at nothing of the level's but the extras. The
-** start positions leave the objects here: the game never meets one (11.8).
+** Arrays of its own, pointing at nothing of the level's but the extras and
+** the kept lines. The start positions leave the objects here: the game never
+** meets one (11.8).
 */
 void ed_level_doc(const ed_level_t *lv, level_doc_t *doc)
 {
@@ -213,13 +221,15 @@ void ed_level_doc(const ed_level_t *lv, level_doc_t *doc)
         doc->extras[doc->count] = o->extra;
         doc->count += 1;
     }
+    doc->kept = lv->kept;
+    doc->nb_kept = lv->nb_kept;
 }
 
 void ed_doc_free(level_doc_t *doc)
 {
     free(doc->objs);
     free(doc->extras);                       /* the strings are the level's */
-    free(doc->starts);
+    free(doc->starts);                       /* and so are the kept lines */
     *doc = (level_doc_t){0};
 }
 
