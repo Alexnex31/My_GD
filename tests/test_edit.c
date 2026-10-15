@@ -224,6 +224,7 @@ static void test_select(void)
     int a;
     int b;
     int c;
+    int d;
 
     begin(&lv);
     a = add(&lv, "block 100 700 2");
@@ -248,6 +249,18 @@ static void test_select(void)
     CHECK(ed_selected(&lv) == 1 && ed_find(&lv, c)->selected);
     ed_select_box(&lv, (rect_t){0.0, 0.0, 250.0, 2000.0}, true);
     CHECK(ed_selected(&lv) == 2 && ed_find(&lv, a)->selected);
+    d = add(&lv, "block 2000 700 2 rot=45");           /* a diamond */
+    ed_select_box(&lv, (rect_t){1985.0, 690.0, 0.0, 0.0}, false);
+    CHECK(ed_selected(&lv) == 0);            /* its bounds' empty corner */
+    ed_select_box(&lv, (rect_t){1970.0, 650.0, 20.0, 20.0}, false);
+    CHECK(ed_selected(&lv) == 0);
+    ed_select_box(&lv, (rect_t){2050.0, 750.0, 0.0, 0.0}, false);
+    CHECK(ed_selected(&lv) == 1 && ed_find(&lv, d)->selected);
+    ed_select_box(&lv, (rect_t){1950.0, 740.0, 40.0, 20.0}, false);
+    CHECK(ed_selected(&lv) == 1);            /* its left point */
+    ed_remove(&lv, d);
+    ed_select_box(&lv, (rect_t){0.0, 0.0, 250.0, 2000.0}, false);
+    ed_select_click(&lv, b, true);
     ed_select_all(&lv);
     CHECK(ed_selected(&lv) == 3);
     ed_select_click(&lv, b, true);
@@ -306,6 +319,14 @@ static void test_move(void)
     CHECK(ed_find(&lv, a)->obj.rect.y == 651.0);
     ed_select_none(&lv);
     CHECK(!ed_nudge(&lv, &H, 50.0, 0.0) && H.nb_undo == 3);
+    ed_select_click(&lv, a, false);
+    ed_select_click(&lv, b, true);
+    ed_grab(&lv, &g);
+    ed_remove(&lv, b);                         /* gone from under the grab */
+    ed_grab_move(&lv, &g, 50.0, 0.0);
+    CHECK(ed_grab_drop(&lv, &H, &g) && H.nb_undo == 4);
+    CHECK(H.undo[3].count == 1 && ed_find(&lv, a)->obj.rect.x == 300.0);
+    CHECK(ed_undo(&lv, &H) && ed_find(&lv, a)->obj.rect.x == 250.0);
     ed_level_free(&lv);
 }
 

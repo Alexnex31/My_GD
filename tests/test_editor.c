@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "editor/ed_level.h"
 #include "sim/modes.h"
@@ -89,6 +91,9 @@ static void test_open_and_save(void)
     ed_level_free(&back);
     CHECK(ed_level_open(&back, "/tmp/990078.gd") != 0);       /* no such file */
     CHECK(ed_level_open(&back, "/tmp/not_digits.gd") != 0);   /* not an id */
+    mkdir("/tmp/990079.gd", 0755);
+    CHECK(ed_level_open(&back, "/tmp/990079.gd") != 0);       /* a folder */
+    rmdir("/tmp/990079.gd");
     remove("/tmp/990077.gd");
     ed_level_free(&lv);
 }
@@ -127,6 +132,12 @@ static void test_hit(void)
     CHECK(ed_hit(&lv, (vec2_t){1200.0, 725.0}) == tilted); /* its center */
     CHECK(ed_hit(&lv, (vec2_t){1010.0, 725.0}) == -1);     /* its unturned end */
     CHECK(ed_hit(&lv, (vec2_t){1300.0, 825.0}) == tilted); /* along the 45 deg */
+    level_object_from_line("block 3120 700 2", &o);
+    block = ed_add(&lv, &o, NULL);
+    level_object_from_line("block 3100 700 2", &o);
+    spike = ed_add(&lv, &o, NULL);                         /* drawn over it */
+    CHECK(ed_hit(&lv, (vec2_t){3150.0, 750.0}) == spike);  /* not by x */
+    CHECK(ed_hit(&lv, (vec2_t){3210.0, 750.0}) == block);
     ed_level_free(&lv);
 }
 
@@ -196,6 +207,14 @@ static void test_place(void)
     CHECK(strcmp(text, "name LEVEL 9\n\norb -50 500 2 green\n"
         "block 1200 750 2\nspike 1200 750 2\nportal 2000 650 2 ship\n") == 0);
     free(text);
+    CHECK(ed_place(&lv, find_entry(e, n, "speed 1"),
+        (vec2_t){3010.0, 660.0}, 50.0));
+    CHECK(ed_place(&lv, find_entry(e, n, "speed 2"),
+        (vec2_t){3010.0, 660.0}, 50.0));               /* another speed */
+    CHECK(!ed_place(&lv, find_entry(e, n, "speed 2"),
+        (vec2_t){3010.0, 660.0}, 50.0));
+    CHECK(ed_place(&lv, find_entry(e, n, "portal ufo"),
+        (vec2_t){2010.0, 660.0}, 50.0));               /* another mode */
     ed_level_free(&lv);
 }
 
@@ -224,6 +243,8 @@ static void test_plays(void)
 static void test_next_id(void)
 {
     static const char *const ids[] = {"1", "12", "7", "10280"};
+    static const char *const big[] = {"100000000000000000",
+        "999999999999999999", "1", "2"};
     char out[LEVEL_ID_MAX + 1];
 
     ed_next_id(ids, 3, out, sizeof(out));
@@ -232,6 +253,10 @@ static void test_next_id(void)
     CHECK(strcmp(out, "10281") == 0);
     ed_next_id(NULL, 0, out, sizeof(out));
     CHECK(strcmp(out, "1") == 0);
+    ed_next_id(big, 2, out, sizeof(out));      /* 19 digits: cut, it would */
+    CHECK(strcmp(out, "1") == 0);              /* be the first one */
+    ed_next_id(big, 4, out, sizeof(out));
+    CHECK(strcmp(out, "3") == 0);                  /* the smallest free one */
 }
 
 void test_editor(void)

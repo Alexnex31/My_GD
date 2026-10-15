@@ -135,14 +135,12 @@ int sim_init(sim_t *s, const level_doc_t *doc, const level_header_t *hdr,
     return 0;
 }
 
-static char *read_whole_file(const char *path, size_t *len);
-
 int level_read_header(const char *path, level_header_t *hdr,
     uint64_t *file_hash)
 {
     char id[LEVEL_ID_MAX + 1] = "";
     size_t len = 0;
-    char *text = read_whole_file(path, &len);
+    char *text = level_read_file(path, &len);
 
     if (text == NULL)
         return -1;
@@ -183,7 +181,7 @@ bool level_id_from_path(const char *path, char *id, size_t size)
 ** report LLONG_MAX, an allocation that ends the game. No level is bigger
 ** than LEVEL_FILE_MAX: a bigger file is no level to read (7.3).
 */
-static char *read_whole_file(const char *path, size_t *len)
+char *level_read_file(const char *path, size_t *len)
 {
     FILE *f = fopen(path, "rb");
     struct stat st;
@@ -215,7 +213,7 @@ int sim_load(sim_t *s, const char *path, sim_log_fn log)
             log("a level file is named <digits>.gd");
         return -1;
     }
-    buf = read_whole_file(path, &len);
+    buf = level_read_file(path, &len);
     if (buf == NULL) {
         if (log != NULL)
             log("level file cannot be read");

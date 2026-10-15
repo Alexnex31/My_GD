@@ -50,6 +50,8 @@ static inline double hitbox_extent(const hitbox_t *h, int k)
 ** and culls with this, or sprites pop in and out at the edge of the view (9.2).
 */
 rect_t object_drawn_bounds(const object_t *o);
+/* cos and sin of a turn in degrees, exact for the quarter turns. */
+void hitbox_rotation(double deg, double *cs, double *sn);
 
 /* Edge i, if it is horizontal and faces the player's up (G.7). Inline: the
 ** step search asks it about every edge of every candidate, every leg. */

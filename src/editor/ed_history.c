@@ -137,19 +137,25 @@ bool ed_do_place(ed_level_t *lv, ed_history_t *h, const ed_entry_t *e,
     return true;
 }
 
+/* An id no object has any more is left out: there is nothing to change back. */
 void ed_do_change(ed_level_t *lv, ed_history_t *h, const int *ids,
     const ed_object_t *before, size_t count)
 {
     ed_cmd_t *c = record(h, ED_CHANGE);
+    size_t hint = 0;
 
-    c->count = count;
     c->ids = sim_xcalloc(count + 1, sizeof(int));
     c->before = sim_xcalloc(count + 1, sizeof(ed_object_t));
     c->after = sim_xcalloc(count + 1, sizeof(ed_object_t));
     for (size_t i = 0; i < count; i++) {
-        c->ids[i] = ids[i];
-        c->before[i] = before[i];
-        c->after[i] = *ed_find(lv, ids[i]);
+        const ed_object_t *now = ed_find_from(lv, ids[i], &hint);
+
+        if (now == NULL)
+            continue;
+        c->ids[c->count] = ids[i];
+        c->before[c->count] = before[i];
+        c->after[c->count] = *now;
+        c->count += 1;
     }
     lv->dirty = true;
 }
@@ -173,6 +179,8 @@ static void take_out(ed_level_t *lv, const ed_cmd_t *c)
 
 static void apply(ed_level_t *lv, const ed_cmd_t *c, bool forward)
 {
+    size_t hint = 0;
+
     if (c->kind == ED_ADD && forward)
         for (size_t i = 0; i < c->count; i++)
             ed_insert(lv, &c->objs[i], c->at[i]);
@@ -186,8 +194,10 @@ static void apply(ed_level_t *lv, const ed_cmd_t *c, bool forward)
         return;
     for (size_t i = 0; i < c->count; i++) {
         const ed_object_t *to = forward ? &c->after[i] : &c->before[i];
-        ed_object_t *o = ed_find(lv, c->ids[i]);
+        ed_object_t *o = ed_find_from(lv, c->ids[i], &hint);
 
+        if (o == NULL)
+            continue;
         o->obj = to->obj;
         o->start = to->start;
     }

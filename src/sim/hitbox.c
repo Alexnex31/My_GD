@@ -126,7 +126,7 @@ static void build_axes(hitbox_t *h)
 ** level is full of objects at 0, 90, 180 and 270 degrees. Exact values keep
 ** their faces exactly horizontal and vertical whatever the coordinates are.
 */
-static void rotation_of(double deg, double *cs, double *sn)
+void hitbox_rotation(double deg, double *cs, double *sn)
 {
     static const double quarter[4][2] = {{1.0, 0.0}, {0.0, 1.0},
         {-1.0, 0.0}, {0.0, -1.0}};
@@ -151,7 +151,7 @@ void hitbox_build_poly(hitbox_t *h, const vec2_t *local, int n, rect_t rect,
     double cs = 0.0;
     double sn = 0.0;
 
-    rotation_of(deg, &cs, &sn);
+    hitbox_rotation(deg, &cs, &sn);
 
     h->kind = SHAPE_POLY;
     h->nverts = n;
@@ -192,7 +192,7 @@ rect_t object_drawn_bounds(const object_t *o)
     double cs = 0.0;
     double sn = 0.0;
 
-    rotation_of(o->rotation, &cs, &sn);
+    hitbox_rotation(o->rotation, &cs, &sn);
     rect_corners(o->rect, v);
     for (int i = 0; i < 4; i++)
         v[i] = rotate_point(v[i], c, cs, sn);

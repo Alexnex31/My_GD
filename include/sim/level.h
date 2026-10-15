@@ -84,6 +84,9 @@ bool level_id_from_path(const char *path, char *id, size_t size);
 */
 int level_read_header(const char *path, level_header_t *hdr,
     uint64_t *file_hash);
+/* A level file's bytes, NUL terminated, or NULL: unreadable, not a regular
+** file, or over LEVEL_FILE_MAX. The caller frees it. */
+char *level_read_file(const char *path, size_t *len);
 
 /* FNV-1a over raw bytes: the level file's version (6.4) and the progress store. */
 uint64_t fnv1a(const void *data, size_t len);

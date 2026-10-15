@@ -47,13 +47,6 @@ static int by_left(const void *a, const void *b)
     return i < j ? -1 : (i > j);
 }
 
-static bool same_place(const object_t *a, const object_t *b)
-{
-    return a->type == b->type && a->rotation == b->rotation
-        && a->rect.x == b->rect.x && a->rect.y == b->rect.y
-        && a->rect.w == b->rect.w && a->rect.h == b->rect.h;
-}
-
 /* How far `b` reaches inside `a` along a's axes, at the shallowest of them. */
 static double depth_along(const hitbox_t *a, const hitbox_t *b)
 {
@@ -121,7 +114,7 @@ static void together(const object_t *a, const object_t *b, unsigned *fa,
     bool a_spike = a->type == OBJ_SPIKE && OBJ_CATEGORY[b->type] == CAT_NEUTRAL;
     bool b_spike = b->type == OBJ_SPIKE && OBJ_CATEGORY[a->type] == CAT_NEUTRAL;
 
-    if (same_place(a, b))
+    if (ed_same_obj(a, b))
         *fb |= 1u << ED_ISSUE_TWICE;
     if ((a_spike || b_spike) && overlap(&a->hitbox, &b->hitbox))
         *(a_spike ? fa : fb) |= 1u << ED_HINT_SPIKE_IN_BLOCK;

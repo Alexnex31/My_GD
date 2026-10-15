@@ -5,6 +5,7 @@
 ** the level the editor edits: objects with stable ids, open, save (FEATURES 11.1)
 */
 
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -122,6 +123,25 @@ ed_object_t *ed_find(ed_level_t *lv, int id)
     return NULL;
 }
 
+/*
+** From where the last one was found, then round: ids asked for in list order
+** are found in one walk of the list, not one walk each.
+*/
+ed_object_t *ed_find_from(ed_level_t *lv, int id, size_t *hint)
+{
+    size_t from = *hint < lv->count ? *hint : 0;
+
+    for (size_t k = 0; k < lv->count; k++) {
+        size_t i = (from + k) % lv->count;
+
+        if (lv->objects[i].id == id) {
+            *hint = i + 1;
+            return &lv->objects[i];
+        }
+    }
+    return NULL;
+}
+
 /* The order of the others is kept: it decides what is drawn on top. */
 bool ed_remove(ed_level_t *lv, int id)
 {
@@ -162,26 +182,6 @@ void ed_level_from_text(ed_level_t *lv, const char *buf, size_t len,
     lv->dirty = false;
 }
 
-static char *read_file(const char *path, size_t *len)
-{
-    FILE *f = fopen(path, "rb");
-    long size;
-    char *buf;
-
-    if (f == NULL)
-        return NULL;
-    if (fseek(f, 0, SEEK_END) != 0 || (size = ftell(f)) < 0
-        || size > LEVEL_FILE_MAX) {
-        fclose(f);
-        return NULL;
-    }
-    rewind(f);
-    buf = sim_xcalloc((size_t)size + 1, 1);
-    *len = fread(buf, 1, (size_t)size, f);
-    fclose(f);
-    return buf;
-}
-
 int ed_level_open(ed_level_t *lv, const char *path)
 {
     char id[LEVEL_ID_MAX + 1];
@@ -190,7 +190,7 @@ int ed_level_open(ed_level_t *lv, const char *path)
 
     if (!level_id_from_path(path, id, sizeof(id)))
         return -1;
-    buf = read_file(path, &len);
+    buf = level_read_file(path, &len);
     if (buf == NULL)
         return -1;
     ed_level_from_text(lv, buf, len, id);
@@ -280,23 +280,27 @@ double ed_snap(double v, double grid)
 static bool rect_holds(const object_t *o, vec2_t at)
 {
     vec2_t c = {o->rect.x + o->rect.w / 2.0, o->rect.y + o->rect.h / 2.0};
-    double rad = -o->rotation * M_PI / 180.0;
-    double x = c.x + (at.x - c.x) * cos(rad) - (at.y - c.y) * sin(rad);
-    double y = c.y + (at.x - c.x) * sin(rad) + (at.y - c.y) * cos(rad);
+    double cs = 0.0;
+    double sn = 0.0;
+    double x;
+    double y;
+
+    hitbox_rotation(-o->rotation, &cs, &sn);
+    x = c.x + (at.x - c.x) * cs - (at.y - c.y) * sn;
+    y = c.y + (at.x - c.x) * sn + (at.y - c.y) * cs;
 
     return x >= o->rect.x && x < o->rect.x + o->rect.w
         && y >= o->rect.y && y < o->rect.y + o->rect.h;
 }
 
 /*
-** Drawn later means on top: by layer (blocks, hazards, interactive objects,
-** which is the category's own order), then by x, then by place in the list.
+** The one the canvas draws on top: by layer (blocks, hazards, interactive
+** objects, which is the category's own order), then the later in the list.
+** The list is walked in order, so a tie goes to `a`, the later one.
 */
 static bool drawn_over(const object_t *a, const object_t *b)
 {
-    if (OBJ_CATEGORY[a->type] != OBJ_CATEGORY[b->type])
-        return OBJ_CATEGORY[a->type] > OBJ_CATEGORY[b->type];
-    return a->rect.x >= b->rect.x;
+    return OBJ_CATEGORY[a->type] >= OBJ_CATEGORY[b->type];
 }
 
 int ed_hit(const ed_level_t *lv, vec2_t at)
@@ -358,17 +362,31 @@ int ed_entries(ed_entry_t *out, int max)
     return n;
 }
 
-static bool same_object(const ed_object_t *ea, const ed_object_t *eb)
+/*
+** Everything an object is but its id, extras and selection: the placement's
+** "the very same object", a property step's "nothing changed" and the level
+** check's "twice in the same place" are one test.
+*/
+bool ed_same_obj(const object_t *a, const object_t *b)
 {
-    const object_t *a = &ea->obj;
-    const object_t *b = &eb->obj;
-
-    return ea->is_start == eb->is_start && a->type == b->type && a->rect.x == b->rect.x
+    return a->type == b->type && a->rect.x == b->rect.x
         && a->rect.y == b->rect.y && a->rect.w == b->rect.w
         && a->rect.h == b->rect.h && a->rotation == b->rotation
         && a->portal_mode == b->portal_mode
         && a->portal_gravity == b->portal_gravity && a->launch == b->launch
-        && a->portal_mini == b->portal_mini;
+        && a->speed == b->speed && a->portal_mini == b->portal_mini;
+}
+
+bool ed_same_object(const ed_object_t *a, const ed_object_t *b)
+{
+    const level_start_t *sa = &a->start;
+    const level_start_t *sb = &b->start;
+
+    if (a->is_start != b->is_start || !ed_same_obj(&a->obj, &b->obj))
+        return false;
+    return !a->is_start || (sa->mode == sb->mode
+        && sa->gravity_dir == sb->gravity_dir && sa->speed == sb->speed
+        && sa->mini == sb->mini);
 }
 
 /* The object is made by the loader from its line: what is placed is what
@@ -389,7 +407,7 @@ bool ed_place_object(const ed_level_t *lv, const ed_entry_t *e, vec2_t at,
     if (!e->start && level_object_from_line(line, &out->obj) != 0)
         return false;
     for (size_t i = 0; i < lv->count; i++)
-        if (same_object(&lv->objects[i], out))
+        if (ed_same_object(&lv->objects[i], out))
             return false;
     return true;
 }
@@ -404,6 +422,19 @@ bool ed_place(ed_level_t *lv, const ed_entry_t *e, vec2_t at, double grid)
     return true;
 }
 
+static bool taken(const char *const *ids, size_t count, long long n)
+{
+    for (size_t i = 0; i < count; i++)
+        if (strtoll(ids[i], NULL, 10) == n)
+            return true;
+    return false;
+}
+
+/*
+** One past the highest. When that doesn't fit `size` (an id is LEVEL_ID_MAX
+** digits at most), the smallest number no level has: a cut id could be one
+** that exists, and a save would write over it.
+*/
 void ed_next_id(const char *const *ids, size_t count, char *out, size_t size)
 {
     long long highest = 0;
@@ -413,5 +444,14 @@ void ed_next_id(const char *const *ids, size_t count, char *out, size_t size)
 
         highest = v > highest ? v : highest;
     }
-    snprintf(out, size, "%lld", highest + 1);
+    if (highest < LLONG_MAX
+        && snprintf(NULL, 0, "%lld", highest + 1) < (int)size) {
+        snprintf(out, size, "%lld", highest + 1);
+        return;
+    }
+    for (long long n = 1; ; n++)
+        if (!taken(ids, count, n)) {
+            snprintf(out, size, "%lld", n);
+            return;
+        }
 }

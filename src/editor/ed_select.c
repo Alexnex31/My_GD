@@ -53,11 +53,63 @@ void ed_select_click(ed_level_t *lv, int id, bool shift)
         o->selected = true;
 }
 
+/* Lowest and highest of four points along an axis. */
+static void project(const vec2_t *p, vec2_t axis, double *lo, double *hi)
+{
+    *lo = INFINITY;
+    *hi = -INFINITY;
+    for (int i = 0; i < 4; i++) {
+        double d = dot(p[i], axis);
+
+        *lo = fmin(*lo, d);
+        *hi = fmax(*hi, d);
+    }
+}
+
+/*
+** The rect as the canvas draws it, turned, against the box: its bounds
+** first, then its own two axes, so the empty corners of a turned object's
+** bounds hold nothing. Touching is not overlapping (3.0).
+*/
+static bool drawn_overlap(const object_t *o, rect_t box)
+{
+    const rect_t *r = &o->rect;
+    vec2_t c = {r->x + r->w / 2.0, r->y + r->h / 2.0};
+    vec2_t turned[4];
+    vec2_t corners[4] = {{box.x, box.y}, {box.x + box.w, box.y},
+        {box.x + box.w, box.y + box.h}, {box.x, box.y + box.h}};
+    double cs = 0.0;
+    double sn = 0.0;
+
+    if (!rect_overlap(object_drawn_bounds(o), box))
+        return false;
+    hitbox_rotation(o->rotation, &cs, &sn);
+    for (int i = 0; i < 4; i++) {
+        double dx = (i == 1 || i == 2 ? r->w : 0.0) - r->w / 2.0;
+        double dy = (i >= 2 ? r->h : 0.0) - r->h / 2.0;
+
+        turned[i] = (vec2_t){c.x + dx * cs - dy * sn, c.y + dx * sn + dy * cs};
+    }
+    for (int k = 0; k < 2; k++) {
+        vec2_t axis = k == 0 ? (vec2_t){cs, sn} : (vec2_t){-sn, cs};
+        double lo_o;
+        double hi_o;
+        double lo_b;
+        double hi_b;
+
+        project(turned, axis, &lo_o, &hi_o);
+        project(corners, axis, &lo_b, &hi_b);
+        if (!(lo_b < hi_o && lo_o < hi_b))
+            return false;
+    }
+    return true;
+}
+
 void ed_select_box(ed_level_t *lv, rect_t box, bool add)
 {
     for (size_t i = 0; i < lv->count; i++) {
         ed_object_t *o = &lv->objects[i];
-        bool in = rect_overlap(object_drawn_bounds(&o->obj), box);
+        bool in = drawn_overlap(&o->obj, box);
 
         o->selected = in || (add && o->selected);
     }
@@ -98,8 +150,10 @@ static void release(ed_grab_t *g)
 /* The hitbox is rebuilt: the canvas, a click and a playtest see one shape. */
 void ed_grab_move(ed_level_t *lv, const ed_grab_t *g, double dx, double dy)
 {
+    size_t hint = 0;
+
     for (size_t i = 0; i < g->count; i++) {
-        ed_object_t *o = ed_find(lv, g->ids[i]);
+        ed_object_t *o = ed_find_from(lv, g->ids[i], &hint);
 
         if (o == NULL)
             continue;

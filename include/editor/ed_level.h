@@ -76,12 +76,15 @@ size_t ed_starts(const ed_level_t *lv);
 
 bool ed_remove(ed_level_t *lv, int id);
 ed_object_t *ed_find(ed_level_t *lv, int id);
+/* The same, looking from *hint first and leaving it after the one found: a
+** walk over ids in list order is linear. NULL when no object has that id. */
+ed_object_t *ed_find_from(ed_level_t *lv, int id, size_t *hint);
 /* Puts an object back where it was, with the id it had: an undo (11.7). */
 void ed_insert(ed_level_t *lv, const ed_object_t *o, size_t at);
 
 /* The cell a point is in: floor, so it is the cell under the mouse (11.4). */
 double ed_snap(double v, double grid);
-/* The object drawn on top at a point, or -1 (11.5). */
+/* The object the canvas draws on top at a point, or -1 (11.5). */
 int ed_hit(const ed_level_t *lv, vec2_t at);
 
 /* Every entry, from the object, mode and colour tables (11.14, E4). */
@@ -95,7 +98,12 @@ bool ed_place(ed_level_t *lv, const ed_entry_t *e, vec2_t at, double grid);
 bool ed_place_object(const ed_level_t *lv, const ed_entry_t *e, vec2_t at,
     double grid, ed_object_t *out);
 
-/* The id a new level takes: one past the highest of those that exist. */
+/* Two objects that are the same but for their id: place, kind and settings. */
+bool ed_same_obj(const object_t *a, const object_t *b);
+bool ed_same_object(const ed_object_t *a, const ed_object_t *b);
+
+/* The id a new level takes: one past the highest of those that exist, or
+** the smallest free one when that one wouldn't fit `size`. */
 void ed_next_id(const char *const *ids, size_t count, char *out, size_t size);
 
 #endif
