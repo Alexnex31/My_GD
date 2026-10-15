@@ -141,6 +141,7 @@ Two tools, `Tab` switches between them: **Place** and **Select**.
 | Ctrl+wheel | Zoom around the mouse, 25% to 400% |
 | Middle button, or Space and drag | Pan |
 | G | Grid 50 / 25 |
+| , / . | Editor layer: All, 0, 1, 2… (the others fade and can't be picked) |
 | L | The level's panel: its song, offset, BPM and first beat (Shift+click: bigger steps) |
 | P | Hear the level's song from the middle of the canvas; again to stop |
 | Enter | Playtest from the level's start |
@@ -152,7 +153,7 @@ Two tools, `Tab` switches between them: **Place** and **Select**.
 
 Holding a move key, Ctrl+Z or Ctrl+Y repeats it.
 
-With something selected, a panel in the canvas's top right corner shows its properties, each with a minus and a plus: turn (15 degrees), width and height (grid units), kind (a portal's mode, a pad's or an orb's colour, a gravity portal's direction). A saw stays round: its width and height change together. A speed portal has a speed row instead of a kind.
+With something selected, a panel in the canvas's top right corner shows its properties, each with a minus and a plus: turn (15 degrees), width and height (grid units), kind (a portal's mode, a pad's or an orb's colour, a gravity portal's direction). Every object also has its Z layer (B5 to T4: behind or in front of the player), its Z order (higher is on top) and its editor layer. A saw stays round: its width and height change together. A speed portal has a speed row instead of a kind.
 
 **Start positions** are the palette's last entry. They are other places to begin an attempt from, for practice: the level's real start doesn't change, and they aren't obstacles. Selected, the panel sets their gamemode, gravity and speed. In the game and in a playtest, **A** and **E** go to the previous and the next one (the level's start is the first of the list) and begin an attempt there. An attempt from a start position still adds to the attempt counter, but records no best and no completion. A short `<1/2>` shows which one it is.
 
@@ -212,6 +213,7 @@ speed 6000 650 2 3            # speed portal: 0.5, 1, 2, 3 or 4
 - **Body**: `type x y size [word] [key=value ...]`, with types `block`, `slope`, `spike`, `saw` (a disc, 0.42 of its width in radius), `portal` (whose word is the gamemode: `cube`, `ship`, `ufo`, `wave`, `ball`, `robot`, `swing`, `spider`), `gravity` (a gravity portal, whose word is `up` or `down`), `start` (another place to begin an attempt for practice, `start x y mode [up|down] [speed] [mini]`: no size, no hitbox, and the real start stays the header's), `mini` (a size portal, whose word is `on` or `off`: half the size, and GD's smaller jumps), `speed` (a speed portal, whose word is one of GD's five speeds by name: `0.5`, `1`, `2`, `3` or `4`, which are 837, 1039, 1291, 1560 and 1920 px/s, not multiples), `pad` (a jump pad: `yellow`, `pink`, `red` or `blue`) and `orb` (a jump orb, clicked while touching it: `yellow`, `pink`, `red`, `blue`, `green` or `black`).
 - `x` and `y` are the object's top-left corner in world pixels, `y` grows downward and the ground's surface is at `y = 850`.
 - `size` is in grid units of 50 px, so `size 2` is the 100 x 100 block that matches the player. `w=` and `h=` override it per axis, `rot=` turns the object by any angle.
+- `zl=` is the Z layer, `b5` to `b1` behind the player and `t1` (the default) to `t4` in front; `z=` the Z order inside it (higher is on top); `el=` the editor layer, which only the editor reads. With the same Z layer and order, the object placed last is on top: the file keeps the objects in the order they were placed.
 - Sizes must be at least 1: a zero or negative size rejects the line, naming the file and the line.
 - `x`, `y` and the object's width and height must stay within 10 000 000 px (over two hours of level): beyond that the line is rejected the same way.
 - **Your progress is never written into a level file.** Attempts and bests live in `save/progress.txt`, keyed by the level's id, so editing or sharing a level never touches your records. A level gets a line there once you've played it, and a best below 100% is never saved as 100.

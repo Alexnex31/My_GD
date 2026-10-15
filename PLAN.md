@@ -2202,6 +2202,11 @@ Optional `key=value` fields, any object:
 | `w=<units>` | width in grid units (50 px) | `size` |
 | `h=<units>` | height in grid units | `size` |
 | `group=<n>[,<n>...]` | reserved for GD-style triggers (5.1): parsed, stored nowhere yet, one warning per level | none |
+| `zl=<layer>` | Z layer, GD's: `b5` to `b1` behind the player, `t1` to `t4` in front (FEATURES 11.15); any case | `t1` for every type with a hitbox, `b1` for a decoration |
+| `z=<n>` | Z order inside its Z layer, a whole number from −10 000 to 10 000: the higher is drawn over | `0` |
+| `el=<n>` | editor layer, 0 to 10 000: the editor's only, the game never reads it | `0` |
+
+**Order.** The objects are written in the order they were placed, never sorted: of two objects on the same Z layer and Z order, the one placed last is drawn on top, as in GD, and only the order of the lines keeps that. The loader numbers each object by its line, and the game draws by Z layer, then Z order, then that number.
 
 Why width and height: with `size` alone, every object is a square, so a "wide platform" of 8 units is also 8 units tall (400 × 400 px), sinking far below the ground. `w`/`h` make real platforms and walls one line each, and keep the long-block case (F5) meaningful.
 
@@ -2453,7 +2458,7 @@ CSFML adds a C-to-C++ call on top of SFML, and every `sfRenderWindow_drawSprite`
 1. **Static geometry, built once.** Objects never move (Principle 1), so their vertices are computed once per level load, never per frame.
 2. **One texture for all level objects** (an atlas), so every object can share a draw call.
 3. **Chunks** of the level along x: only chunks overlapping the view are drawn.
-4. **GPU-resident vertices**: `sfVertexBuffer` (SFML 2.5+) keeps the static vertices on the GPU; drawing them costs almost nothing on the CPU.
+4. **Vertices computed once**: each object's vertices are built at load; a frame only copies those in view, in the draw order (9.2).
 5. **No per-frame allocation or text layout**: shapes, texts and arrays are created once; a text's string is only set when its content changes.
 6. **Measure**: the debug overlay (9.6) shows the frame time and the number of draw calls, counted by small wrappers around the `sfRenderWindow_draw*` calls.
 
@@ -2517,7 +2522,7 @@ static vec2_t snap_camera(gd_t *gd, float x, float y)
 
 `viewport_px_w` is the letterboxed viewport's width in window pixels (9.7). Also call `sfTexture_setSmooth(tex, sfFalse)` on every game texture, and leave 2 px of padding around each atlas entry, filled by repeating its border pixels, so rounding never samples a neighbor.
 
-### 9.2 Objects: atlas, chunks, static vertex buffers
+### 9.2 Objects: atlas, chunks, the draw order
 
 **Atlas.** At startup, load every object image (`block.png`, `spike.png`, `cube_portal.png`, later pads and orbs) as an `sfImage`, copy them side by side into one atlas image with `sfImage_copyImage`, and create one `sfTexture` from it. Keep each image's rectangle in the atlas (`gd->atlas_rect[type]`).
 
@@ -2540,31 +2545,16 @@ static void append_object(sfVertex *v, const object_t *o, sfFloatRect tex, sfCol
 }
 ```
 
-**Chunks and layers.** Split the level into chunks of 1024 px along x, by the left edge of each object's drawn (rotated) bounds. Inside each chunk, keep one vertex buffer **per layer**: blocks, then hazards, then interactive objects (the same draw order in the game and the editor, FEATURES 11.5). Each chunk remembers the leftmost and rightmost drawn x of its objects, since an object can stick out of its chunk.
+**Chunks and the draw order.** GD draws by Z layer, then Z order, then the order objects were placed in (7.2, FEATURES 11.15), and the player between B1 and T1. That order is global: two overlapping objects in different slices of x must still be drawn in it, so it can't be cut into per-chunk buffers. At load, each object's six vertices are computed once (objects never move, Principle 1) and the objects are sorted once into the draw order; each one knows its rank. The level is still split into chunks of 1024 px along x, by the left edge of each object's drawn (rotated) bounds, for culling only: a chunk lists its objects' ranks, and remembers the leftmost and rightmost drawn x of its objects, since an object can stick out of its chunk.
+
+Each frame, the ranks of the chunks in view are gathered and sorted, and their vertices copied into one array, in that order, a saw turned by the attempt's time on the way. The ones behind the player (B5 to B1) are drawn, then the player, then the rest (T1 to T4): two draw calls. The death explosion, the spent flashes and the practice checkpoints come after.
 
 ```c
-typedef struct render_chunk {
-    float left;                          /* min drawn x of its objects */
-    float right;                         /* max drawn x                */
-    sfVertexBuffer *layer[LAYER_COUNT];  /* NULL if the layer is empty */
-} render_chunk_t;
-
-void render_objects(gd_t *gd, level_t *lv, float cam_x)
-{
-    sfRenderStates rs = {sfBlendAlpha, sfTransform_Identity, gd->atlas, NULL};
-
-    for (int layer = 0; layer < LAYER_COUNT; layer++)
-        for (size_t c = 0; c < lv->nb_chunks; c++) {
-            render_chunk_t *ch = &lv->chunks[c];
-
-            if (ch->right < cam_x || ch->left > cam_x + VIEW_W || ch->layer[layer] == NULL)
-                continue;
-            sfRenderWindow_drawVertexBuffer(gd->w, ch->layer[layer], &rs);
-        }
-}
+void render_objects(gd_t *gd, level_t *lv, float cam_x, bool front);
+/* front false: find the objects in view, draw B5..B1; front true: T1..T4 */
 ```
 
-Build the buffers once in `level_start`: `sfVertexBuffer_create(n, sfTriangles, sfVertexBufferStatic)` then `sfVertexBuffer_update(buf, vertices, n, 0)`. If `sfVertexBuffer_isAvailable()` is false (very old GPUs), keep the same vertices in `sfVertexArray`s instead: same code, drawn with `sfRenderWindow_drawVertexArray`. The chunk loop is over a few hundred chunks at most; for very long levels, keep a first-visible chunk cursor like the collision cursor (4.1).
+Static GPU buffers per chunk were the first version: they kept the vertices on the GPU, but drew blocks, hazards and interactive objects as three fixed layers, which is not GD's order. A frame's copy is a few thousand objects at most, well under a millisecond.
 
 **Spent objects** are drawn like live ones: they lose their hitbox, not their sprite. The feedback flash when an interactive object becomes spent is the only per-frame object drawing: the game layer compares the `spent` bitset with the previous frame's and, for a few frames, draws that one object again with a single sprite (white, fading out). Pulsing orbs later work the same way: a small dynamic vertex array for animated objects, the static buffers for everything else.
 

@@ -1658,7 +1658,7 @@ Wheel: scroll horizontally by 200 px × zoom. Ctrl+wheel: `ed_zoom_at(ed, gd, de
 - Placing: the object's top-left = `snap(mouse_world)` where `snap(p) = floor(p / grid) × grid`. Using `floor` (not `round`) means the object appears in the cell the mouse is in.
 - Moving by drag: snap the **delta**, not the object positions: `delta = snap(mouse_now − mouse_at_drag_start)`, applied to each object's original position. This keeps objects that were off-grid (placed at 25 px, or imported) at the same offset from the grid, instead of all jumping to grid lines.
 - Draw only visible grid lines, in one `sfVertexArray` of `sfLines`, rebuilt when the camera changes. Every 4th line brighter (every 200 px = 2 blocks). Draw the ground line (y = 850), the level end (`end_shift + PLAYER_SCREEN_X`) and the kill ceiling (`kill_y`, PLAN 4.7) as distinct colored lines.
-- Objects are drawn with the game's renderer (PLAN 9.2: atlas, layers), so the canvas looks exactly like the level. The editor's vertex buffers are rebuilt for the chunks an edit touches, not for the whole level.
+- Objects are drawn with the game's vertices (PLAN 9.2: atlas) and in the game's draw order (11.15), so the canvas looks exactly like the level. The objects in view are sorted each frame.
 
 **Rotation and size.**
 
@@ -1688,7 +1688,7 @@ Wheel: scroll horizontally by 200 px × zoom. Ctrl+wheel: `ed_zoom_at(ed, gd, de
 
 The 4 px threshold stops a slightly shaky click from becoming a 1-grid move.
 
-Hit test: objects whose **rotated** rect contains the mouse (the point-in-rectangle test in the object's own rotated frame: rotate the mouse point by `-rotation` around the rect's center, then test the unrotated rect). If several, the one drawn **on top** wins, matching what's visible: by layer (blocks, then hazards, then interactive objects), then the later in the editor's list, which is the canvas's own order. Linear search is fine for thousands of objects.
+Hit test: objects whose **rotated** rect contains the mouse (the point-in-rectangle test in the object's own rotated frame: rotate the mouse point by `-rotation` around the rect's center, then test the unrotated rect). If several, the one drawn **on top** wins, matching what's visible: by Z layer, then Z order, then the later in the editor's list (11.15), which is the canvas's and the game's own order. Only objects of the editor layer worked in can be hit. Linear search is fine for thousands of objects.
 
 ### 11.6 Shortcuts
 
@@ -1849,7 +1849,7 @@ Draw only beats in view: compute `k_min` and `k_max` from the view's left and ri
 
 1. New level: ask for a name (text field). The file is `levels/<id>.gd`, the id being one past the highest that exists (PLAN 7.2: ids are digits, and progress is keyed by them), or the smallest free number when one past the highest has more digits than an id may (a cut id could be one that exists); the name goes in the `name` header.
 2. Write `levels/<file>.tmp` with `level_write`, check `fclose`, `rename` over `levels/<file>`.
-3. Content: the header fields that aren't at their default value, the lines the loader couldn't use (unknown header fields, skipped lines) as they were, the start positions, then objects **sorted by x** (then y). Sorted files are readable and give small git diffs. Optional fields are written only when they differ from their default (`rot=` when not 0, `w=`/`h=` when not equal to `size`), followed by the object's `extra` fields unchanged. Every number is written so it reads back exactly (PLAN 7.2): what is saved, read and saved again is the same text, which the fuzzer checks on every input.
+3. Content: the header fields that aren't at their default value, the lines the loader couldn't use (unknown header fields, skipped lines) as they were, the start positions, then the objects **in the order they were placed** (11.15: it decides what is drawn on top; the first version sorted them by x, which lost it). Optional fields are written only when they differ from their default (`rot=` when not 0, `w=`/`h=` when not equal to `size`, `zl=` when not the type's, `z=` and `el=` when not 0), followed by the object's `extra` fields unchanged. Every number is written so it reads back exactly (PLAN 7.2): what is saved, read and saved again is the same text, which the fuzzer checks on every input.
 4. `dirty = false`.
 5. The editor's own sim numbers objects in the order this file will list them, so two objects tied in x (two speed portals stacked at one x) resolve the same way in a playtest, in the verify bot and in the game. The temp file is flushed and synced before the rename, and its name is built at any length.
 
@@ -1872,11 +1872,11 @@ Show counts in the toolbar; clicking cycles the camera through the flagged objec
 
 ### 11.13b As built: groundwork, E1 and E2
 
-- **The loader is three parts** (`src/sim/level_parse.c`, `level_write.c`, `level_build.c`). `level_parse_doc` reads a level as a document: its objects in file order, the fields of each line nothing edits (`group=`, unknown keys) kept as written, and its start positions. `level_write` gives the text back: the header fields that aren't at their default, the start positions, then the objects by x then y with only the fields each needs, written to a `.tmp` file and renamed. `sim_init` builds a simulation from a document. `sim_load_mem` is now parse then build; every level plays tick for tick as before.
+- **The loader is three parts** (`src/sim/level_parse.c`, `level_write.c`, `level_build.c`). `level_parse_doc` reads a level as a document: its objects in file order, the fields of each line nothing edits (`group=`, unknown keys) kept as written, and its start positions. `level_write` gives the text back: the header fields that aren't at their default, the start positions, then the objects in the order they were placed (since 11.15; by x then y before) with only the fields each needs, written to a `.tmp` file and renamed. `sim_init` builds a simulation from a document. `sim_load_mem` is now parse then build; every level plays tick for tick as before.
 - **What a save keeps and loses.** Written and parsed again, every level of `levels/` gives the same text and plays the same. A save does **not** keep comments, blank lines or the order of the lines: the file is rewritten whole.
 - **Start positions (11.8)** are parsed, kept in `lvl.starts`, saved, and drawn in the editor as faint blue icons. Choosing one with A/E and attempts that don't count come with E5.
 - **The text field** is a toolkit widget (`W_TEXT`): typed characters, Backspace, Enter confirms, a click only focuses it, and no key is a shortcut while it has the focus.
-- **The editor's level** (`src/editor/ed_level.c`, pure and tested): objects with ids never given twice, open, save, the cell under the mouse, what a click hits (the object the canvas draws on top: by layer, then the later in the list, in its own turned frame), and the palette's entries, generated from the object, mode and colour tables. A placed object is made by the loader from its own line, so what is placed is what the game reads back; the same object is never placed twice in a cell. "The same" is one test (`ed_same_object`) for placing, for a property step that changed nothing and for the level check: type, rect, turn and every kind field (mode, gravity, colour, speed, size), so a speed 2 portal goes on a speed 1 portal's cell, as a ship portal goes on a cube portal's. A box selection tests each object's turned rect, so a click in the empty corner of a turned object's bounds selects nothing.
+- **The editor's level** (`src/editor/ed_level.c`, pure and tested): objects with ids never given twice, open, save, the cell under the mouse, what a click hits (the object the canvas draws on top, 11.15, in its own turned frame), and the palette's entries, generated from the object, mode and colour tables. A placed object is made by the loader from its own line, so what is placed is what the game reads back; the same object is never placed twice in a cell. "The same" is one test (`ed_same_object`) for placing, for a property step that changed nothing and for the level check: type, rect, turn, every kind field (mode, gravity, colour, speed, size) and the Z layer and order (the editor layer only for a property step, since the game can't see it), so a speed 2 portal goes on a speed 1 portal's cell, as a ship portal goes on a cube portal's. A box selection tests each object's turned rect, so a click in the empty corner of a turned object's bounds selects nothing.
 - **E1, the canvas** (`src/editor_canvas.c`, `editor_draw.c`): the level drawn with the game's own vertices and atlas, pan (middle button or Space and drag), the wheel along the level, Ctrl and the wheel to zoom around the mouse from 25% to 400%, a grid that thins out when zoomed out, the ground, the level's end and the kill ceiling as lines, the real start and the start positions as icons. Objects are rebuilt each frame for what is in view, not kept in the game's chunk buffers: simpler, and fast enough at this size.
 - **E2, making a level** (`src/editor_scene.c`, `editor_menu.c`): the editor opens on a list of the levels and a field to name a new one. Left click places the palette's entry (keys 1 to 9, the arrows, or a click on it), dragging paints, right click deletes, G switches the grid between 50 and 25, Ctrl+S saves. Leaving with unsaved changes warned once, until E7's dialog.
 - **The level list** in the game scrolls (wheel, Up, Down), so a thirteenth level is reachable.
@@ -1946,6 +1946,18 @@ Show counts in the toolbar; clicking cycles the camera through the flagged objec
 | E7 | Verify, validation, autosave, unsaved-changes dialog | A level with an impossible jump shows "Bot found no path" at the right spot, as information |
 
 ---
+
+### 11.15 Layers: Z layer, Z order, editor layer
+
+As in GD, as the user described it:
+
+- **Z layer**: B5, B4, B3, B2, B1 are drawn behind the player, T1, T2, T3, T4 in front of it, each over the ones before. An object with a hitbox the player cares about starts on **T1**; a background object that is only a picture (none exist yet) will start on **B1**. There is **no order between object types**: a spike isn't drawn over a block because it is a spike.
+- **Z order**: a whole number, 0 by default for every object; inside a Z layer the higher is drawn over.
+- **Ties**: same Z layer and Z order, the object **placed last** is on top. The file keeps the objects in the order they were placed (PLAN 7.2), the editor's list is that order, and a removed object comes back to its place on undo.
+- **Editor layer**: a number from 0, the editor's only. With one chosen (`,` and `.` go through All, 0, 1, 2…; the toolbar shows it), the objects of the other layers are drawn faint and can't be clicked, box-selected, selected with Ctrl+A or erased. Placed, pasted and duplicated objects go into the chosen layer. Start positions are in every layer. Choosing a layer drops the selection outside it.
+- The file: `zl=b5`…`zl=t4`, `z=<n>`, `el=<n>`, each written only when not its default (PLAN 7.2). The properties panel steps all three (Z layer, Z order, Layer), each step one undo step; a start position has none of them. The game draws by Z layer, then Z order, then line; the editor's canvas and click by Z layer, then Z order, then place in the list: the same order (PLAN 9.2). The simulation never reads any of them: a T4 spike kills exactly like a T1 one, and the level check calls two objects "twice in the same place" only when their Z layer and order match too.
+
+Not yet: GD's second editor layer (2.2), and the B1 default, which waits for decoration objects.
 
 ## 12. Level format v2 grammar
 
