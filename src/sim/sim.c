@@ -105,6 +105,7 @@ void sim_reset_at(sim_t *s, const level_start_t *start)
     st->first_active = 0;
     st->complete = false;
     memset(st->spent, 0, st->spent_words * sizeof(uint64_t));
+    st->spent_hash = 0;
     if (start != &s->lvl.hdr.start) {
         place_along(s, start);
         spend_what_is_behind(s);

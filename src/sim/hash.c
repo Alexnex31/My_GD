@@ -78,7 +78,7 @@ static uint64_t hash_state(const sim_t *s, bool with_camera)
     }
     hash_long(&h, (long)st->first_active);
     hash_long(&h, st->complete);
-    hash_bytes(&h, st->spent, st->spent_words * sizeof(uint64_t));
+    hash_bytes(&h, &st->spent_hash, sizeof st->spent_hash);   /* the bitset's */
     if (with_camera) {
         hash_double(&h, st->cam.pos.x);
         hash_double(&h, st->cam.pos.y);

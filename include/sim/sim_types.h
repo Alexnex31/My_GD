@@ -199,6 +199,8 @@ typedef struct run_state {    /* everything an attempt changes */
     bool complete;
     uint64_t *spent;          /* bitset, one bit per object (5.1) */
     size_t spent_words;
+    uint64_t spent_hash;      /* the set's hash, kept as bits are set: hashing
+                                 a state never reads the whole bitset (8.3)  */
 } run_state_t;
 
 typedef struct sim_snapshot {
@@ -264,9 +266,24 @@ static inline bool is_spent(const run_state_t *st, size_t i)
     return (st->spent[i / 64] >> (i % 64)) & 1u;
 }
 
+/* A key of its own for each object: their XOR is the set's hash. */
+static inline uint64_t spent_key(size_t i)
+{
+    uint64_t z = (uint64_t)i + 0x9e3779b97f4a7c15ULL;
+
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
+
 static inline void set_spent(run_state_t *st, size_t i)
 {
-    st->spent[i / 64] |= (uint64_t)1 << (i % 64);
+    uint64_t bit = (uint64_t)1 << (i % 64);
+
+    if (st->spent[i / 64] & bit)
+        return;
+    st->spent[i / 64] |= bit;
+    st->spent_hash ^= spent_key(i);
 }
 
 #endif
