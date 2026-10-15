@@ -2166,25 +2166,29 @@ The exact rules, so a file always loads the same way:
 
 - **Keys are lowercase and matched exactly.** `Name` is not `name`: it's an unknown field.
 - **`block`, `slope`, `spike` and `portal` can never be keys**, because the type is tested first (7.3). Every other first word is a header field, which is also why a typo'd object line (`blok 1000 700 2`) is reported as an unknown header field and not as a broken object.
-- **A `#` ends the line**, in the header as well as in the body, so a value can't contain one.
+- **A `#` ends the line**, in the header as well as in the body, so a value can't contain one. The editor writes a name, an author or a song up to its first `#` and without the blanks around it (`level_clean_text`), which is exactly what reading it back gives; a new level's name is cleaned the same way when it is typed, and the editor only offers songs whose file names fit.
+- **Blanks before a key are nothing**, as before an object's type, and a UTF-8 byte order mark at the start of the file is skipped.
 - **The same key twice: the last one wins.** The editor writes each field once.
 - **An empty value is ignored with a warning** and the default is kept, so `name` on its own never blanks the level's name.
-- **A value longer than the field is truncated with a warning**: 127 characters for `name`, 63 for `author` and `music`.
-- **An unknown key is one warning and is ignored**, the rest of the file still loads, so a file written by a newer build still opens and the editor keeps those lines verbatim when it saves (FEATURES 11.1).
+- **A value longer than the field is truncated with a warning**: 127 characters for `name`, 63 for `author` and `music`. A number or a word longer than 63 characters is no number or word: it is ignored with a warning, never cut into a different one.
+- **Numbers stay in range**, or the line is ignored with a warning and the default kept: `start_x` and `start_y` within 10 000 000 px like any object, `bpm` from 0 (no grid) to 1000, `music_offset` and `first_beat` within a day (86 400 s). Beyond that, a beat or tick count computed from them would not fit its integer.
+- **An unknown key is one warning and is ignored**, the rest of the file still loads, so a file written by a newer build still opens, and the editor keeps those lines verbatim when it saves (FEATURES 11.1). So does every line the loader skipped: `level_doc_t.kept` holds them in file order, and the writer puts them back right after the header fields. Opening and saving a file never loses a line, only comments and blank lines.
 
 **Player progress is never in the level file**: attempts, best and practice best live in `save/progress.txt`, keyed by the id (6.4). A level file only describes the level, so editing or sharing one never touches anyone's records, and the game never writes to `levels/`.
 
 **Body.** One object per line: `type x y size [word] [key=value ...]`.
 
 - Types: `block`, `slope` (a right triangle rising left to right, 4.2; `rot=` turns it into any other orientation, e.g. `rot=90` for a ceiling slope), `spike`, `portal` (whose extra word is the gamemode).
-- `x` and `y` are world pixels, any sign; `size`, `w` and `h` are grid units of 50 px.
+- `x` and `y` are world pixels, any sign; `size`, `w` and `h` are grid units of 50 px. `size` is a whole number; `w` and `h` take decimals, down to one pixel (`w=0.02`), since a portal's own width is 1.2 blocks and the editor's steps add whole ones to it (`w=3.4`).
+- **A line is read whole or not at all**: more than 64 words, or more than 1023 characters, skips it with a warning, and the editor keeps it as it was. A NUL byte ends a line's text.
+- **The writer writes every number so it reads back exactly**: the shortest of `%.10g` to `%.17g` that does, so `0.1` stays `0.1` and a hand-tuned `1000.123456789` stays itself. A width or height is the decimal whose product by 50 is the width in pixels.
 - `#` starts a comment anywhere on a line.
 
 Optional `key=value` fields, any object:
 
 | Field | Meaning | Default |
 |---|---|---|
-| `rot=<degrees>` | rotation, any angle, clockwise, around the rect's center (4.4) | `0` |
+| `rot=<degrees>` | rotation, any angle up to a million degrees either way, clockwise, around the rect's center (4.4) | `0` |
 | (portals) | a portal with no `w=`/`h=` is `1.2 x size` wide and `2.8 x size` tall, centered on its cell: GD's portals are tall and narrow (4.2) | |
 | `w=<units>` | width in grid units (50 px) | `size` |
 | `h=<units>` | height in grid units | `size` |
@@ -2194,7 +2198,7 @@ Why width and height: with `size` alone, every object is a square, so a "wide pl
 
 Why `rot=` instead of `up|down|left|right`: an angle covers the four directions (`0`, `90`, `180`, `270`) and everything in between, for every object type, with one field. Hitboxes follow the angle (4.4).
 
-Sizes: `size`, `w` and `h` must be at least 1. Zero or negative rejects the line (a zero-size object would be invisible and touch nothing, so it's always a mistake). An object whose `x`, `y`, width or height is beyond 10 000 000 px (`LEVEL_COORD_MAX`, over two hours of level at normal speed) is rejected too: the renderer cuts the level into chunks up to its rightmost object, and one object at `x = 1e12` would ask for a billion of them.
+Sizes: `size` must be at least 1, `w` and `h` at least one pixel. Zero or negative rejects the line (a zero-size object would be invisible and touch nothing, so it's always a mistake). An object whose `x`, `y`, width or height is beyond 10 000 000 px (`LEVEL_COORD_MAX`, over two hours of level at normal speed) is rejected too: the renderer cuts the level into chunks up to its rightmost object, and one object at `x = 1e12` would ask for a billion of them.
 
 **No migration, ever.** The legacy format (a first line of `id attempts best`, files named `levelN`) is not read at all: the seven levels that existed were converted once by hand, and the old copies are kept outside the repository. A legacy file loads as a level whose first line is an invalid object, with one warning.
 
@@ -2264,8 +2268,9 @@ Loader (`sim_load` reads the file into memory, then `sim_load_mem` does the work
 2. Walk the lines, strip `\r\n` (files edited on Windows have `\r`), skip blank lines and comments. A last line without a newline is a normal line.
 3. A line whose first word isn't an object type is a header field (7.2): store the known keys, warn once for an unknown one.
 4. `parse_object`; on failure log `levels/10280.gd:12: invalid line, skipped` and continue.
-5. Two passes over the buffer: the first counts the lines, the second fills one allocation of that size (the object array ends up exactly as long as the number of valid objects). One allocation, no realloc, and the same result whatever the file.
-6. After reading: sort by `(hitbox.aabb.x, line)` with an explicit comparator (`(a > b) - (a < b)`, never a float subtraction cast to int), then compute `reach`, `end_shift` (3.4), `kill_y` (4.7), allocate the `spent` bitset (`(n + 63) / 64` words) and call `sim_reset`. A level with no object is legal: `reach` 0, `end_shift` 100, and `kill_y` from the corridor constant alone.
+5. One pass over the buffer, and the arrays grow by doubling as objects, start positions and kept lines come: a file of comments allocates nothing. A file is at most 16 MiB (`LEVEL_FILE_MAX`, the game and the editor alike) and a level at most 250 000 objects (`LEVEL_OBJECTS_MAX`, three times GD's longest levels); past that, one warning and the rest of the object lines are skipped, not kept. An earlier version allocated one object per line of the file up front, so 40 MB of comments asked for 24 GB.
+6. **Messages say what is wrong**: the key and the value at fault (`invalid value for w= ('0')`, `unexpected word 'extra'`), a start out of range as such. A line that is skipped says only why: the warnings for the unknown fields it carried come once the line is known to load.
+7. After reading: sort by `(hitbox.aabb.x, line)` with an explicit comparator (`(a > b) - (a < b)`, never a float subtraction cast to int), then compute `reach`, `end_shift` (3.4), `kill_y` (4.7), allocate the `spent` bitset (`(n + 63) / 64` words) and call `sim_reset`. A level with no object is legal: `reach` 0, `end_shift` 100, and `kill_y` from the corridor constant alone.
 
 ### 7.4 A `--check` mode
 
@@ -2312,7 +2317,7 @@ Plain C with a tiny assert macro (or Criterion if you already use it):
 
 What to test (levels are given as strings to `sim_load_mem`, no temp files):
 
-- **Parser:** blank lines, comments (full-line and after an object), `\r\n`, missing fields, unknown types, bad portal modes, negative coordinates, no trailing newline, legacy header detection, `name` line. Rejected: `size` `0`, `-1`, `2.5`, `nan`, `inf`, `1e99`, `w=0`, `h=-2`, trailing junk (`750x`). Accepted: `rot=`, `w=`, `h=`, `group=` (ignored with one warning), an unknown field (ignored, line kept).
+- **Parser:** blank lines, comments (full-line and after an object), `\r\n`, missing fields, unknown types, bad portal modes, negative coordinates, no trailing newline, legacy header detection, `name` line. Rejected: `size` `0`, `-1`, `2.5`, `nan`, `inf`, `1e99`, `w=0`, `w=0.01`, `h=-2`, `rot=1e308`, trailing junk (`750x`), more than 64 words, more than 1023 characters. Accepted: `rot=` (a turn of 100 045° is exactly one of 325°), `w=`, `h=` and their decimals (`w=3.4`), `group=` (ignored with one warning), an unknown field (ignored, line kept), blanks before a header key, a byte order mark. Each message, word for word. Header numbers out of range, and one too long to be a number.
 - **Progress:** the file is written once per visit, not per attempt: 20 simulated deaths leave `save/progress.txt` untouched (same mtime and bytes), and leaving the level writes `attempts=20` once; save → load round trip keeps `47.83` and `practice_best`; an unknown `key=value` survives a load/save cycle; a missing file gives an empty store; `progress_get` creates entries; invalid ids are refused; a failed save leaves the previous file untouched.
 - **Collisions**, with hand-built objects: land on a block from above; die hitting its side; ship slides under; spike hitbox edges (1 px inside kills, 1 px outside doesn't); the wide-block case (F5, now `w=8 h=1`); the 100 px gap under a wall (level 5).
 - **Broadphase:** a 45°-rotated block (its hitbox bounds stick out of its rect) still stops a player at its corner; every test level gives the same results with the broadphase and with a brute-force loop over all objects (compare `sim_state_hash` every tick).
