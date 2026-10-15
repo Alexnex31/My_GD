@@ -140,6 +140,20 @@ void input_start(gd_t *gd)
         sched_yield();                       /* the first poll: under a ms */
 }
 
+/*
+** Out of the pause menu (PLAN 10.4): what happened while it was open is read
+** and pressed nothing, and the mouse button that clicked Resume is no jump
+** until it is released, as at a level's start.
+*/
+void input_resume(gd_t *gd)
+{
+    input_poll_t *ip = &gd->input;
+    int64_t now = input_now_us(gd) * TICK_RATE;
+
+    input_read_tick(&ip->reader, &ip->queue, now, now);
+    ip->reader.latched |= ip->reader.down & mouse_inputs(&ip->jump);
+}
+
 void input_stop(gd_t *gd)
 {
     atomic_store(&gd->input.running, false);

@@ -16,6 +16,7 @@
     #include "view.h"
     #include "music/library.h"
     #include "fx/trail.h"
+    #include "ui/ui.h"
 
 typedef struct gd gd_t;
 
@@ -26,6 +27,8 @@ typedef struct render_chunk {
     sfVertexBuffer *layer[LAYER_COUNT];
     sfVertexArray *array[LAYER_COUNT];   /* the fallback, same vertices    */
 } render_chunk_t;
+
+    #define PAUSE_ITEMS 3
 
 typedef enum level_state {
     LEVEL_PLAYING,
@@ -89,6 +92,10 @@ typedef struct level {
     size_t path_cap;
     trail_t trail;                /* the wave's path, corners only (FEATURES 8.5) */
     sfVertexArray *trail_va;      /* its strip, built again each frame         */
+    bool paused;                  /* the pause menu is open: no tick (PLAN 10.4) */
+    ui_screen_t pause_ui;
+    widget_t pause_widgets[PAUSE_ITEMS];
+    int pause_action;             /* a button's, done once the events are read */
 } level_t;
 
 /* The scene (3.6): events, then whole ticks, then one render. */
@@ -127,7 +134,17 @@ bool input_event_is(const sfEvent *ev, binding_t b);
 
 /* Per level. The click that started it isn't a jump: ignored until it's up. */
 void input_start(gd_t *gd);
+void input_resume(gd_t *gd);                 /* out of the pause menu */
 void input_stop(gd_t *gd);
+
+/*
+** The pause menu (PLAN 10.4): Escape or a lost focus opens it, the level
+** stops ticking and its song waits. Resume, Restart, Quit.
+*/
+void level_pause(level_t *lv, gd_t *gd);
+void pause_event(level_t *lv, gd_t *gd);     /* one event, while it's open */
+void pause_act(level_t **lv, gd_t *gd);      /* what its buttons asked */
+void pause_draw(gd_t *gd, level_t *lv);
 
 /* The static geometry: built once per level, drawn a few calls per frame. */
 void level_build_chunks(level_t *lv, gd_t *gd);

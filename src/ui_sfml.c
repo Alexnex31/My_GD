@@ -252,6 +252,19 @@ static void draw_capture(gd_t *gd, const widget_t *w)
         (sfVector2f){VIEW_W / 2.0f, 580.0f}, 1, 1.0f);
 }
 
+/* The whole screen darkened, under a menu drawn over a scene (PLAN 10.4). */
+void ui_dim(gd_t *gd)
+{
+    sfRenderWindow_setView(gd->w, gd->ui_view);
+    rect(gd, (ui_rect_t){0.0f, 0.0f, VIEW_W, VIEW_H}, DIM, 0.0f);
+}
+
+/* One line of text centered on x, in the toolkit's font and size. */
+void ui_caption(gd_t *gd, const char *s, float x, float y)
+{
+    text(gd, s, (sfVector2f){x, y}, 1, 1.0f);
+}
+
 /* In the UI view. A dialog on top is drawn over a dimmed screen. */
 void ui_draw(gd_t *gd, const ui_screen_t *ui)
 {

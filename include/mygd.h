@@ -69,6 +69,7 @@ void keyboard_events_main_menu(main_m_t **menu, gd_t *gd);
 void keyboard_events_editor_menu(editor_m_t **editor_m, gd_t *gd);
 void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd);
 void keyboard_events_playing(level_t **level, gd_t *gd);
+void go_back_playing_level_list(gd_t *gd, level_t **level);   /* frees it */
 
 
 /* ./my_gd --check <level>: load it with the sim only and report (7.4). */
@@ -94,6 +95,7 @@ bool music_probe(const char *path, float *duration);
 int music_load(music_manager_t *m, const char *file);
 void music_play_from(music_manager_t *m, double seconds);
 void music_stop(music_manager_t *m);
+void music_pause(music_manager_t *m);       /* where it is: resumed by play_from */
 double music_position(const music_manager_t *m);   /* seconds into the song */
 bool music_is_playing(const music_manager_t *m);
 void music_set_loop(music_manager_t *m, bool loop);
@@ -121,6 +123,8 @@ void ui_gfx_create(gd_t *gd);
 void ui_gfx_free(gd_t *gd);
 bool ui_from_sf(gd_t *gd, const sfEvent *ev, ui_event_t *out);
 void ui_draw(gd_t *gd, const ui_screen_t *ui);
+void ui_dim(gd_t *gd);
+void ui_caption(gd_t *gd, const char *s, float x, float y);
 int64_t ui_now_ms(void);
 const sfUint32 *utf8_to_utf32(const char *s);
 

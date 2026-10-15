@@ -376,12 +376,23 @@ void handle_playing(gd_t *gd, level_t **level)
     level_frame(gd, *level);                 /* Retry replaced the level */
 }
 
+/* The pause menu's frame: no tick, no timer, the level as it stopped. */
+static void paused_frame(gd_t *gd, level_t *lv, int64_t now)
+{
+    lv->last_frame_us = now;
+    lv->frame_us = 0;
+    level_render(gd, lv);
+    pause_draw(gd, lv);
+}
+
 void level_frame(gd_t *gd, level_t *lv)
 {
     int64_t now = 0;
     int64_t frame_us = 0;
 
     now = input_now_us(gd);
+    if (lv->paused)
+        return paused_frame(gd, lv, now);
     frame_us = now - lv->last_frame_us;
     lv->last_frame_us = now;
     if (frame_us > 250000)

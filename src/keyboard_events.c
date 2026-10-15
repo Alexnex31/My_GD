@@ -237,15 +237,29 @@ void handle_end_screen_click(level_t **level, gd_t *gd, int mx, int my)
         go_back_playing_level_list(gd, level);
 }
 
-/* The level scene's keys. The jump has its own thread (FEATURES 1). */
+/*
+** The level scene's keys. The jump has its own thread (FEATURES 1). Escape
+** pauses (PLAN 10.4); once the level is complete it leaves, as Quit does.
+*/
 static void playing_key(level_t **level, gd_t *gd, sfKeyCode key)
 {
-    if (key == sfKeyEscape)
+    if (key == sfKeyEscape && (*level)->state == LEVEL_COMPLETE)
         return go_back_playing_level_list(gd, level);
+    if (key == sfKeyEscape)
+        return level_pause(*level, gd);
     if (key == sfKeyF3)
         gd->debug_overlay = !gd->debug_overlay;
     if (key == sfKeyA || key == sfKeyE)      /* the start positions (11.8) */
         level_change_start(*level, gd, key == sfKeyE ? 1 : -1);
+}
+
+/* While the pause menu is open, every event is its own. */
+static bool paused_event(level_t *lv, gd_t *gd)
+{
+    if (!lv->paused)
+        return false;
+    pause_event(lv, gd);
+    return true;
 }
 
 void keyboard_events_playing(level_t **level, gd_t *gd)
@@ -259,8 +273,12 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
             close_window(gd->w);
             return;
         }
+        if (gd->event->type == sfEvtLostFocus)
+            level_pause(*level, gd);         /* the keys are someone else's */
         if (gd->event->type == sfEvtGainedFocus)
             (*level)->last_frame_us = input_now_us(gd);  /* no burst after a pause */
+        if (paused_event(*level, gd))
+            continue;
         if (gd->event->type == sfEvtKeyPressed) {
             playing_key(level, gd, gd->event->key.code);
             if (*level == NULL)
@@ -277,4 +295,6 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
             return;
         }
     }
+    if (*level != NULL && (*level)->paused)
+        pause_act(level, gd);
 }

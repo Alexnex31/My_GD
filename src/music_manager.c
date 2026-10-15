@@ -77,6 +77,13 @@ void music_stop(music_manager_t *m)
         sfMusic_stop(m->current);
 }
 
+/* The pause menu's (PLAN 10.4): resuming plays from the tick's place again. */
+void music_pause(music_manager_t *m)
+{
+    if (m->current != NULL && sfMusic_getStatus(m->current) == sfPlaying)
+        sfMusic_pause(m->current);
+}
+
 void music_set_loop(music_manager_t *m, bool loop)
 {
     if (m->current != NULL)
