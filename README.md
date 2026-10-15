@@ -78,7 +78,8 @@ Exit code `84` means a missing asset, an unreadable level or a bad argument, wit
 | Action | Key |
 |---|---|
 | Jump / hold | `Space`, `Up`, or left click (`jump_bindings`) |
-| Pause: Resume, Restart, Quit (`Escape` again resumes; the window losing focus pauses too) | `Escape` |
+| Pause: Resume, Restart, Practice on/off, Quit (`Escape` again resumes; the window losing focus pauses too) | `Escape` |
+| Practice: place / remove a checkpoint (a death goes back to the last one; only the practice best counts) | `Z` / `X` (`checkpoint_key`, `remove_checkpoint_key`) |
 | Back to the level list, once the level is complete | `Escape` |
 | Restart the attempt | `R` (`restart_key`) |
 | Previous / next start position (no best and no completion from one) | `A` / `E` |

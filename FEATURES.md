@@ -281,7 +281,7 @@ static const setting_def_t DEFS[] = {
 
 `offsetof` gives the field's position inside the struct, so one generic function reads and writes every setting. A value is only stored once it's valid: a rejected one never touches the field.
 
-What uses them today: the window (size, fullscreen, vsync, frame limit) at startup, the music volume, the three HUD toggles, the jump bindings (read by the input thread when a level starts) and the restart key. The others wait for their features: `sfx_volume` (there are no sounds yet), `menu_song` (4), the checkpoint keys (practice) and `audio_offset_ms` (4.8).
+What uses them today: the window (size, fullscreen, vsync, frame limit) at startup, the music volume, the three HUD toggles, the jump bindings (read by the input thread when a level starts), the restart key and the checkpoint keys (practice, PLAN 13.1). The others wait for their features: `sfx_volume` (there are no sounds yet), `menu_song` (4) and `audio_offset_ms` (4.8).
 
 ### 2.4 Saving rules
 

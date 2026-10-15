@@ -2841,6 +2841,8 @@ Toggled from the pause menu (10.4). While it's on:
 
 Because a snapshot is the whole run state (player, camera, corridor, tick, cursor, spent objects, and every FEATURES field), a restored checkpoint is exactly the moment it was taken: no special cases per mode or object.
 
+*Done (2026-10-15):* `src/practice.c`. The pause menu's third button turns it on (the run under way goes on, as a practice one) and off (that run's percentage is practice's, the checkpoints go, and the level starts again from its start, so no normal best ever comes from a checkpoint). `level_respawn` restores the last checkpoint when there is one, after a death, the restart key or the pause menu's Restart, and its song plays from that tick as from any respawn; the objects the checkpoint had used stay used and aren't flashed again. `level_record_best` writes to `practice_best` while practicing, only from the level's own start like the best. Changing start position (A / E) discards the checkpoints, which belong to the old start. The progress bar turns blue in practice and shows each checkpoint as a green tick; the checkpoints themselves are green diamonds at the player's position. The end screen says "PRACTICE COMPLETE" and that the best is untouched. The level list shows "Practice: N%" beside the best once there is one. A checkpoint placed right before an obstacle the player can't clear from there respawns into it again and again, as in GD: remove it with `X`.
+
 ### 13.2 Replays and ghost
 
 Record the ticks where `held` changes and the ticks with `pressed` (a few dozen integers per run). Replaying = feeding them back through `sim_tick`. Save the best run per level in `save/replays/<id>.txt`:
