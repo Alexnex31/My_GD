@@ -30,13 +30,21 @@ typedef struct progress {
     progress_entry_t *entries;
     size_t count;
     size_t cap;
+    char **kept;              /* lines that aren't a level of ours (comments, a
+                                 newer build's ids), written back unchanged   */
+    size_t nb_kept;
+    bool unreadable;          /* the file is there but couldn't be read: it
+                                 is never overwritten                         */
     char path[256];
 } progress_t;
 
-/* A missing file is an empty store, not an error. Returns 0, or -1 on a read error. */
+/*
+** A missing file is an empty store, not an error. Returns 0, or -1 when the
+** file is there but can't be read: the store is empty and `unreadable`.
+*/
 int progress_load(progress_t *p, const char *path);
 
-/* Writes through a .tmp + rename, so a crash never truncates the store. */
+/* Atomic, so a crash never truncates the store. -1 if it was unreadable. */
 int progress_save(const progress_t *p);
 
 /* The entry for this id, created empty if the store has none. NULL if invalid. */
@@ -51,7 +59,11 @@ progress_entry_t *progress_find(const progress_t *p, const char *id);
 */
 float progress_printable(float pct);
 
-/* Empties the store and saves it, the old file copied to <path>.bak first. */
+/*
+** Empties the store and saves it, the old file copied to <path>.bak first
+** (an empty one leaves the last .bak alone). -1: nothing changed, in memory
+** or on disk.
+*/
 int progress_reset(progress_t *p);
 
 void progress_free(progress_t *p);

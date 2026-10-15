@@ -5,6 +5,7 @@
 ** the settings store: defaults, ranges, bindings, unknown keys (FEATURES 2)
 */
 
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -235,22 +236,71 @@ static void test_unreadable(void)
     CHECK(strcmp(read_file(), "music_volume=3\n") == 0);   /* untouched */
 }
 
+/*
+** A line is whole however long: a long comment never applies the key at its
+** end, and a long unknown value is written back as it was. A newer build's
+** key with digits in it is kept too.
+*/
+static void test_long_lines(void)
+{
+    settings_t s;
+    char *text = calloc(8192, 1);
+    char *back = calloc(8192, 1);
+    char value[3001];
+    FILE *f = NULL;
+
+    memset(value, 'v', sizeof(value) - 1);
+    value[sizeof(value) - 1] = '\0';
+    memset(text, '#', 1500);
+    snprintf(text + 1500, 8192 - 1500, "music_volume=5\nfuture=%s\n"
+        "volume2=50\n", value);
+    load(&s, text);
+    CHECK(s.music_volume == 80 && nb_logged == 0);
+    CHECK(s.nb_extra == 2 && strncmp(s.extra[0], "future=", 7) == 0);
+    CHECK(s.nb_extra == 2 && strlen(s.extra[0]) == 7 + strlen(value));
+    CHECK(s.nb_extra == 2 && strcmp(s.extra[1], "volume2=50") == 0);
+    CHECK(settings_save(&s) == 0);
+    f = fopen(path, "r");
+    if (f != NULL) {
+        back[fread(back, 1, 8191, f)] = '\0';
+        fclose(f);
+    }
+    snprintf(text, 8192, "\nfuture=%s\nvolume2=50\n", value);
+    CHECK(strstr(back, text) != NULL);
+    settings_free(&s);
+    free(text);
+    free(back);
+}
+
+/* What a folder holds, "." and ".." aside. */
+static int nb_files(const char *dir)
+{
+    DIR *d = opendir(dir);
+    int n = 0;
+
+    if (d == NULL)
+        return -1;
+    for (struct dirent *e = readdir(d); e != NULL; e = readdir(d))
+        n += e->d_name[0] != '.';
+    closedir(d);
+    return n;
+}
+
 /* The folder is made, and nothing is left behind but the file (2.4). */
 static void test_save_makes_its_folder(void)
 {
     settings_t s;
     char nested[128];
-    char tmp[140];
+    char dir[128];
 
     snprintf(nested, sizeof(nested), "%s/save/settings.txt", tmp_dir);
-    snprintf(tmp, sizeof(tmp), "%s.tmp", nested);
+    snprintf(dir, sizeof(dir), "%s/save", tmp_dir);
     settings_load(&s, nested, capture);
     CHECK(settings_save(&s) == 0);
-    CHECK(access(nested, R_OK) == 0 && access(tmp, F_OK) != 0);
+    CHECK(access(nested, R_OK) == 0 && nb_files(dir) == 1);
     settings_free(&s);
     remove(nested);
-    snprintf(nested, sizeof(nested), "%s/save", tmp_dir);
-    rmdir(nested);
+    rmdir(dir);
 }
 
 /* Every name reads back as itself; any case reads (2.2). */
@@ -290,6 +340,7 @@ void test_settings(void)
     test_action_keys();
     test_round_trip();
     test_unreadable();
+    test_long_lines();
     test_save_makes_its_folder();
     test_binding_names();
     remove(path);

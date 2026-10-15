@@ -101,7 +101,7 @@ void options_apply_display(option_m_t *om)
 static void reset_progress(option_m_t *om)
 {
     if (progress_reset(&om->gd->progress) != 0)
-        return options_notice(om, "Couldn't back the progress up: nothing"
+        return options_notice(om, "Couldn't reset the progress: nothing"
             " was deleted");
     options_notice(om, "Progress reset (the old file is progress.txt.bak)");
 }

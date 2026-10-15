@@ -154,7 +154,9 @@ gd_t *create_gd(void)
     gd->menu = 'm';
     snprintf(gd->selected_id, sizeof(gd->selected_id), "1");
     atlas_build(gd);
-    progress_load(&gd->progress, SAVE_PATH);
+    if (progress_load(&gd->progress, SAVE_PATH) != 0)
+        dprintf(2, "my_gd: cannot read %s: the progress won't be saved\n",
+            SAVE_PATH);                      /* never over a file kept (6.4) */
     return gd;
 }
 

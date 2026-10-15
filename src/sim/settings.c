@@ -11,13 +11,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 
 #include "sim/alloc.h"
 #include "sim/save_file.h"
 #include "sim/settings.h"
 
-#define LINE_MAX_LEN 1024
+#define VALUE_LEN 1024                /* a value as this build writes one */
 #define MSG_LEN 1400
 
 typedef enum setting_type {
@@ -173,13 +172,12 @@ static char *trim(char *s)
 /* "Space, Up ,MouseLeft": 1 to BINDINGS_MAX names, each once, none empty. */
 static bool parse_bindings(const char *v, bindings_t *out)
 {
-    char buf[LINE_MAX_LEN];
+    char *buf = sim_xstrdup(v);
     char *tok = buf;
     char *comma = NULL;
     bindings_t b = {0};
 
-    snprintf(buf, sizeof(buf), "%s", v);
-    do {
+    for (;;) {
         binding_t one;
 
         comma = strchr(tok, ',');
@@ -188,10 +186,13 @@ static bool parse_bindings(const char *v, bindings_t *out)
         tok = trim(tok);
         if (b.count == BINDINGS_MAX || !parse_binding(tok, &one)
             || one.kind == BIND_NONE || bindings_contain(&b, one))
-            return false;
+            return free(buf), false;
         b.items[b.count++] = one;
+        if (comma == NULL)
+            break;
         tok = comma + 1;
-    } while (comma != NULL);
+    }
+    free(buf);
     *out = b;
     return true;
 }
@@ -274,12 +275,14 @@ static void keep_extra(settings_t *s, const char *key, const char *value)
     s->nb_extra += 1;
 }
 
+/* Lower case, digits and '_': a newer build's "volume2" is kept (2.3). */
 static bool valid_key(const char *k)
 {
     if (k[0] == '\0')
         return false;
     for (; *k != '\0'; k++)
-        if (!(*k >= 'a' && *k <= 'z') && *k != '_')
+        if (!(*k >= 'a' && *k <= 'z') && !(*k >= '0' && *k <= '9')
+            && *k != '_')
             return false;
     return true;
 }
@@ -287,7 +290,7 @@ static bool valid_key(const char *k)
 static void parse_line(settings_t *s, char *line, int nb, sim_log_fn log)
 {
     char msg[MSG_LEN];
-    char was[LINE_MAX_LEN];
+    char was[VALUE_LEN];
     char *eq = strchr(line, '=');
     char *key = NULL;
     char *value = NULL;
@@ -359,50 +362,41 @@ static void check_action_keys(settings_t *s, sim_log_fn log)
     }
 }
 
-static bool regular_file(FILE *f)
+/* Whole lines, however long: none is ever cut in two. */
+static void read_lines(settings_t *s, char *text, sim_log_fn log)
 {
-    struct stat st;
-
-    return fstat(fileno(f), &st) == 0 && S_ISREG(st.st_mode);
-}
-
-static int read_lines(settings_t *s, FILE *f, sim_log_fn log)
-{
-    char line[LINE_MAX_LEN];
+    char *cursor = text;
+    char *line = NULL;
     char *t = NULL;
     int nb = 0;
 
-    while (fgets(line, sizeof(line), f) != NULL) {
+    while ((line = save_next_line(&cursor)) != NULL) {
         nb += 1;
         t = trim(line);
         if (t[0] != '\0' && t[0] != '#')
             parse_line(s, t, nb, log);
     }
-    return ferror(f) ? -1 : 0;
 }
 
 int settings_load(settings_t *s, const char *path, sim_log_fn log)
 {
     char msg[MSG_LEN];
-    FILE *f = NULL;
+    char *text = NULL;
+    save_read_t got;
 
     settings_defaults(s);
     snprintf(s->path, sizeof(s->path), "%s", path);
-    f = fopen(path, "r");
-    if (f == NULL && errno == ENOENT)
+    got = save_read(path, &text);
+    if (got == SAVE_MISSING)
         return 0;                            /* the first run: defaults */
-    if (f == NULL || !regular_file(f) || read_lines(s, f, log) != 0) {
-        if (f != NULL)
-            fclose(f);
-        settings_free(s);
-        settings_defaults(s);
-        snprintf(s->path, sizeof(s->path), "%s", path);
+    if (got == SAVE_UNREADABLE) {
         s->unreadable = true;
         snprintf(msg, sizeof(msg), "%s: unreadable, using the defaults"
             " (it won't be overwritten)", path);
         return say(log, msg), -1;
     }
-    fclose(f);
+    read_lines(s, text, log);
+    free(text);
     check_action_keys(s, log);
     return 0;
 }
@@ -410,7 +404,7 @@ int settings_load(settings_t *s, const char *path, sim_log_fn log)
 static void write_settings(FILE *f, const void *data)
 {
     const settings_t *s = data;
-    char value[LINE_MAX_LEN];
+    char value[VALUE_LEN];
 
     fprintf(f, "# my_gd settings (FEATURES 2.2). Comments aren't kept.\n");
     for (size_t i = 0; i < NB_DEFS; i++) {

@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "sim/progress.h"
@@ -147,9 +148,56 @@ static void test_progress_reset(void)
     progress_free(&p);
     progress_load(&p, path);
     CHECK(p.count == 0);
+    CHECK(progress_reset(&p) == 0);          /* again: the .bak stays */
+    text = slurp(bak);
+    CHECK(text != NULL && strstr(text, "3 attempts=12") != NULL);
     progress_free(&p);
     remove(path);
     remove(bak);
+    rmdir(dir);
+}
+
+/*
+** A reset that fails changes nothing: not the file, not the store in
+** memory. The backup can't read the file, or the empty store can't be saved.
+*/
+static void test_progress_reset_fails(void)
+{
+    char dir[] = "/tmp/my_gd_resetXXXXXX";
+    char path[64];
+    char locked[64];
+    char target[80];
+    progress_t p;
+
+    if (geteuid() == 0 || mkdtemp(dir) == NULL)
+        return;                              /* root writes anywhere */
+    snprintf(path, sizeof(path), "%s/progress.txt", dir);
+    progress_load(&p, path);
+    progress_get(&p, "3")->attempts = 12;
+    progress_save(&p);
+    chmod(path, 0);
+    CHECK(progress_reset(&p) == -1 && p.count == 1);
+    chmod(path, 0644);
+    CHECK(slurp(path) != NULL && strstr(slurp(path), "3 attempts=12"));
+    remove(path);
+    snprintf(locked, sizeof(locked), "%s/locked", dir);
+    snprintf(target, sizeof(target), "%s/progress.txt", locked);
+    mkdir(locked, 0755);
+    snprintf(p.path, sizeof(p.path), "%s", target);
+    CHECK(progress_save(&p) == 0);
+    snprintf(p.path, sizeof(p.path), "%s", path);
+    chmod(locked, 0555);                     /* the save can't go there */
+    CHECK(symlink("locked/progress.txt", path) == 0);
+    CHECK(progress_reset(&p) == -1);
+    CHECK(p.count == 1 && progress_find(&p, "3")->attempts == 12);
+    CHECK(slurp(target) != NULL && strstr(slurp(target), "3 attempts=12"));
+    progress_free(&p);
+    chmod(locked, 0755);
+    remove(target);
+    rmdir(locked);
+    remove(path);
+    snprintf(target, sizeof(target), "%s.bak", path);
+    remove(target);
     rmdir(dir);
 }
 
@@ -181,5 +229,6 @@ void test_options(void)
     test_slot_names();
     test_window_sizes();
     test_progress_reset();
+    test_progress_reset_fails();
     test_dirty();
 }
