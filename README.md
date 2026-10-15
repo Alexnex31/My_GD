@@ -78,11 +78,11 @@ Exit code `84` means a missing asset, an unreadable level or a bad argument, wit
 | Action | Key |
 |---|---|
 | Jump / hold | `Space`, `Up`, or left click (`jump_bindings`) |
-| Back to the level list | `Escape` |
+| Pause: Resume, Restart, Quit (`Escape` again resumes; the window losing focus pauses too) | `Escape` |
+| Back to the level list, once the level is complete | `Escape` |
 | Restart the attempt | `R` (`restart_key`) |
 | Previous / next start position (no best and no completion from one) | `A` / `E` |
 | Debug overlay (hitboxes, contacts, tick, speeds) | `F3` |
-| Pause | *(planned)* |
 
 The keys are rebindable in `save/settings.txt`, written with the defaults the first time the game quits. Every key is `key=value`, one per line:
 
