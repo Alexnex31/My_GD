@@ -165,7 +165,7 @@ void handle_level_list(gd_t *gd, level_list_t **level_list)
 {
     if (*level_list == NULL)
         *level_list = create_level_list(gd);
-    print_level_list(*level_list, gd->w);
+    print_level_list(*level_list, gd);
     song_picker_draw(*level_list, gd);
     print_cursor(gd->cursor, gd->w);
     keyboard_events_level_list(level_list, gd);
@@ -192,7 +192,7 @@ void handle_main_menu(gd_t *gd, main_m_t **menu)
 {
     if (*menu == NULL)
         *menu = create_main_menu(gd);
-    print_main_menu(*menu, gd->w);
+    print_main_menu(*menu, gd);
     print_cursor(gd->cursor, gd->w);
     keyboard_events_main_menu(menu, gd);
 }

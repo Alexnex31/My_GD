@@ -191,7 +191,7 @@ static void test_latched_click(void)
     CHECK(!in.pressed && !in.held);
     push(q, in_tick(1, 10), MOUSE | SPACE);
     in = tick(&r, q, 1);
-    CHECK(in.pressed && in.held);             /* the keyboard is never ignored */
+    CHECK(in.pressed && in.held);             /* a key not latched: a jump */
     push(q, in_tick(2, 10), SPACE);
     push(q, in_tick(3, 10), 0);
     tick(&r, q, 2);
@@ -199,6 +199,31 @@ static void test_latched_click(void)
     push(q, in_tick(4, 10), MOUSE);
     in = tick(&r, q, 4);
     CHECK(in.pressed && in.held);
+    free(q);
+}
+
+/*
+** A level's start (input_start): every input latched, the first poll pushed.
+** Space held from the Retry it chose is nothing until up; Up, not down at
+** the start, is a jump at its first press; so is Space once released.
+*/
+static void test_latched_at_start(void)
+{
+    input_queue_t *q = new_queue();
+    input_reader_t r = {0, ~0u};
+    input_t in;
+
+    push(q, in_tick(0, 0), SPACE);
+    in = tick(&r, q, 0);
+    CHECK(!in.pressed && !in.held);
+    push(q, in_tick(1, 10), SPACE | UP);
+    in = tick(&r, q, 1);
+    CHECK(in.pressed && in.held);
+    push(q, in_tick(2, 10), 0);
+    tick(&r, q, 2);
+    push(q, in_tick(3, 10), SPACE);
+    in = tick(&r, q, 3);
+    CHECK(in.pressed && in.held && r.latched == 0);
     free(q);
 }
 
@@ -265,6 +290,7 @@ void test_input(void)
     test_boundary();
     test_press_before_the_window();
     test_latched_click();
+    test_latched_at_start();
     test_other_button_while_held();
     test_full_queue();
     test_full_queue_holds_the_clock();

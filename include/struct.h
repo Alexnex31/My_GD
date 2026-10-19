@@ -25,10 +25,10 @@ typedef struct cursor {
     sfTexture *cursor_t;
 } cursor_t;
 
+/* An image the toolkit clicks (button_widget): a square it fills. */
 typedef struct button {
     sfSprite *sprite;
-    sfVector2f pos;
-    int size;
+    ui_rect_t area;
 } button_t;
 
 typedef struct end_level_screen {
@@ -39,6 +39,9 @@ typedef struct end_level_screen {
     sfText *song_text;            /* "Song: Title — Artist (License)" (4.11) */
     button_t *retry_button;
     button_t *quit_button;
+    ui_screen_t ui;               /* Retry, Quit (FEATURES 3)               */
+    widget_t widgets[2];
+    int action;                   /* 0 none, 1 retry, 2 quit: after events  */
 } end_level_screen_t;
 
 typedef struct level_button {
@@ -65,6 +68,12 @@ typedef struct level_list {
     int nb_levels;
     float scroll;                 /* UI pixels the grid is moved up by      */
     sfView *scrolled;             /* the UI view, moved down by the scroll  */
+    ui_screen_t ui;               /* each level's Play, then its song line  */
+    widget_t *widgets;            /* 2 per level, in the grid's coordinates */
+    bool follow;                  /* a key moved the focus: scroll to it    */
+    int pending_play;             /* what a callback chose, -1: done after  */
+    int pending_song;             /* the events (3.5)                       */
+    bool pending_back;
     struct gd *gd;                /* for the picker's callbacks             */
     int picker_for;               /* the level whose song is chosen, -1 (4.6) */
     bool picker_closing;          /* closed by a callback: freed after events */
@@ -101,11 +110,14 @@ typedef struct editor_menu {
     bool want_back;
 } editor_m_t;
 
+/* Options, Play, Editor: toolkit buttons over the images (FEATURES 3). */
 typedef struct main_menu {
     sfSprite *background;
-    button_t *play;
-    button_t *param;
-    button_t *online;
+    button_t *buttons[3];
+    ui_screen_t ui;
+    widget_t widgets[3];
+    char next;                    /* the scene a callback asked for, or 0   */
+    bool quit;                    /* Escape                                 */
     sfText *title;
 } main_m_t;
 

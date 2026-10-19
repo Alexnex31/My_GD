@@ -40,12 +40,11 @@ void free_cursor(cursor_t *cursor);
 
 
 void free_button(button_t *b);
-void print_button(button_t *b, sfRenderWindow *w);
-bool button_hit(const button_t *b, int mx, int my);
 button_t *create_button(float x, float y, int size, sfTexture *texture);
+widget_t button_widget(const button_t *b, const char *label, widget_fn fn);
 
 void free_main_menu(main_m_t *m);
-void print_main_menu(main_m_t *m, sfRenderWindow *w);
+void print_main_menu(main_m_t *m, gd_t *gd);
 main_m_t *create_main_menu(gd_t *gd);
 
 
@@ -55,12 +54,12 @@ editor_m_t *create_editor_menu(gd_t *gd);
 
 void free_level_button(level_button_t *lb);
 void free_level_list_menu(level_list_t *level_list);
-void print_level_list(level_list_t *level_list, sfRenderWindow *w);
+void print_level_list(level_list_t *level_list, gd_t *gd);
+void level_list_follow(level_list_t *list);
 float level_list_max_scroll(const level_list_t *list);
 void level_list_scroll(level_list_t *list, float by);
 level_list_t *create_level_list(gd_t *gd);
 
-int check_end_screen_buttons(end_level_screen_t *end_screen, int mx, int my);
 end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd);
 void print_end_level_screen(gd_t *gd, end_level_screen_t *end_screen);
 void free_end_level_screen(end_level_screen_t *end_screen);
@@ -129,6 +128,10 @@ void ui_gfx_create(gd_t *gd);
 void ui_gfx_free(gd_t *gd);
 bool ui_from_sf(gd_t *gd, const sfEvent *ev, ui_event_t *out);
 void ui_draw(gd_t *gd, const ui_screen_t *ui);
+/* Widget i drawn as an image (the menus' buttons), in the current view. */
+void ui_draw_sprite(gd_t *gd, const ui_screen_t *ui, int i, sfSprite *s);
+/* Only widget i's focus outline: a widget drawn by its screen (a text). */
+void ui_draw_focus(gd_t *gd, const ui_screen_t *ui, int i);
 void ui_dim(gd_t *gd);
 void ui_caption(gd_t *gd, const char *s, float x, float y);
 int64_t ui_now_ms(void);

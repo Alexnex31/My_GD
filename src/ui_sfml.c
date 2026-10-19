@@ -272,6 +272,51 @@ static void draw_capture(gd_t *gd, const ui_screen_t *ui, const widget_t *w)
     capture_button(gd, ui, UI_CAPTURE_CLEAR, "Clear");
 }
 
+static void outline(gd_t *gd, ui_rect_t r)
+{
+    sfRectangleShape_setPosition(gd->ui_shape, (sfVector2f){r.x, r.y});
+    sfRectangleShape_setSize(gd->ui_shape, (sfVector2f){r.w, r.h});
+    sfRectangleShape_setFillColor(gd->ui_shape, sfTransparent);
+    sfRectangleShape_setOutlineThickness(gd->ui_shape, OUTLINE_W);
+    sfRectangleShape_setOutlineColor(gd->ui_shape, sfWhite);
+    draw_rect(gd, gd->ui_shape);
+}
+
+/*
+** The look of 3.2 on an image: grown or shrunk around its center, faded
+** when disabled, outlined when it has the keyboard's focus. The sprite is
+** left as it was: its place is its widget's.
+*/
+void ui_draw_sprite(gd_t *gd, const ui_screen_t *ui, int i, sfSprite *s)
+{
+    ui_look_t look = ui_look(ui, i);
+    ui_rect_t b = ui->widgets[i].bounds;
+    sfFloatRect local = sfSprite_getLocalBounds(s);
+    sfVector2f pos = sfSprite_getPosition(s);
+    sfVector2f scale = sfSprite_getScale(s);
+
+    sfSprite_setOrigin(s, (sfVector2f){local.width / 2.0f,
+        local.height / 2.0f});
+    sfSprite_setPosition(s, center(b));
+    sfSprite_setScale(s, (sfVector2f){scale.x * look.scale,
+        scale.y * look.scale});
+    sfSprite_setColor(s, faded(sfWhite, look.alpha));
+    draw_sprite(gd, s, NULL);
+    sfSprite_setOrigin(s, (sfVector2f){0.0f, 0.0f});
+    sfSprite_setPosition(s, pos);
+    sfSprite_setScale(s, scale);
+    if (look.outline)
+        outline(gd, scaled(b, look.scale));
+}
+
+void ui_draw_focus(gd_t *gd, const ui_screen_t *ui, int i)
+{
+    ui_look_t look = ui_look(ui, i);
+
+    if (look.outline)
+        outline(gd, scaled(ui->widgets[i].bounds, 1.05f));
+}
+
 /* The whole screen darkened, under a menu drawn over a scene (PLAN 10.4). */
 void ui_dim(gd_t *gd)
 {

@@ -20,155 +20,84 @@ bool poll_event(gd_t *gd)
     return true;
 }
 
-/* A click in window pixels, in the menus' 1920x1080 space (9.1, 9.7). */
-static sfVector2i click_pos(gd_t *gd)
-{
-    sfVector2i pixel = {gd->event->mouseButton.x, gd->event->mouseButton.y};
-    sfVector2f pos = sfRenderWindow_mapPixelToCoords(gd->w, pixel,
-        gd->ui_view);
-
-    return (sfVector2i){(int)pos.x, (int)pos.y};
-}
-
-void play_button(main_m_t **menu, gd_t *gd)
-{
-    free_main_menu(*menu);
-    *menu = NULL;
-    gd->menu = 'l';
-}
-
-void param_button(main_m_t **menu, gd_t *gd)
-{
-    free_main_menu(*menu);
-    *menu = NULL;
-    gd->menu = 'o';
-}
-
-void online_button(main_m_t **menu, gd_t *gd)
-{
-    free_main_menu(*menu);
-    *menu = NULL;
-    gd->menu = 'e';
-}
-
-void buttons_menu(main_m_t **menu, gd_t *gd, int mx, int my)
-{
-    if (button_hit((*menu)->play, mx, my))
-        return play_button(menu, gd);
-    if (button_hit((*menu)->param, mx, my))
-        return param_button(menu, gd);
-    if (button_hit((*menu)->online, mx, my))
-        return online_button(menu, gd);
-}
-
+/* After the events (3.5): the scene a button chose, or the window closed. */
 void keyboard_events_main_menu(main_m_t **menu, gd_t *gd)
 {
-    sfVector2i pos;
+    ui_event_t ev;
+    char next = 0;
 
     while (poll_event(gd)) {
-        if (gd->event->type == sfEvtClosed) {
-            close_window(gd->w);
-            return;
-        }
-        if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeyEscape) {
-            close_window(gd->w);
-            return;
-        }
-        if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeySpace) {
-            play_button(menu, gd);
-            return;
-        }
-        if (gd->event->type == sfEvtMouseButtonPressed && gd->event->mouseButton.button == sfMouseLeft) {
-            pos = click_pos(gd);
-            buttons_menu(menu, gd, pos.x, pos.y);
-            return;
-        }
+        if (gd->event->type == sfEvtClosed)
+            return close_window(gd->w);
+        if (ui_from_sf(gd, gd->event, &ev))
+            ui_event(&(*menu)->ui, &ev, ui_now_ms());
     }
+    if ((*menu)->quit)
+        return close_window(gd->w);
+    next = (*menu)->next;
+    if (next == 0)
+        return;
+    free_main_menu(*menu);
+    *menu = NULL;
+    gd->menu = next;
 }
 
-void go_back_list_main(level_list_t **lvl_list, gd_t *gd)
+/*
+** The grid's widgets are in the scrolled space: a mouse position is moved
+** by the scroll. The wheel scrolls; a key that moves the focus scrolls to it.
+*/
+static void level_list_event(level_list_t *list, gd_t *gd)
 {
-    free_level_list_menu(*lvl_list);
+    ui_event_t ev;
+
+    if (!ui_from_sf(gd, gd->event, &ev))
+        return;
+    if (ev.kind == UI_WHEEL)
+        level_list_scroll(list, -(float)ev.wheel * LIST_ROW_H / 2.0f);
+    if (ev.kind == UI_MOVE || ev.kind == UI_WHEEL
+        || ev.input.kind == BIND_MOUSE)
+        ev.y += list->scroll;
+    if (ev.kind == UI_PRESS && ev.input.kind == BIND_KEY)
+        list->follow = true;
+    ui_event(&list->ui, &ev, ui_now_ms());
+}
+
+/*
+** A level chosen starts once the list is gone; whatever chose it, a click
+** or a key that is also a jump, is no jump until released (input_start).
+*/
+static void level_list_act(level_list_t **lvl_list, gd_t *gd)
+{
+    level_list_t *list = *lvl_list;
+
+    if (list->pending_song >= 0)
+        song_picker_open(list, gd, list->pending_song);
+    list->pending_song = -1;
+    if (list->pending_play < 0 && !list->pending_back)
+        return;
+    if (list->pending_play >= 0)
+        snprintf(gd->selected_id, sizeof(gd->selected_id), "%s",
+            list->level_buttons[list->pending_play]->id);
+    gd->menu = list->pending_play >= 0 ? 'P' : 'm';
+    free_level_list_menu(list);
     *lvl_list = NULL;
-    gd->menu = 'm';
-}
-
-int check_level_button_click(level_button_t *lb, int mx, int my)
-{
-    return button_hit(lb->play_button, mx, my);
-}
-
-void handle_level_buttons_click(level_list_t **lvl_list, gd_t *gd, int mx, int my)
-{
-    int i = 0;
-
-    while (i < (*lvl_list)->nb_levels) {
-        if (check_level_button_click((*lvl_list)->level_buttons[i], mx, my)) {
-            snprintf(gd->selected_id, sizeof(gd->selected_id), "%s",
-                (*lvl_list)->level_buttons[i]->id);
-            free_level_list_menu(*lvl_list);
-            *lvl_list = NULL;
-            gd->menu = 'P';
-            return;
-        }
-        i += 1;
-    }
-}
-
-/* A click on a level's song line opens its picker (FEATURES 4.6). */
-static bool song_line_click(level_list_t *list, gd_t *gd, int mx, int my)
-{
-    for (int i = 0; i < list->nb_levels; i++) {
-        sfFloatRect b = sfText_getGlobalBounds(
-            list->level_buttons[i]->song_text);
-
-        if (sfFloatRect_contains(&b, (float)mx, (float)my)) {
-            song_picker_open(list, gd, i);
-            return true;
-        }
-    }
-    return false;
 }
 
 void keyboard_events_level_list(level_list_t **lvl_list, gd_t *gd)
 {
-    sfVector2i pos;
-
     while (poll_event(gd)) {
-        if (gd->event->type == sfEvtClosed) {
-            close_window(gd->w);
-            return;
-        }
-        if ((*lvl_list)->picker_for >= 0) {
+        if (gd->event->type == sfEvtClosed)
+            return close_window(gd->w);
+        if ((*lvl_list)->picker_for >= 0)
             song_picker_event(*lvl_list, gd);    /* it has every event */
-            continue;
-        }
-        if (gd->event->type == sfEvtMouseWheelScrolled)
-            level_list_scroll(*lvl_list,
-                -gd->event->mouseWheelScroll.delta * LIST_ROW_H / 2.0f);
-        if (gd->event->type == sfEvtKeyPressed
-            && (gd->event->key.code == sfKeyDown
-            || gd->event->key.code == sfKeyUp))
-            level_list_scroll(*lvl_list, gd->event->key.code == sfKeyDown
-                ? LIST_ROW_H : -LIST_ROW_H);
-        if (gd->event->type == sfEvtMouseButtonPressed
-            && gd->event->mouseButton.button == sfMouseLeft
-            && song_line_click(*lvl_list, gd, click_pos(gd).x,
-            click_pos(gd).y + (int)(*lvl_list)->scroll))
-            continue;
-        if (gd->event->type == sfEvtKeyPressed && gd->event->key.code == sfKeyEscape) {
-            go_back_list_main(lvl_list, gd);
-            return;
-        }
-        if (gd->event->type == sfEvtMouseButtonPressed && gd->event->mouseButton.button == sfMouseLeft) {
-            pos = click_pos(gd);
-            handle_level_buttons_click(lvl_list, gd, pos.x,
-                pos.y + (int)(*lvl_list)->scroll);
-            return;
-        }
+        else
+            level_list_event(*lvl_list, gd);
     }
     song_picker_finish(*lvl_list, gd);       /* what a callback closed */
     song_picker_update(*lvl_list, gd);
+    ui_update(&(*lvl_list)->ui, ui_now_ms());
+    level_list_follow(*lvl_list);
+    level_list_act(lvl_list, gd);
 }
 
 void go_back_playing_level_list(gd_t *gd, level_t **level)
@@ -187,23 +116,21 @@ void retry_level(gd_t *gd, level_t **level)
     *level = level_start(gd, id);
 }
 
-int check_end_screen_buttons(end_level_screen_t *end_screen, int mx, int my)
+/* The end screen is up: the end sequence is over (9.8). */
+static bool end_screen_shown(const level_t *lv)
 {
-    if (button_hit(end_screen->retry_button, mx, my))
-        return 1;
-    return button_hit(end_screen->quit_button, mx, my) ? 2 : 0;
+    return lv->state == LEVEL_COMPLETE && lv->end_screen != NULL
+        && lv->end_time >= level_end_flight((level_t *)lv) + END_FLASH;
 }
 
-void handle_end_screen_click(level_t **level, gd_t *gd, int mx, int my)
+/* Retry or Quit, once the events are read: both free the level. */
+static void end_screen_act(level_t **level, gd_t *gd)
 {
-    int result;
+    int action = (*level)->end_screen->action;
 
-    if ((*level)->end_screen == NULL)
-        return;
-    result = check_end_screen_buttons((*level)->end_screen, mx, my);
-    if (result == 1)
+    if (action == 1)
         retry_level(gd, level);
-    else if (result == 2)
+    else if (action == 2)
         go_back_playing_level_list(gd, level);
 }
 
@@ -242,7 +169,7 @@ static bool paused_event(level_t *lv, gd_t *gd)
 
 void keyboard_events_playing(level_t **level, gd_t *gd)
 {
-    sfVector2i pos;
+    ui_event_t ev;
 
     while (poll_event(gd)) {
         if (gd->event->type == sfEvtClosed) {
@@ -257,6 +184,11 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
             (*level)->last_frame_us = input_now_us(gd);  /* no burst after a pause */
         if (paused_event(*level, gd))
             continue;
+        if (end_screen_shown(*level)) {      /* it has every event */
+            if (ui_from_sf(gd, gd->event, &ev))
+                ui_event(&(*level)->end_screen->ui, &ev, ui_now_ms());
+            continue;
+        }
         if (gd->event->type == sfEvtKeyPressed) {
             playing_key(level, gd, gd->event->key.code);
             if (*level == NULL)
@@ -269,14 +201,9 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
             practice_place(*level);          /* practice only (13.1) */
         if (input_event_is(gd->event, gd->settings.remove_checkpoint_key))
             practice_remove(*level);
-        if (gd->event->type == sfEvtMouseButtonPressed
-            && (*level)->state == LEVEL_COMPLETE
-            && (*level)->end_time >= level_end_flight(*level) + END_FLASH) {
-            pos = click_pos(gd);
-            handle_end_screen_click(level, gd, pos.x, pos.y);
-            return;
-        }
     }
     if (*level != NULL && (*level)->paused)
         pause_act(level, gd);
+    else if (*level != NULL && end_screen_shown(*level))
+        end_screen_act(level, gd);
 }

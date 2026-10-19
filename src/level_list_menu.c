@@ -48,6 +48,7 @@ void free_level_list_menu(level_list_t *level_list)
         }
         free(level_list->level_buttons);
     }
+    free(level_list->widgets);
     sfSprite_destroy(level_list->background);
     sfView_destroy(level_list->scrolled);
     free(level_list);
@@ -71,32 +72,101 @@ void level_list_scroll(level_list_t *list, float by)
     list->scroll = list->scroll > max ? max : list->scroll;
 }
 
+/* The song line's widget is where its text is: it changes with the song. */
+static void song_bounds(level_list_t *list, int i)
+{
+    sfFloatRect b = sfText_getGlobalBounds(list->level_buttons[i]->song_text);
+
+    list->widgets[2 * i + 1].bounds = (ui_rect_t){b.left - 8.0f,
+        b.top - 8.0f, b.width + 16.0f, b.height + 16.0f};
+}
+
 /*
 ** The background stays; the levels are drawn through the same view moved
 ** down by the scroll, so more than three rows of them can be reached.
+** Their widgets are in that moved space too (level_list_event).
 */
-void print_level_list(level_list_t *level_list, sfRenderWindow *w)
+void print_level_list(level_list_t *list, gd_t *gd)
 {
-    const sfView *ui = level_list->gd->ui_view;
+    const sfView *ui = gd->ui_view;
     sfVector2f c = sfView_getCenter(ui);
-    int i = 0;
 
-    sfRenderWindow_drawSprite(w, level_list->background, NULL);
-    sfView_setViewport(level_list->scrolled, sfView_getViewport(ui));
-    sfView_setCenter(level_list->scrolled,
-        (sfVector2f){c.x, c.y + level_list->scroll});
-    sfRenderWindow_setView(w, level_list->scrolled);
-    while (i < level_list->nb_levels) {
-        if (level_list->level_buttons[i] != NULL) {
-            print_button(level_list->level_buttons[i]->play_button, w);
-            sfRenderWindow_drawText(w, level_list->level_buttons[i]->name_text, NULL);
-            sfRenderWindow_drawText(w, level_list->level_buttons[i]->attempts_text, NULL);
-            sfRenderWindow_drawText(w, level_list->level_buttons[i]->best_text, NULL);
-            sfRenderWindow_drawText(w, level_list->level_buttons[i]->song_text, NULL);
-        }
-        i += 1;
+    sfRenderWindow_drawSprite(gd->w, list->background, NULL);
+    sfView_setViewport(list->scrolled, sfView_getViewport(ui));
+    sfView_setCenter(list->scrolled, (sfVector2f){c.x, c.y + list->scroll});
+    sfRenderWindow_setView(gd->w, list->scrolled);
+    for (int i = 0; i < list->nb_levels; i++) {
+        level_button_t *lb = list->level_buttons[i];
+
+        ui_draw_sprite(gd, &list->ui, 2 * i, lb->play_button->sprite);
+        sfRenderWindow_drawText(gd->w, lb->name_text, NULL);
+        sfRenderWindow_drawText(gd->w, lb->attempts_text, NULL);
+        sfRenderWindow_drawText(gd->w, lb->best_text, NULL);
+        song_bounds(list, i);
+        sfText_setFillColor(lb->song_text, ui_look(&list->ui, 2 * i + 1).state
+            == UI_HOVER ? sfWhite : (sfColor){180, 230, 255, 255});
+        sfRenderWindow_drawText(gd->w, lb->song_text, NULL);
+        ui_draw_focus(gd, &list->ui, 2 * i + 1);
     }
-    sfRenderWindow_setView(w, level_list->gd->ui_view);
+    sfRenderWindow_setView(gd->w, gd->ui_view);
+}
+
+/* The callbacks only say what was chosen: it happens after the events. */
+static void play_chosen(void *ctx, widget_t *w)
+{
+    level_list_t *list = ctx;
+
+    list->pending_play = (int)(w - list->widgets) / 2;
+}
+
+static void song_chosen(void *ctx, widget_t *w)
+{
+    level_list_t *list = ctx;
+
+    list->pending_song = (int)(w - list->widgets) / 2;
+}
+
+static void list_back(void *ctx)
+{
+    ((level_list_t *)ctx)->pending_back = true;
+}
+
+/* A key moved the focus: the grid scrolls until its level is whole on screen. */
+void level_list_follow(level_list_t *list)
+{
+    int k = list->ui.focused / 2;
+    float top = 0.0f;
+    float bottom = 0.0f;
+
+    if (!list->follow || list->ui.focused < 0)
+        return;
+    list->follow = false;
+    top = sfText_getGlobalBounds(list->level_buttons[k]->name_text).top
+        - 20.0f;
+    bottom = list->widgets[2 * k + 1].bounds.y
+        + list->widgets[2 * k + 1].bounds.h + 20.0f;
+    if (top < list->scroll)
+        level_list_scroll(list, top - list->scroll);
+    else if (bottom > list->scroll + VIEW_H)
+        level_list_scroll(list, bottom - VIEW_H - list->scroll);
+}
+
+/* Each level: its Play button, then its song line (4.6). */
+static void build_widgets(level_list_t *list)
+{
+    list->widgets = sim_xcalloc((size_t)list->nb_levels * 2 + 1,
+        sizeof(widget_t));
+    for (int i = 0; i < list->nb_levels; i++) {
+        level_button_t *lb = list->level_buttons[i];
+
+        list->widgets[2 * i] = button_widget(lb->play_button,
+            lb->display_name, play_chosen);
+        list->widgets[2 * i + 1] = (widget_t){.kind = W_BUTTON,
+            .label = "Song", .enabled = true, .on_activate = song_chosen};
+        song_bounds(list, i);
+    }
+    ui_init(&list->ui, list->widgets, list->nb_levels * 2, list);
+    list->ui.on_back = list_back;
 }
 
 static int cmp_id(const void *a, const void *b)
@@ -184,7 +254,8 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     lb->filename = strdup(filepath);
     snprintf(lb->id, sizeof(lb->id), "%s", id);
     fill_level_info(lb, gd);
-    lb->play_button = create_button(x + 200, y + 100, 100, gd->res->play_button);
+    lb->play_button = create_button(x + 200, y + 100, 100,
+        gd->res->play_button);
     lb->name_text = sfText_create();
     text_pos = (sfVector2f){x, y};
     sfText_setUnicodeString(lb->name_text, utf8_to_utf32(lb->display_name));
@@ -229,6 +300,8 @@ level_list_t *create_level_list(gd_t *gd)
     music_menu(gd);                          /* back from a level: resumes (4.10) */
     menu->gd = gd;
     menu->picker_for = -1;
+    menu->pending_play = -1;
+    menu->pending_song = -1;
     menu->background = sfSprite_create();
     sfSprite_setTexture(menu->background, gd->res->list_background, sfTrue);
     menu->scrolled = sfView_copy(gd->ui_view);
@@ -240,6 +313,7 @@ level_list_t *create_level_list(gd_t *gd)
         menu->level_buttons[i] = create_level_button(menu->names[i], i, gd);
         i += 1;
     }
+    build_widgets(menu);
     gd->menu = 'l';
     return menu;
 }

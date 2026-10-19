@@ -62,16 +62,6 @@ static unsigned int buttons_down(const bindings_t *jump)
     return down;
 }
 
-static unsigned int mouse_inputs(const bindings_t *jump)
-{
-    unsigned int mask = 0;
-
-    for (int i = 0; i < jump->count; i++)
-        if (jump->items[i].kind == BIND_MOUSE)
-            mask |= 1u << i;
-    return mask;
-}
-
 /* A key or button press event of this binding (the restart key's, 6.5). */
 bool input_event_is(const sfEvent *ev, binding_t b)
 {
@@ -114,9 +104,11 @@ static void *poll_loop(void *arg)
 }
 
 /*
-** A level starts from a click (Play, Retry), usually still down when its
+** A level starts from a click or a key (Play, Retry: Space activates a
+** focused button and is a jump input too), usually still down when its
 ** first tick runs: held, it would be a jump at tick 0 (3.4's carried hold).
-** The mouse is ignored until it's released; the keyboard never is.
+** Every jump input down at the start is ignored until it's released: the
+** thread's first poll is pushed, and the latch keeps only what it saw down.
 */
 void input_start(gd_t *gd)
 {
@@ -126,7 +118,7 @@ void input_start(gd_t *gd)
     atomic_store(&ip->queue.tail, 0);
     atomic_store(&ip->queue.polled_us, 0);
     ip->jump = gd->settings.jump_bindings;   /* the thread's own copy */
-    ip->reader = (input_reader_t){0, mouse_inputs(&ip->jump)};
+    ip->reader = (input_reader_t){0, ~0u};
     atomic_store(&ip->running, true);
     if (pthread_create(&ip->thread, NULL, poll_loop, ip) != 0) {
         dprintf(2, "my_gd: cannot start the input thread\n");

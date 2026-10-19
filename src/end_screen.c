@@ -42,6 +42,18 @@ static sfText *end_text(gd_t *gd, const char *string, unsigned int size,
     return text;
 }
 
+static void end_chosen(void *ctx, widget_t *w)
+{
+    end_level_screen_t *es = ctx;
+
+    es->action = (int)(w - es->widgets) + 1;
+}
+
+static void end_back(void *ctx)
+{
+    ((end_level_screen_t *)ctx)->action = 2;  /* Escape leaves, as Quit */
+}
+
 /*
 ** The attempts shown are this session's: how many it took this time. The
 ** store keeps the total, and the level list shows it (6.2).
@@ -81,6 +93,10 @@ end_level_screen_t *create_end_level_screen(level_t *level, gd_t *gd)
     sfText_setUnicodeString(es->song_text, utf8_to_utf32(credit));
     es->retry_button = create_button(600, 700, 250, gd->res->retry_button);
     es->quit_button = create_button(1000, 700, 250, gd->res->quit_button);
+    es->widgets[0] = button_widget(es->retry_button, "Retry", end_chosen);
+    es->widgets[1] = button_widget(es->quit_button, "Quit", end_chosen);
+    ui_init(&es->ui, es->widgets, 2, es);   /* Retry focused: Enter retries */
+    es->ui.on_back = end_back;
     return es;
 }
 
@@ -92,6 +108,7 @@ void print_end_level_screen(gd_t *gd, end_level_screen_t *end_screen)
     sfRenderWindow_drawText(gd->w, end_screen->attempts_text, NULL);
     sfRenderWindow_drawText(gd->w, end_screen->percent_text, NULL);
     sfRenderWindow_drawText(gd->w, end_screen->song_text, NULL);
-    print_button(end_screen->retry_button, gd->w);
-    print_button(end_screen->quit_button, gd->w);
+    ui_update(&end_screen->ui, ui_now_ms());
+    ui_draw_sprite(gd, &end_screen->ui, 0, end_screen->retry_button->sprite);
+    ui_draw_sprite(gd, &end_screen->ui, 1, end_screen->quit_button->sprite);
 }
