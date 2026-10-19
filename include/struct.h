@@ -28,7 +28,6 @@ typedef struct button {
     sfSprite *sprite;
     sfVector2f pos;
     int size;
-    char pressed;
 } button_t;
 
 typedef struct end_level_screen {
@@ -64,6 +63,7 @@ typedef struct level_list {
     level_button_t **level_buttons;
     int nb_levels;
     float scroll;                 /* UI pixels the grid is moved up by      */
+    sfView *scrolled;             /* the UI view, moved down by the scroll  */
     struct gd *gd;                /* for the picker's callbacks             */
     int picker_for;               /* the level whose song is chosen, -1 (4.6) */
     bool picker_closing;          /* closed by a callback: freed after events */
@@ -105,7 +105,6 @@ typedef struct main_menu {
     button_t *param;
     button_t *online;
     sfText *title;
-    char *title_string;
 } main_m_t;
 
 typedef struct textures {

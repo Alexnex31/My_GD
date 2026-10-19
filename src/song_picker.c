@@ -109,7 +109,6 @@ void song_picker_open(level_list_t *list, gd_t *gd, int index)
     level_button_t *lb = list->level_buttons[index];
     char title[200];
 
-    list->gd = gd;
     list->picker_for = index;
     build_rows(list, gd, override_of(gd, lb));
     list->picker_list = (widget_t){W_LIST, NULL, {360.0f, 220.0f, 1200.0f,

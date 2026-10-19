@@ -21,8 +21,6 @@ void free_main_menu(main_m_t *m)
         free_button(m->online);
     if (m->title != NULL)
         sfText_destroy(m->title);
-    if (m->title_string != NULL)
-        free(m->title_string);
     free(m);
 }
 
@@ -45,9 +43,8 @@ main_m_t *create_main_menu(gd_t *gd)
     music_menu(gd);                          /* FEATURES 4.10 */
     menu->background = sfSprite_create();
     menu->title = sfText_create();
-    menu->title_string = strdup("My_GD");
     sfSprite_setTexture(menu->background, gd->res->main_background, sfTrue);
-    sfText_setString(menu->title, menu->title_string);
+    sfText_setString(menu->title, "My_GD");
     sfText_setCharacterSize(menu->title, 140);
     sfText_setPosition(menu->title, title_pos);
     sfText_setFont(menu->title, gd->main_font);

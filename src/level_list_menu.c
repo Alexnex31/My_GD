@@ -49,6 +49,7 @@ void free_level_list_menu(level_list_t *level_list)
         free(level_list->level_buttons);
     }
     sfSprite_destroy(level_list->background);
+    sfView_destroy(level_list->scrolled);
     free(level_list);
 }
 
@@ -76,12 +77,15 @@ void level_list_scroll(level_list_t *list, float by)
 */
 void print_level_list(level_list_t *level_list, sfRenderWindow *w)
 {
-    sfView *moved = sfView_copy(level_list->gd->ui_view);
+    const sfView *ui = level_list->gd->ui_view;
+    sfVector2f c = sfView_getCenter(ui);
     int i = 0;
 
     sfRenderWindow_drawSprite(w, level_list->background, NULL);
-    sfView_move(moved, (sfVector2f){0.0f, level_list->scroll});
-    sfRenderWindow_setView(w, moved);
+    sfView_setViewport(level_list->scrolled, sfView_getViewport(ui));
+    sfView_setCenter(level_list->scrolled,
+        (sfVector2f){c.x, c.y + level_list->scroll});
+    sfRenderWindow_setView(w, level_list->scrolled);
     while (i < level_list->nb_levels) {
         if (level_list->level_buttons[i] != NULL) {
             print_button(level_list->level_buttons[i]->play_button, w);
@@ -93,7 +97,6 @@ void print_level_list(level_list_t *level_list, sfRenderWindow *w)
         i += 1;
     }
     sfRenderWindow_setView(w, level_list->gd->ui_view);
-    sfView_destroy(moved);
 }
 
 static int cmp_id(const void *a, const void *b)
@@ -162,8 +165,8 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
 {
     level_button_t *lb = sim_xcalloc(1, sizeof(level_button_t));
     char filepath[256];
-    char *attempts_str;
-    char *best_str;
+    char attempts_str[50];
+    char best_str[64];
     float x = 120 + (index % LIST_COLUMNS) * 450;
     float y = LIST_TOP + (index / LIST_COLUMNS) * LIST_ROW_H;
     sfVector2f text_pos;
@@ -175,27 +178,25 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     lb->play_button = create_button(x + 200, y + 100, 100, gd->res->play_button);
     lb->name_text = sfText_create();
     text_pos = (sfVector2f){x, y};
-    sfText_setString(lb->name_text, lb->display_name);
+    sfText_setUnicodeString(lb->name_text, utf8_to_utf32(lb->display_name));
     sfText_setFont(lb->name_text, gd->main_font);
     sfText_setCharacterSize(lb->name_text, 35);
     sfText_setPosition(lb->name_text, text_pos);
     sfText_setOutlineThickness(lb->name_text, 2);
     lb->attempts_text = sfText_create();
-    attempts_str = malloc(50);
-    snprintf(attempts_str, 50, "Attempts: %d", lb->attempts);
+    snprintf(attempts_str, sizeof(attempts_str), "Attempts: %d", lb->attempts);
     text_pos = (sfVector2f){x, y + 50};
     sfText_setString(lb->attempts_text, attempts_str);
     sfText_setFont(lb->attempts_text, gd->main_font);
     sfText_setCharacterSize(lb->attempts_text, 25);
     sfText_setPosition(lb->attempts_text, text_pos);
     lb->best_text = sfText_create();
-    best_str = sim_xcalloc(64, 1);
     if (lb->practice_best > 0.0f)
-        snprintf(best_str, 64, "Best: %.2f%%%s   Practice: %.0f%%",
+        snprintf(best_str, sizeof(best_str), "Best: %.2f%%%s   Practice: %.0f%%",
             progress_printable(lb->best), lb->edited ? " (edited)" : "",
             progress_printable(lb->practice_best));
     else
-        snprintf(best_str, 64, "Best: %.2f%%%s", progress_printable(lb->best),
+        snprintf(best_str, sizeof(best_str), "Best: %.2f%%%s", progress_printable(lb->best),
             lb->edited ? " (edited)" : "");
     text_pos = (sfVector2f){x, y + 80};
     sfText_setString(lb->best_text, best_str);
@@ -208,8 +209,6 @@ level_button_t *create_level_button(char *id, int index, gd_t *gd)
     sfText_setPosition(lb->song_text, (sfVector2f){x, y + 205});  /* under Play */
     sfText_setFillColor(lb->song_text, (sfColor){180, 230, 255, 255});
     song_line_refresh(gd, lb);
-    free(attempts_str);
-    free(best_str);
     return lb;
 }
 
@@ -223,6 +222,7 @@ level_list_t *create_level_list(gd_t *gd)
     menu->picker_for = -1;
     menu->background = sfSprite_create();
     sfSprite_setTexture(menu->background, gd->res->list_background, sfTrue);
+    menu->scrolled = sfView_copy(gd->ui_view);
     menu->names = fill_names_list();
     menu->nb_levels = count_names(menu->names);
     menu->level_buttons = sim_xcalloc(menu->nb_levels + 1,

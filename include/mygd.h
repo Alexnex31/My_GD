@@ -41,6 +41,7 @@ void free_cursor(cursor_t *cursor);
 
 void free_button(button_t *b);
 void print_button(button_t *b, sfRenderWindow *w);
+bool button_hit(const button_t *b, int mx, int my);
 button_t *create_button(float x, float y, int size, sfTexture *texture);
 
 void free_main_menu(main_m_t *m);
