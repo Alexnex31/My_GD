@@ -110,10 +110,10 @@ bool ed_place_object(const ed_level_t *lv, const ed_entry_t *e, vec2_t at,
     double grid, ed_object_t *out);
 
 /*
-** Two objects the game can't tell apart: place, kind, settings, Z. The
-** editor layer is the editor's only: `layer_too` asks for it as well.
+** Two objects the game can't tell apart (object_same), and the same start
+** position. The editor layer is the editor's only: `layer_too` asks for it
+** as well.
 */
-bool ed_same_obj(const object_t *a, const object_t *b);
 bool ed_same_object(const ed_object_t *a, const ed_object_t *b,
     bool layer_too);
 

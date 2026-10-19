@@ -114,7 +114,7 @@ static void together(const object_t *a, const object_t *b, unsigned *fa,
     bool a_spike = a->type == OBJ_SPIKE && OBJ_CATEGORY[b->type] == CAT_NEUTRAL;
     bool b_spike = b->type == OBJ_SPIKE && OBJ_CATEGORY[a->type] == CAT_NEUTRAL;
 
-    if (ed_same_obj(a, b))
+    if (object_same(a, b))
         *fb |= 1u << ED_ISSUE_TWICE;
     if ((a_spike || b_spike) && overlap(&a->hitbox, &b->hitbox))
         *(a_spike ? fa : fb) |= 1u << ED_HINT_SPIKE_IN_BLOCK;

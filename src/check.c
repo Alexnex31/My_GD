@@ -9,16 +9,19 @@
 #include "sim/bot.h"
 #include "sim/modes.h"
 
-static int g_loader_messages;
+static int g_loader_warnings;
 
 /*
 ** The loader's messages. Only the lines it skipped make the exit code 1
-** (lvl.skipped_lines); an ignored field or header value is a warning.
+** (lvl.skipped_lines); an ignored field or header value is a warning. Every
+** message about a skipped line says "skipped", and the object limit says it
+** once for all the lines past it: those aren't counted here.
 */
 static void loader_warning(const char *msg)
 {
     dprintf(2, "  %s\n", msg);
-    g_loader_messages += 1;
+    if (strstr(msg, "skipped") == NULL)
+        g_loader_warnings += 1;
 }
 
 static int warn(const char *fmt, int line, double x)
@@ -27,24 +30,49 @@ static int warn(const char *fmt, int line, double x)
     return 1;
 }
 
+#define CMP(f) if (a->f != b->f) return (a->f > b->f) - (a->f < b->f)
+
+/* Every field object_same compares, then the line: duplicates side by side. */
+static int by_fields(const void *pa, const void *pb)
+{
+    const object_t *a = *(const object_t *const *)pa;
+    const object_t *b = *(const object_t *const *)pb;
+
+    CMP(type);
+    CMP(rect.x);
+    CMP(rect.y);
+    CMP(rect.w);
+    CMP(rect.h);
+    CMP(rotation);
+    CMP(portal_mode);
+    CMP(portal_gravity);
+    CMP(launch);
+    CMP(speed);
+    CMP(portal_mini);
+    CMP(z_layer);
+    CMP(z_order);
+    return (a->line > b->line) - (a->line < b->line);
+}
+
 /*
-** Two identical objects in the same place: one of them is invisible and only
-** costs collision time. They are sorted by x, so a duplicate is a neighbour.
+** Two objects the game can't tell apart (object_same): sorted by what it
+** compares, they are neighbours wherever they are in the level, and every
+** copy after the first is reported.
 */
 static int check_duplicates(const level_data_t *lvl)
 {
+    const object_t **sorted = sim_xcalloc(lvl->nb_objects + 1,
+        sizeof(object_t *));
     int found = 0;
 
-    for (size_t i = 1; i < lvl->nb_objects; i++) {
-        const object_t *a = &lvl->objects[i - 1];
-        const object_t *b = &lvl->objects[i];
-
-        if (a->type == b->type && a->rotation == b->rotation
-            && a->rect.x == b->rect.x && a->rect.y == b->rect.y
-            && a->rect.w == b->rect.w && a->rect.h == b->rect.h)
-            found += warn("the same object twice in the same place", b->line,
-                b->rect.x);
-    }
+    for (size_t i = 0; i < lvl->nb_objects; i++)
+        sorted[i] = &lvl->objects[i];
+    qsort(sorted, lvl->nb_objects, sizeof(object_t *), by_fields);
+    for (size_t i = 1; i < lvl->nb_objects; i++)
+        if (object_same(sorted[i - 1], sorted[i]))
+            found += warn("the same object twice in the same place",
+                sorted[i]->line, sorted[i]->rect.x);
+    free(sorted);
     return found;
 }
 
@@ -191,22 +219,22 @@ int level_check(const char *path)
     int issues = 0;
     int bad = 0;
 
-    g_loader_messages = 0;
+    g_loader_warnings = 0;
     dprintf(2, "%s:\n", path);
     if (sim_load(&s, path, loader_warning) != 0) {
         dprintf(2, "  cannot be read\n");
         return 1;
     }
-    dprintf(2, "  \"%s\" by %s: %zu objects, %.0f px long, ends at %.1f%%\n",
+    dprintf(2, "  \"%s\" by %s: %zu objects, %.0f px long\n",
         s.lvl.hdr.name, s.lvl.hdr.author[0] ? s.lvl.hdr.author : "nobody",
-        s.lvl.nb_objects, s.lvl.end_shift, 100.0);
+        s.lvl.nb_objects, s.lvl.end_shift);
     issues += check_duplicates(&s.lvl);
     issues += check_below_ground(&s.lvl);
     issues += check_steep_faces(&s.lvl);
     issues += check_crowding(&s.lvl);
     issues += check_behind_spawn(&s.lvl);
     issues += check_song(&s.lvl);
-    issues += g_loader_messages - s.lvl.skipped_lines;
+    issues += g_loader_warnings;
     bad = s.lvl.skipped_lines;
     dprintf(2, "  %d invalid line(s), %d warning(s)\n", bad, issues);
     report_bot(&s);

@@ -41,6 +41,17 @@ int object_draw_cmp(const object_t *a, long placed_a, const object_t *b,
     return (placed_a > placed_b) - (placed_a < placed_b);
 }
 
+bool object_same(const object_t *a, const object_t *b)
+{
+    return a->type == b->type && a->rect.x == b->rect.x
+        && a->rect.y == b->rect.y && a->rect.w == b->rect.w
+        && a->rect.h == b->rect.h && a->rotation == b->rotation
+        && a->portal_mode == b->portal_mode
+        && a->portal_gravity == b->portal_gravity && a->launch == b->launch
+        && a->speed == b->speed && a->portal_mini == b->portal_mini
+        && a->z_layer == b->z_layer && a->z_order == b->z_order;
+}
+
 const char *z_layer_name(z_layer_t z)
 {
     static const char *const NAMES[] = {"b5", "b4", "b3", "b2", "b1", "t1",

@@ -118,6 +118,13 @@ typedef struct object {       /* level data: never modified after load */
 int object_draw_cmp(const object_t *a, long placed_a, const object_t *b,
     long placed_b);
 
+/*
+** Two objects the game can't tell apart: place, kind, settings, Z. One of
+** them is invisible and only costs collision time: the editor won't place
+** it, and the level checks report it (7.4, 11.13g).
+*/
+bool object_same(const object_t *a, const object_t *b);
+
 typedef struct level_start {  /* where and how an attempt starts (7.2) */
     vec2_t pos;               /* start_x, start_y: the player's center           */
     gamemode_t mode;          /* start_gamemode                                  */

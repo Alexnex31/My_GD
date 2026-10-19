@@ -382,29 +382,17 @@ int ed_entries(ed_entry_t *out, int max)
 }
 
 /*
-** Everything an object is in the game: the placement's "the very same
-** object" and the level check's "twice in the same place" are one test,
-** and a property step's "nothing changed" is the same with the editor
-** layer too.
+** The placement's "the very same object" is the level check's "twice in the
+** same place" (object_same), and a property step's "nothing changed" is
+** the same with the editor layer too.
 */
-bool ed_same_obj(const object_t *a, const object_t *b)
-{
-    return a->type == b->type && a->rect.x == b->rect.x
-        && a->rect.y == b->rect.y && a->rect.w == b->rect.w
-        && a->rect.h == b->rect.h && a->rotation == b->rotation
-        && a->portal_mode == b->portal_mode
-        && a->portal_gravity == b->portal_gravity && a->launch == b->launch
-        && a->speed == b->speed && a->portal_mini == b->portal_mini
-        && a->z_layer == b->z_layer && a->z_order == b->z_order;
-}
-
 bool ed_same_object(const ed_object_t *a, const ed_object_t *b,
     bool layer_too)
 {
     const level_start_t *sa = &a->start;
     const level_start_t *sb = &b->start;
 
-    if (a->is_start != b->is_start || !ed_same_obj(&a->obj, &b->obj))
+    if (a->is_start != b->is_start || !object_same(&a->obj, &b->obj))
         return false;
     if (layer_too && a->obj.editor_layer != b->obj.editor_layer)
         return false;
