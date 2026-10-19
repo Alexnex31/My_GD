@@ -62,9 +62,31 @@ typedef struct window_sizes {
 
 /*
 ** 1280x720, 1600x900 and 1920x1080, those that fit the desktop (5.2), and
-** the settings' own size first if it's none of them.
+** the settings' own size first if it isn't one of those: never lost, even
+** too big for this desktop.
 */
 void window_sizes_list(window_sizes_t *ws, int desk_w, int desk_h,
     int cur_w, int cur_h);
+
+    #define DISPLAY_TRIAL_MS 10000
+
+/*
+** A new display mode on trial (5.4): it is the settings' while the window
+** shows it, but saved only once kept. Reverted, timed out or left unanswered
+** when the game closes, the mode before it comes back: it is known to work.
+*/
+typedef struct display_trial {
+    bool open;
+    bool fullscreen;              /* the mode before                       */
+    int w;
+    int h;
+    int64_t until_ms;             /* reverted then, unanswered             */
+} display_trial_t;
+
+void display_trial_begin(display_trial_t *t, settings_t *s, bool fullscreen,
+    int w, int h, int64_t now_ms);
+bool display_trial_due(const display_trial_t *t, int64_t now_ms);
+/* Keep marks the settings to be saved; anything else puts the old mode back. */
+void display_trial_end(display_trial_t *t, settings_t *s, bool keep);
 
 #endif

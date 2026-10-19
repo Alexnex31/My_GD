@@ -5,13 +5,12 @@
 ** the options screen's dialogs: display revert, progress reset, save folder (FEATURES 5.4, 5.6)
 */
 
+#include <fcntl.h>
 #include <limits.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 
 #include "mygd.h"
-
-#define REVERT_MS 10000
 
 static void first_button(void *ctx, widget_t *w)
 {
@@ -49,7 +48,6 @@ void options_open_dialog(option_m_t *om, options_dialog_t which)
     om->dialog_ui.on_back = dialog_back;
     om->dialog_ui.panel = (ui_rect_t){260.0f, 370.0f, 1400.0f, 370.0f};
     om->rows.modal = &om->dialog_ui;
-    om->revert_at_ms = ui_now_ms() + REVERT_MS;
 }
 
 static void close_dialog(option_m_t *om)
@@ -58,17 +56,18 @@ static void close_dialog(option_m_t *om)
     om->rows.modal = NULL;
 }
 
-static void set_display(settings_t *s, bool fullscreen, int w, int h)
+/*
+** The game closed while the mode was still on trial: what is saved is the
+** mode before it, which is known to work. The window goes anyway.
+*/
+void options_forget_display(option_m_t *om)
 {
-    s->fullscreen = fullscreen;
-    s->window_width = w;
-    s->window_height = h;
+    display_trial_end(&om->trial, &om->gd->settings, false);
 }
 
 static void revert_display(option_m_t *om)
 {
-    set_display(&om->gd->settings, om->before_fullscreen, om->before_w,
-        om->before_h);
+    display_trial_end(&om->trial, &om->gd->settings, false);
     if (window_apply(om->gd) != 0)
         options_notice(om, "The previous display mode failed too");
     options_build_rows(om);
@@ -81,15 +80,11 @@ static void revert_display(option_m_t *om)
 */
 void options_apply_display(option_m_t *om)
 {
-    settings_t *s = &om->gd->settings;
-
-    om->before_fullscreen = s->fullscreen;
-    om->before_w = s->window_width;
-    om->before_h = s->window_height;
-    set_display(s, om->fullscreen, om->sizes.w[om->window_size],
-        om->sizes.h[om->window_size]);
+    display_trial_begin(&om->trial, &om->gd->settings, om->fullscreen,
+        om->sizes.w[om->window_size], om->sizes.h[om->window_size],
+        ui_now_ms());
     if (window_apply(om->gd) != 0) {
-        set_display(s, om->before_fullscreen, om->before_w, om->before_h);
+        display_trial_end(&om->trial, &om->gd->settings, false);
         options_build_rows(om);
         return options_notice(om, "Display mode not supported");
     }
@@ -97,13 +92,16 @@ void options_apply_display(option_m_t *om)
     options_open_dialog(om, DIALOG_REVERT);
 }
 
-/* Everything gone, the old file kept as progress.txt.bak (5.6). */
+/* Everything gone, the old file kept as progress.txt.bak if it had any (5.6). */
 static void reset_progress(option_m_t *om)
 {
-    if (progress_reset(&om->gd->progress) != 0)
+    int kept = progress_reset(&om->gd->progress);
+
+    if (kept < 0)
         return options_notice(om, "Couldn't reset the progress: nothing"
             " was deleted");
-    options_notice(om, "Progress reset (the old file is progress.txt.bak)");
+    options_notice(om, kept > 0 ? "Progress reset (the old file is"
+        " progress.txt.bak)" : "Progress reset (it was empty: nothing to keep)");
 }
 
 void options_answer(option_m_t *om, int answer)
@@ -113,6 +111,8 @@ void options_answer(option_m_t *om, int answer)
     close_dialog(om);
     if (which == DIALOG_REVERT && answer == 1)
         revert_display(om);
+    if (which == DIALOG_REVERT && answer == 2)
+        display_trial_end(&om->trial, &om->gd->settings, true);   /* 5.7 */
     if (which == DIALOG_RESET && answer == 2)
         reset_progress(om);
 }
@@ -120,7 +120,8 @@ void options_answer(option_m_t *om, int answer)
 /* Unanswered for 10 s: Revert (5.4). */
 void options_dialogs_update(option_m_t *om)
 {
-    if (om->dialog == DIALOG_REVERT && ui_now_ms() >= om->revert_at_ms)
+    if (om->dialog == DIALOG_REVERT && display_trial_due(&om->trial,
+        ui_now_ms()))
         options_answer(om, 1);
 }
 
@@ -139,7 +140,7 @@ static void centered(option_m_t *om, const char *s, float y)
 void options_draw_dialog(option_m_t *om)
 {
     char line[120];
-    int64_t left = om->revert_at_ms - ui_now_ms();
+    int64_t left = om->trial.until_ms - ui_now_ms();
 
     if (om->dialog == DIALOG_REVERT) {
         snprintf(line, sizeof(line), "Keep these display settings? Reverting"
@@ -155,30 +156,50 @@ void options_draw_dialog(option_m_t *om)
 }
 
 /*
-** xdg-open, without a shell and without waiting for it: the child starts it
-** from a grandchild and exits at once, so nothing is left to reap.
+** xdg-open, without a shell, from a grandchild: the child exits at once, so
+** nothing is left to reap. The pipe closes on its own when xdg-open starts
+** (close-on-exec); a byte in it is an exec that failed.
 */
+static bool start_opener(const char *path)
+{
+    int fds[2];
+    int status = 1;
+    char c = 0;
+    pid_t child;
+
+    if (pipe(fds) != 0)
+        return false;
+    fcntl(fds[1], F_SETFD, FD_CLOEXEC);
+    child = fork();
+    if (child == 0) {
+        close(fds[0]);
+        if ((child = fork()) == 0) {
+            execlp("xdg-open", "xdg-open", path, (char *)NULL);
+            (void)!write(fds[1], "x", 1);
+            _exit(127);
+        }
+        _exit(child < 0);
+    }
+    close(fds[1]);
+    if (child > 0)
+        waitpid(child, &status, 0);
+    status = child > 0 && WIFEXITED(status) && WEXITSTATUS(status) == 0
+        && read(fds[0], &c, 1) == 0;
+    close(fds[0]);
+    return status;
+}
+
 void options_open_save_folder(option_m_t *om)
 {
     char path[PATH_MAX];
-    char text[PATH_MAX + 16];
-    pid_t child = 0;
+    char text[PATH_MAX + 32];
 
     mkdir("save", 0755);
     if (realpath("save", path) == NULL)
         return options_notice(om, "There's no save folder");
     printf("%s\n", path);
     fflush(stdout);
-    child = fork();
-    if (child == 0) {
-        if (fork() == 0) {
-            execlp("xdg-open", "xdg-open", path, (char *)NULL);
-            _exit(127);
-        }
-        _exit(0);
-    }
-    if (child > 0)
-        waitpid(child, NULL, 0);
-    snprintf(text, sizeof(text), "Opened %s", path);
+    snprintf(text, sizeof(text), start_opener(path) ? "Opened %s"
+        : "Couldn't open it: %s", path);
     options_notice(om, text);
 }

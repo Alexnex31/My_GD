@@ -55,6 +55,7 @@ option_m_t *create_option_menu(gd_t *gd)
     music_menu(gd);                          /* it plays on (FEATURES 4.10) */
     om->gd = gd;
     om->pending_section = -1;
+    om->rows_of = -1;
     om->background = sfSprite_create();
     sfSprite_setTexture(om->background, gd->res->opt_background, sfTrue);
     om->text = sfText_create();
@@ -74,6 +75,7 @@ option_m_t *create_option_menu(gd_t *gd)
 
 void free_option_menu(option_m_t *om)
 {
+    options_forget_display(om);
     sfSprite_destroy(om->background);
     sfText_destroy(om->text);
     free(om->song_titles);

@@ -130,6 +130,19 @@ static void list_scroll(widget_t *w, int by)
         w->scroll = 0;
 }
 
+/*
+** Nothing held here any more: the window lost the focus, or a dialog or a
+** capture takes the events, so their releases would never reach this
+** screen and a held arrow would repeat on its own once it is back.
+*/
+static void let_go(ui_screen_t *ui)
+{
+    ui->repeat_key = NO_KEY;
+    ui->captured = -1;
+    ui->pressed = -1;
+    ui->mouse_down = false;
+}
+
 /* Enter, Space, or a click released where it started (3.3). */
 static void activate(ui_screen_t *ui, int i)
 {
@@ -139,8 +152,10 @@ static void activate(ui_screen_t *ui, int i)
         set_value(ui, w, *w->value ? 0 : 1);
     if (w->kind == W_CYCLER)
         cycler_step(ui, w, 1);
-    if (w->kind == W_KEYBIND)
+    if (w->kind == W_KEYBIND) {
         ui->capturing = i;               /* the next press is the result (5.5) */
+        let_go(ui);
+    }
     if ((w->kind == W_BUTTON || w->kind == W_LIST || w->kind == W_TEXT)
         && w->on_activate != NULL)
         w->on_activate(ui->ctx, w);
@@ -319,9 +334,25 @@ static void key_press(ui_screen_t *ui, const ui_event_t *ev, int64_t now)
         ui->on_key(ui->ctx, ev->input, ev->shift);
 }
 
+/* A left click on the prompt's Cancel, or outside the prompt: no change. */
+static bool cancels(const ui_event_t *ev)
+{
+    if (is_key(ev->input, KEY_Escape))
+        return true;
+    return is_left_click(ev->input) && (ui_rect_contains(UI_CAPTURE_CANCEL,
+        ev->x, ev->y) || !ui_rect_contains(UI_CAPTURE_PANEL, ev->x, ev->y));
+}
+
+static bool clears(const ui_event_t *ev)
+{
+    return is_key(ev->input, KEY_Backspace) || (is_left_click(ev->input)
+        && ui_rect_contains(UI_CAPTURE_CLEAR, ev->x, ev->y));
+}
+
 /*
-** The modal of a keybind (5.5): Escape cancels, Backspace clears, any other
-** key, mouse button or gamepad button is the result. Only presses count, so
+** The modal of a keybind (5.5): Escape cancels, Backspace clears, and so do
+** its two buttons; any other key, mouse button or gamepad button is the
+** result, the left button clicked inside the prompt. Only presses count, so
 ** the click that opened it doesn't.
 */
 static void capture_event(ui_screen_t *ui, const ui_event_t *ev)
@@ -329,14 +360,16 @@ static void capture_event(ui_screen_t *ui, const ui_event_t *ev)
     widget_t *w = &ui->widgets[ui->capturing];
     binding_t b = ev->input;
 
-    if (ev->kind == UI_RELEASE && is_left_click(ev->input))
-        ui->mouse_down = false;
+    if (ev->kind == UI_MOVE) {
+        ui->mouse_x = ev->x;                 /* the prompt's buttons light up */
+        ui->mouse_y = ev->y;
+    }
     if (ev->kind != UI_PRESS)
         return;
     ui->capturing = -1;
-    if (is_key(b, KEY_Escape))
+    if (cancels(ev))
         return;
-    if (is_key(b, KEY_Backspace))
+    if (clears(ev))
         b = NO_KEY;
     if (w->on_capture != NULL)
         return w->on_capture(ui->ctx, w, b);
@@ -356,6 +389,8 @@ static void wheel(ui_screen_t *ui, const ui_event_t *ev)
 
 void ui_event(ui_screen_t *ui, const ui_event_t *ev, int64_t now_ms)
 {
+    if (ev->kind == UI_LET_GO || ui->modal != NULL || ui->capturing >= 0)
+        let_go(ui);
     if (ui->modal != NULL)
         return ui_event(ui->modal, ev, now_ms);
     if (ui->capturing >= 0)

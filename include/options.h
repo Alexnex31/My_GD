@@ -49,6 +49,7 @@ typedef struct option_menu {
     widget_t tab_widgets[NB_SECTIONS + 1];
     char tab_labels[NB_SECTIONS][24];
     ui_screen_t rows;             /* the section's rows: every event        */
+    int rows_of;                  /* the section they were built for, -1    */
     widget_t row_widgets[OPT_ROWS_MAX];
     int music_volume;
     int sfx_volume;
@@ -67,10 +68,7 @@ typedef struct option_menu {
     options_dialog_t dialog;
     ui_screen_t dialog_ui;
     widget_t dialog_widgets[2];
-    int64_t revert_at_ms;
-    bool before_fullscreen;       /* the display before the change (5.4)    */
-    int before_w;
-    int before_h;
+    display_trial_t trial;        /* a new display mode, until kept (5.4)   */
     char notice[200];
     int64_t notice_until_ms;
     bool pending_leave;
@@ -92,6 +90,7 @@ void options_notice(option_m_t *om, const char *text);
 /* The dialogs and what they do (options_dialogs.c). */
 void options_open_dialog(option_m_t *om, options_dialog_t which);
 void options_answer(option_m_t *om, int answer);
+void options_forget_display(option_m_t *om);   /* an unkept mode, on quit */
 void options_apply_display(option_m_t *om);
 void options_dialogs_update(option_m_t *om);
 void options_draw_dialog(option_m_t *om);

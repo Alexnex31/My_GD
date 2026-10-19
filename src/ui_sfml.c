@@ -97,6 +97,10 @@ static bool mouse_event(gd_t *gd, const sfEvent *ev, ui_event_t *out)
 bool ui_from_sf(gd_t *gd, const sfEvent *ev, ui_event_t *out)
 {
     *out = (ui_event_t){0};
+    if (ev->type == sfEvtLostFocus) {
+        out->kind = UI_LET_GO;
+        return true;
+    }
     if (ev->type == sfEvtTextEntered) {
         out->kind = UI_TEXT;
         out->ch = ev->text.unicode;
@@ -238,18 +242,31 @@ static void draw_widget(gd_t *gd, const ui_screen_t *ui, int i)
     draw_content(gd, w, r, look.alpha);
 }
 
-/* The keybind's modal (5.5), over everything. */
-static void draw_capture(gd_t *gd, const widget_t *w)
+static void capture_button(gd_t *gd, const ui_screen_t *ui, ui_rect_t r,
+    const char *label)
+{
+    bool hover = ui_rect_contains(r, ui->mouse_x, ui->mouse_y);
+
+    rect(gd, hover ? scaled(r, 1.05f) : r, TRACK, OUTLINE_W);
+    text(gd, label, center(r), 1, 1.0f);
+}
+
+/* The keybind's modal (5.5), over everything: two lines, two buttons. */
+static void draw_capture(gd_t *gd, const ui_screen_t *ui, const widget_t *w)
 {
     char line[160];
 
     rect(gd, (ui_rect_t){0.0f, 0.0f, VIEW_W, VIEW_H}, DIM, 0.0f);
-    rect(gd, (ui_rect_t){360.0f, 390.0f, 1200.0f, 300.0f}, PANEL, OUTLINE_W);
-    snprintf(line, sizeof(line), "Press a key, mouse button or gamepad"
-        " button for %s", w->label != NULL ? w->label : "this action");
-    text(gd, line, (sfVector2f){VIEW_W / 2.0f, 500.0f}, 1, 1.0f);
-    text(gd, "Esc to cancel, Backspace to clear",
-        (sfVector2f){VIEW_W / 2.0f, 580.0f}, 1, 1.0f);
+    rect(gd, UI_CAPTURE_PANEL, PANEL, OUTLINE_W);
+    text(gd, "Press a key, mouse button or gamepad button",
+        (sfVector2f){VIEW_W / 2.0f, 430.0f}, 1, 1.0f);
+    snprintf(line, sizeof(line), "for %s", w->label != NULL ? w->label
+        : "this action");
+    text(gd, line, (sfVector2f){VIEW_W / 2.0f, 490.0f}, 1, 1.0f);
+    text(gd, "Esc cancels, Backspace clears",
+        (sfVector2f){VIEW_W / 2.0f, 560.0f}, 1, 1.0f);
+    capture_button(gd, ui, UI_CAPTURE_CANCEL, "Cancel");
+    capture_button(gd, ui, UI_CAPTURE_CLEAR, "Clear");
 }
 
 /* The whole screen darkened, under a menu drawn over a scene (PLAN 10.4). */
@@ -274,7 +291,7 @@ void ui_draw(gd_t *gd, const ui_screen_t *ui)
     for (int i = 0; i < ui->count; i++)
         draw_widget(gd, ui, i);
     if (ui->capturing >= 0)
-        draw_capture(gd, &ui->widgets[ui->capturing]);
+        draw_capture(gd, ui, &ui->widgets[ui->capturing]);
     if (ui->modal != NULL) {
         rect(gd, (ui_rect_t){0.0f, 0.0f, VIEW_W, VIEW_H}, DIM, 0.0f);
         ui_draw(gd, ui->modal);

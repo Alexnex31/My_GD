@@ -252,9 +252,9 @@ static void write_text(FILE *f, const void *data)
 }
 
 /*
-** The store's file as it is now, to path.bak. No file, or nothing in it,
-** has nothing to keep: the last .bak stays, so a second reset never
-** replaces the real progress with an empty file.
+** The store's file as it is now, to path.bak: 1 when it was copied. No
+** file, or nothing in it, has nothing to keep (0): the last .bak stays, so
+** a second reset never replaces the real progress with an empty file.
 */
 static int backup(const progress_t *p)
 {
@@ -267,7 +267,7 @@ static int backup(const progress_t *p)
         return -1;
     if (got == SAVE_READ && text[strspn(text, " \t\r\n")] != '\0') {
         snprintf(bak, sizeof(bak), "%s.bak", p->path);
-        ok = save_atomic(bak, write_text, text);
+        ok = save_atomic(bak, write_text, text) == 0 ? 1 : -1;
     }
     free(text);
     return ok;
@@ -281,15 +281,16 @@ static int backup(const progress_t *p)
 int progress_reset(progress_t *p)
 {
     progress_t empty = {0};
+    int kept = p->unreadable ? -1 : backup(p);
 
-    if (p->unreadable || backup(p) != 0)
+    if (kept < 0)
         return -1;
     snprintf(empty.path, sizeof(empty.path), "%s", p->path);
     if (progress_save(&empty) != 0)
         return -1;
     progress_free(p);
     *p = empty;
-    return 0;
+    return kept;
 }
 
 void progress_free(progress_t *p)

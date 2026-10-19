@@ -29,12 +29,23 @@ typedef struct ui_rect {
     float h;
 } ui_rect_t;
 
+/*
+** The keybind's prompt (5.5), and its two buttons, for the mouse alone: a
+** click on one of them cancels or clears, a click anywhere else outside
+** the prompt cancels, a click inside it is the left button captured.
+*/
+    #define UI_CAPTURE_PANEL ((ui_rect_t){260.0f, 360.0f, 1400.0f, 400.0f})
+    #define UI_CAPTURE_CANCEL ((ui_rect_t){560.0f, 630.0f, 360.0f, 90.0f})
+    #define UI_CAPTURE_CLEAR ((ui_rect_t){1000.0f, 630.0f, 360.0f, 90.0f})
+
 typedef enum ui_event_kind {
     UI_MOVE,                      /* the mouse moved to x, y                 */
     UI_PRESS,                     /* `input` went down (at x, y if a mouse)  */
     UI_RELEASE,                   /* `input` went up                         */
     UI_WHEEL,                     /* `wheel` notches at x, y, up positive    */
-    UI_TEXT                       /* the character `ch` was typed            */
+    UI_TEXT,                      /* the character `ch` was typed            */
+    UI_LET_GO                     /* the window lost the focus: nothing is held
+                                     any more, its releases won't come      */
 } ui_event_kind_t;
 
 typedef struct ui_event {

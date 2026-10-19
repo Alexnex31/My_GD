@@ -64,6 +64,10 @@ sfRenderWindow *create_window(const settings_t *set)
         video_mode.height = desktop.height;
     window = sfRenderWindow_create(video_mode, "my_gd",
         set->fullscreen ? sfFullscreen : sfResize | sfClose, NULL);
+    if (window != NULL && !sfRenderWindow_isOpen(window)) {
+        sfRenderWindow_destroy(window);      /* CSFML always returns one: */
+        window = NULL;                       /* a failed one isn't open */
+    }
     if (window == NULL)
         return NULL;                         /* the caller keeps the old one */
     window_apply_sync(window, set);

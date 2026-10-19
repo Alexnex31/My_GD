@@ -98,9 +98,10 @@ static void slot_captured(void *ctx, widget_t *w, binding_t b)
     options_notice(om, text);
 }
 
+/* Not saved yet: only Keep makes it the settings' (5.4). */
 static void display_changed(void *ctx, widget_t *w)
 {
-    option_m_t *om = menu_of(ctx);
+    option_m_t *om = ctx;
 
     (void)w;
     om->pending_display = true;              /* a new window, after the events */
@@ -268,15 +269,23 @@ static void read_values(option_m_t *om)
     om->window_size = om->sizes.current;
 }
 
+/*
+** Rebuilt for the same section (a display change applied or reverted), the
+** focus stays on its row: the next Enter acts where the player is.
+*/
 void options_build_rows(option_m_t *om)
 {
     static int (*const BUILD[NB_SECTIONS])(option_m_t *, widget_t *) = {
         audio_rows, gameplay_rows, controls_rows, display_rows, data_rows};
+    int keep = om->rows_of == (int)om->section ? om->rows.focused : -1;
     int n = 0;
 
     read_values(om);
     n = BUILD[om->section](om, om->row_widgets);
     ui_init(&om->rows, om->row_widgets, n, om);
+    if (keep >= 0 && keep < n && om->row_widgets[keep].enabled)
+        om->rows.focused = keep;
+    om->rows_of = (int)om->section;
     om->rows.label_x = OPT_LABEL_X;
     om->rows.on_back = rows_back;
     om->rows.on_key = rows_key;

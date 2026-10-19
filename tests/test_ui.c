@@ -79,16 +79,19 @@ static void setup(fixture_t *f)
             .on_activate = on_activate};
     f->w[TOGGLE].kind = W_TOGGLE;
     f->w[TOGGLE].value = &f->toggle;
-    f->w[SLIDER] = (widget_t){W_SLIDER, "s", {1400.0f, 300.0f, 400.0f, 80.0f},
-        true, &f->slider, NULL, 0, 100, 5, NULL, 0, on_change, NULL, NULL};
+    f->w[SLIDER] = (widget_t){.kind = W_SLIDER, .label = "s",
+        .bounds = {1400.0f, 300.0f, 400.0f, 80.0f}, .enabled = true,
+        .value = &f->slider, .max = 100, .step = 5, .on_change = on_change};
     f->w[OFF].enabled = false;
-    f->w[CYCLER] = (widget_t){W_CYCLER, "c", row_at(CYCLER), true, &f->cycler,
-        NULL, 0, 4, 1, CHOICES, 0, on_change, NULL, NULL};
+    f->w[CYCLER] = (widget_t){.kind = W_CYCLER, .label = "c",
+        .bounds = row_at(CYCLER), .enabled = true, .value = &f->cycler,
+        .max = 4, .step = 1, .choices = CHOICES, .on_change = on_change};
     f->w[KEYBIND].kind = W_KEYBIND;
     f->w[KEYBIND].binding = &f->bound;
-    f->w[LIST] = (widget_t){W_LIST, "l", {1400.0f, 700.0f, 380.0f,
-        3 * UI_ROW_H}, true, &f->row, NULL, 0, 9, 1, ROWS, 0, on_change,
-        on_activate, NULL};
+    f->w[LIST] = (widget_t){.kind = W_LIST, .label = "l",
+        .bounds = {1400.0f, 700.0f, 380.0f, 3 * UI_ROW_H}, .enabled = true,
+        .value = &f->row, .max = 9, .step = 1, .choices = ROWS,
+        .on_change = on_change, .on_activate = on_activate};
     ui_init(&f->ui, f->w, COUNT, f);
     f->ui.on_back = on_back;
     f->ui.on_key = on_key;
@@ -97,7 +100,7 @@ static void setup(fixture_t *f)
 static void send(fixture_t *f, ui_event_kind_t kind, binding_t in, float x,
     float y)
 {
-    ui_event_t ev = {kind, in, x, y, 0, false};
+    ui_event_t ev = {.kind = kind, .input = in, .x = x, .y = y};
 
     ui_event(&f->ui, &ev, 0);
 }
@@ -127,8 +130,8 @@ static void click_at(fixture_t *f, float x, float y)
 
 static void key(fixture_t *f, key_id_t k, int64_t now)
 {
-    ui_event_t down = {UI_PRESS, {BIND_KEY, (int)k}, 0, 0, 0, false};
-    ui_event_t up = {UI_RELEASE, {BIND_KEY, (int)k}, 0, 0, 0, false};
+    ui_event_t down = {.kind = UI_PRESS, .input = {BIND_KEY, (int)k}};
+    ui_event_t up = {.kind = UI_RELEASE, .input = {BIND_KEY, (int)k}};
 
     ui_event(&f->ui, &down, now);
     ui_event(&f->ui, &up, now);
@@ -217,8 +220,8 @@ static void test_keyboard_navigation(void)
     CHECK(f.toggle == 1);
     key(&f, KEY_Escape, 0);
     CHECK(f.backs == 1 && f.keys == 0);
-    ui_event(&f.ui, &(ui_event_t){UI_PRESS, {BIND_KEY, KEY_Tab}, 0, 0, 0,
-        true}, 0);
+    ui_event(&f.ui, &(ui_event_t){.kind = UI_PRESS,
+        .input = {BIND_KEY, KEY_Tab}, .shift = true}, 0);
     CHECK(f.keys == 1 && f.shift);
 }
 
@@ -257,8 +260,8 @@ static void test_left_right(void)
 static void test_key_repeat(void)
 {
     fixture_t f;
-    ui_event_t down = {UI_PRESS, {BIND_KEY, KEY_Right}, 0, 0, 0, false};
-    ui_event_t up = {UI_RELEASE, {BIND_KEY, KEY_Right}, 0, 0, 0, false};
+    ui_event_t down = {.kind = UI_PRESS, .input = {BIND_KEY, KEY_Right}};
+    ui_event_t up = {.kind = UI_RELEASE, .input = {BIND_KEY, KEY_Right}};
 
     setup(&f);
     f.ui.focused = SLIDER;
@@ -278,6 +281,47 @@ static void test_key_repeat(void)
     ui_event(&f.ui, &up, 9001);
     ui_update(&f.ui, 20000);
     CHECK(f.slider == 35);
+}
+
+/*
+** A held arrow whose release goes elsewhere stops: a capture or a dialog
+** takes the events, or the window loses the focus (3.5).
+*/
+static void test_repeat_let_go(void)
+{
+    fixture_t f;
+    fixture_t dialog;
+    ui_event_t down = {.kind = UI_PRESS, .input = {BIND_KEY, KEY_Down}};
+    ui_event_t up = {.kind = UI_RELEASE, .input = {BIND_KEY, KEY_Down}};
+    ui_event_t gone = {.kind = UI_LET_GO};
+
+    setup(&f);
+    setup(&dialog);
+    ui_event(&f.ui, &down, 0);
+    click_at(&f, 1500, 620);                         /* the keybind's capture */
+    ui_event(&f.ui, &up, 10);                        /* the capture's */
+    key(&f, KEY_Escape, 20);
+    f.ui.focused = BUTTON;
+    ui_update(&f.ui, 5000);
+    CHECK(f.ui.focused == BUTTON);
+    ui_event(&f.ui, &down, 0);
+    f.ui.modal = &dialog.ui;
+    ui_event(&f.ui, &up, 10);                        /* the dialog's */
+    f.ui.modal = NULL;
+    f.ui.focused = BUTTON;
+    ui_update(&f.ui, 5000);
+    CHECK(f.ui.focused == BUTTON);
+    f.ui.focused = SLIDER;
+    f.slider = 50;
+    ui_event(&f.ui, &(ui_event_t){.kind = UI_PRESS, .input = {BIND_KEY,
+        KEY_Left}}, 0);
+    ui_event(&f.ui, &gone, 10);                      /* Alt+Tab */
+    ui_update(&f.ui, 5000);
+    CHECK(f.slider == 45);
+    press_at(&f, 1600, 320);                         /* a drag, then Alt+Tab */
+    ui_event(&f.ui, &gone, 0);
+    move(&f, 1400, 320);
+    CHECK(f.slider == 50 && f.ui.captured == -1);
 }
 
 /* The keybind's modal: only the next press counts (5.5). */
@@ -312,6 +356,29 @@ static void test_capture(void)
     CHECK(binding_equal(f.bound, (binding_t){BIND_JOY, 3}));
 }
 
+/* The mouse alone: Cancel, Clear, a click away, a click inside (5.5, 5.8). */
+static void test_capture_mouse(void)
+{
+    fixture_t f;
+    ui_rect_t cancel = UI_CAPTURE_CANCEL;
+    ui_rect_t clear = UI_CAPTURE_CLEAR;
+
+    setup(&f);
+    click_at(&f, 1500, 620);
+    click_at(&f, cancel.x + 10, cancel.y + 10);
+    CHECK(f.ui.capturing == -1 && f.bound.code == KEY_Space);
+    CHECK(f.activations == 0);
+    click_at(&f, 1500, 620);
+    click_at(&f, 100, 100);                          /* away: no change */
+    CHECK(f.ui.capturing == -1 && f.bound.code == KEY_Space);
+    click_at(&f, 1500, 620);
+    click_at(&f, 960, 450);                          /* inside: the left button */
+    CHECK(binding_equal(f.bound, LEFT_CLICK));
+    click_at(&f, 1500, 620);
+    click_at(&f, clear.x + 10, clear.y + 10);
+    CHECK(f.ui.capturing == -1 && f.bound.kind == BIND_NONE);
+}
+
 static void test_list(void)
 {
     fixture_t f;
@@ -332,12 +399,12 @@ static void test_list(void)
     CHECK(f.ui.focused == BUTTON);                   /* off the end: next widget */
     send(&f, UI_WHEEL, (binding_t){BIND_NONE, 0}, 1500, 750);
     f.ui.widgets[LIST].scroll = 0;
-    ui_event(&f.ui, &(ui_event_t){UI_WHEEL, {BIND_NONE, 0}, 1500, 750, -1,
-        false}, 0);
+    ui_event(&f.ui, &(ui_event_t){.kind = UI_WHEEL, .x = 1500,
+        .y = 750, .wheel = -1}, 0);
     CHECK(f.w[LIST].scroll == 3);
     for (int i = 0; i < 5; i++)
-        ui_event(&f.ui, &(ui_event_t){UI_WHEEL, {BIND_NONE, 0}, 1500, 750,
-            -1, false}, 0);
+        ui_event(&f.ui, &(ui_event_t){.kind = UI_WHEEL,
+            .x = 1500, .y = 750, .wheel = -1}, 0);
     CHECK(f.w[LIST].scroll == 7);                    /* the last 3 rows */
     f.w[LIST].scroll = 0;
     f.activations = 0;
@@ -456,7 +523,9 @@ void test_ui(void)
     test_keyboard_navigation();
     test_left_right();
     test_key_repeat();
+    test_repeat_let_go();
     test_capture();
+    test_capture_mouse();
     test_list();
     test_looks();
     test_modal();

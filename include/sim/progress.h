@@ -61,8 +61,8 @@ float progress_printable(float pct);
 
 /*
 ** Empties the store and saves it, the old file copied to <path>.bak first
-** (an empty one leaves the last .bak alone). -1: nothing changed, in memory
-** or on disk.
+** (an empty one leaves the last .bak alone). 1: done, a copy kept; 0: done,
+** there was nothing to copy; -1: nothing changed, in memory or on disk.
 */
 int progress_reset(progress_t *p);
 

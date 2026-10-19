@@ -71,6 +71,11 @@ static void test_rebind(void)
     CHECK(binding_equal(slots[2], UP) && other == -1);    /* nothing moved */
     CHECK(rebind(slots, 3, UP, &other) == REBIND_SWAPPED);    /* jump to jump */
     CHECK(binding_equal(slots[3], UP) && slots[2].kind == BIND_NONE);
+    slots[5] = (binding_t){BIND_JOY, 0};      /* gamepads aren't read yet */
+    CHECK(rebind(slots, 3, NONE, &other) == REBIND_REFUSED);
+    CHECK(rebind(slots, 3, (binding_t){BIND_JOY, 1}, &other)
+        == REBIND_REFUSED);
+    CHECK(binding_equal(slots[3], UP));
 }
 
 static void test_slot_names(void)
@@ -99,6 +104,32 @@ static void test_window_sizes(void)
     CHECK(ws.count == 4 && ws.current == 0 && ws.w[0] == 1000);
     window_sizes_list(&ws, 1024, 600, 1024, 600);
     CHECK(ws.count == 1 && ws.w[0] == 1024);
+    window_sizes_list(&ws, 1600, 900, 1920, 1080);   /* too big here: kept */
+    CHECK(ws.count == 3 && ws.current == 0 && ws.w[0] == 1920);
+    CHECK(ws.h[ws.current] == 1080);
+}
+
+/*
+** A new mode on trial (5.4): the settings' at once, saved only once kept;
+** reverted, timed out or never answered, the old one comes back.
+*/
+static void test_display_trial(void)
+{
+    settings_t s = {.window_width = 1280, .window_height = 720};
+    display_trial_t t = {0};
+
+    display_trial_begin(&t, &s, false, 1600, 900, 1000);
+    CHECK(s.window_width == 1600 && s.window_height == 900 && !s.dirty);
+    CHECK(!display_trial_due(&t, 10999) && display_trial_due(&t, 11000));
+    display_trial_end(&t, &s, false);              /* Revert, or the timeout */
+    CHECK(s.window_width == 1280 && s.window_height == 720 && !s.dirty);
+    CHECK(!display_trial_due(&t, 20000));
+    display_trial_begin(&t, &s, true, 1600, 900, 0);
+    CHECK(s.fullscreen);
+    display_trial_end(&t, &s, true);               /* Keep */
+    CHECK(s.fullscreen && s.window_width == 1600 && s.dirty);
+    display_trial_end(&t, &s, false);              /* over: the quit's does nothing */
+    CHECK(s.fullscreen && s.window_width == 1600);
 }
 
 static char *slurp(const char *path)
@@ -138,7 +169,7 @@ static void test_progress_reset(void)
     snprintf(progress_get(&p, "3")->song, sizeof(p.entries[0].song), "%s",
         "x.ogg");
     progress_save(&p);
-    CHECK(progress_reset(&p) == 0);
+    CHECK(progress_reset(&p) == 1);          /* a copy kept */
     CHECK(p.count == 0 && strcmp(p.path, path) == 0);
     text = slurp(bak);
     CHECK(text != NULL && strstr(text, "3 attempts=12") != NULL);
@@ -228,6 +259,7 @@ void test_options(void)
     test_rebind();
     test_slot_names();
     test_window_sizes();
+    test_display_trial();
     test_progress_reset();
     test_progress_reset_fails();
     test_dirty();
