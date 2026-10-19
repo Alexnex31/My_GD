@@ -84,6 +84,10 @@ typedef struct editor {
     int issue_at;                 /* the one N last went to                  */
     double song_short;            /* seconds the level outlasts its song by  */
     double level_seconds;         /* how long it lasts, measured with it     */
+    ed_prop_view_t props;         /* the panel's rows, kept while the      */
+    uint64_t props_key;           /* selection and the edit count are the  */
+    unsigned int props_edits;     /* same (editor_props)                   */
+    bool props_known;
     ed_dialog_t dialog;
     ui_screen_t dialog_ui;
     widget_t dialog_widgets[3];
@@ -110,8 +114,9 @@ typedef struct editor {
     sfSprite *marker;             /* where attempts start                    */
     double end_x;                 /* measured after each edit: the level's end */
     double kill_y;                /* and its kill ceiling                    */
-    bool measured;
-    sfVector2i pan_from;
+    bool measured;                /* at `measured_edits`: an edit, or a    */
+    unsigned int measured_edits;  /* move not yet one, measures again      */
+    vec2_t drag_delta;            /* the dragged selection's snapped move  */
     bool leave;                   /* back to the list, after the events      */
     char notice[96];
     int64_t notice_until_ms;      /* when the notice goes away               */
@@ -137,7 +142,8 @@ void editor_label(editor_t *ed, gd_t *gd, const char *s, float x, float y,
     unsigned int size, sfColor c);
 
 /* editor_panel.c: the selection's properties, over the canvas's corner */
-bool editor_panel_holds(editor_t *ed, gd_t *gd, sfVector2f at);
+const ed_prop_view_t *editor_props(editor_t *ed);
+bool editor_panel_holds(editor_t *ed, sfVector2f at);
 void editor_panel_click(editor_t *ed, gd_t *gd, sfVector2f at);
 void editor_panel_draw(editor_t *ed, gd_t *gd);
 

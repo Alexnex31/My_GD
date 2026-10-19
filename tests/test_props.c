@@ -139,6 +139,7 @@ static void test_applies(void)
     const char *text = "start 900 300 ship up\nblock 100 750 2\n"
         "portal 500 650 2 ufo\npad 700 750 2 red\nspike 900 750 2 rot=90\n";
     ed_level_t lv;
+    ed_prop_view_t v;
 
     ed_level_from_text(&lv, text, strlen(text), "5");
     CHECK(!ed_prop_applies(&lv, ED_PROP_TURN));        /* nothing selected */
@@ -149,6 +150,9 @@ static void test_applies(void)
     CHECK(prop_is(&lv, ED_PROP_TURN, "0") && prop_is(&lv, ED_PROP_W, "2"));
     ed_select_click(&lv, lv.objects[3].id, true);      /* and the spike */
     CHECK(prop_is(&lv, ED_PROP_TURN, "mixed") && prop_is(&lv, ED_PROP_H, "2"));
+    ed_prop_view(&lv, &v);                             /* all rows at once */
+    CHECK(v.selected == 2 && v.applies[ED_PROP_Z_ORDER] && !v.applies[ED_PROP_KIND]);
+    CHECK(strcmp(v.text[ED_PROP_TURN], "mixed") == 0 && v.text[ED_PROP_KIND][0] == '\0');
     ed_select_click(&lv, lv.objects[1].id, false);     /* the portal */
     CHECK(prop_is(&lv, ED_PROP_KIND, "ufo"));
     ed_select_click(&lv, lv.objects[2].id, true);

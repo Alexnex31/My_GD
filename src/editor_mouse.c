@@ -37,24 +37,26 @@ static void palette_click(editor_t *ed, sfVector2f at)
 static void follow(editor_t *ed, gd_t *gd)
 {
     vec2_t at = editor_mouse_world(ed, gd);
+    vec2_t d = {ed_snap_delta(at.x - ed->press_at.x, ed->grid),
+        ed_snap_delta(at.y - ed->press_at.y, ed->grid)};
     int hit;
 
-    if (ed->mouse == ED_DRAGGING)
-        ed_grab_move(&ed->lv, &ed->grab,
-            ed_snap_delta(at.x - ed->press_at.x, ed->grid),
-            ed_snap_delta(at.y - ed->press_at.y, ed->grid));
-    if (ed->mouse == ED_DRAGGING)
-        ed->measured = false;
+    if (ed->mouse == ED_DRAGGING && (d.x != ed->drag_delta.x
+        || d.y != ed->drag_delta.y)) {
+        ed_grab_move(&ed->lv, &ed->grab, d.x, d.y);
+        ed->drag_delta = d;
+        ed->measured = false;                /* moved: no edit until dropped */
+    }
     if (!editor_mouse_on_canvas(gd))
         return;
-    if (ed->mouse == ED_PAINTING && ed_do_place(&ed->lv, &ed->hist,
-        &ed->entries[ed->entry], at, ed->grid))
-        ed->measured = false;
+    if (ed->mouse == ED_PAINTING)
+        ed_do_place(&ed->lv, &ed->hist, &ed->entries[ed->entry], at,
+            ed->grid);
     if (ed->mouse != ED_ERASING)
         return;
     hit = ed_hit(&ed->lv, at);
-    if (hit >= 0 && ed_do_remove(&ed->lv, &ed->hist, hit))
-        ed->measured = false;
+    if (hit >= 0)
+        ed_do_remove(&ed->lv, &ed->hist, hit);
 }
 
 /* The left button, by tool: paint, or start on an object or on nothing. */
@@ -76,7 +78,7 @@ void editor_mouse_press(editor_t *ed, gd_t *gd, const sfEvent *ev)
     sfVector2f ui = sfRenderWindow_mapPixelToCoords(gd->w, px, gd->ui_view);
 
     ed_gesture(&ed->hist);
-    if (editor_panel_holds(ed, gd, ui)) {    /* it is over the canvas */
+    if (editor_panel_holds(ed, ui)) {    /* it is over the canvas */
         if (b == sfMouseLeft)
             editor_panel_click(ed, gd, ui);
         ed->measured = false;
@@ -135,6 +137,7 @@ static void start_drag(editor_t *ed, sfVector2i px)
     if (!o->selected)
         ed_select_click(&ed->lv, ed->press_id, shift_held());
     ed_grab(&ed->lv, &ed->grab);
+    ed->drag_delta = (vec2_t){0.0, 0.0};
     ed->mouse = ED_DRAGGING;
 }
 
@@ -161,7 +164,6 @@ void editor_mouse_release(editor_t *ed, gd_t *gd)
     if (ed->mouse == ED_BOXING)
         ed_select_box(&ed->lv, editor_box(ed, gd), shift_held());
     ed->mouse = ED_IDLE;
-    ed->measured = false;
 }
 
 /*
@@ -173,10 +175,11 @@ bool editor_mouse_cancel(editor_t *ed)
 {
     if (ed->mouse == ED_IDLE)
         return false;
-    if (ed->mouse == ED_DRAGGING)
+    if (ed->mouse == ED_DRAGGING) {
         ed_grab_cancel(&ed->lv, &ed->grab);
+        ed->measured = false;                /* back where they were */
+    }
     ed->mouse = ED_IDLE;
-    ed->measured = false;
     ed_gesture(&ed->hist);
     return true;
 }

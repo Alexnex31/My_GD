@@ -56,6 +56,7 @@ int ed_do_add(ed_level_t *lv, ed_history_t *h, const object_t *obj,
     const char *extra);                                   /* its id */
 int ed_do_add_object(ed_level_t *lv, ed_history_t *h, const ed_object_t *o);
 bool ed_do_remove(ed_level_t *lv, ed_history_t *h, int id);
+bool ed_do_remove_selected(ed_level_t *lv, ed_history_t *h);
 bool ed_do_place(ed_level_t *lv, ed_history_t *h, const ed_entry_t *e,
     vec2_t at, double grid);
 /*

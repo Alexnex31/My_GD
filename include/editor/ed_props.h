@@ -29,13 +29,24 @@ typedef enum ed_prop {
     ED_PROP_COUNT
 } ed_prop_t;
 
+    #define ED_PROP_TEXT_MAX 32
+
+/* Every row of the panel at once, found in one pass over the level. */
+typedef struct ed_prop_view {
+    size_t selected;          /* how many objects                             */
+    bool applies[ED_PROP_COUNT];
+    char text[ED_PROP_COUNT][ED_PROP_TEXT_MAX];
+} ed_prop_view_t;
+
 const char *ed_prop_name(ed_prop_t p);
+void ed_prop_view(const ed_level_t *lv, ed_prop_view_t *v);
 /* Something selected has it. */
 bool ed_prop_applies(const ed_level_t *lv, ed_prop_t p);
 /* Its value, or "mixed" when the selected objects that have it differ. */
 void ed_prop_text(const ed_level_t *lv, ed_prop_t p, char *out, size_t size);
 /* The next (dir 1) or previous (-1) value on each one that has it: one
-** command. false when nothing changed. */
+** command. false when nothing changed. One moved to another editor layer
+** than the one worked in is no longer selected (11.15). */
 bool ed_prop_step(ed_level_t *lv, ed_history_t *h, ed_prop_t p, int dir);
 
 /*

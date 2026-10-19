@@ -89,31 +89,50 @@ static void text_of(const ed_object_t *o, ed_prop_t p, char *out, size_t size)
         snprintf(out, size, "%d", o->obj.editor_layer);
 }
 
+/* One object into every row it has; a row already mixed stays so. */
+static void view_add(ed_prop_view_t *v, const ed_object_t *o, bool *mixed)
+{
+    char one[ED_PROP_TEXT_MAX];
+
+    v->selected += 1;
+    for (int p = 0; p < ED_PROP_COUNT; p++) {
+        if (mixed[p] || !has(o, (ed_prop_t)p))
+            continue;
+        text_of(o, (ed_prop_t)p, one, sizeof(one));
+        if (!v->applies[p])
+            snprintf(v->text[p], sizeof(v->text[p]), "%s", one);
+        else if (strcmp(one, v->text[p]) != 0) {
+            snprintf(v->text[p], sizeof(v->text[p]), "%s", "mixed");
+            mixed[p] = true;
+        }
+        v->applies[p] = true;
+    }
+}
+
+void ed_prop_view(const ed_level_t *lv, ed_prop_view_t *v)
+{
+    bool mixed[ED_PROP_COUNT] = {false};
+
+    *v = (ed_prop_view_t){0};
+    for (size_t i = 0; i < lv->count; i++)
+        if (lv->objects[i].selected)
+            view_add(v, &lv->objects[i], mixed);
+}
+
 bool ed_prop_applies(const ed_level_t *lv, ed_prop_t p)
 {
-    for (size_t i = 0; i < lv->count; i++)
-        if (lv->objects[i].selected && has(&lv->objects[i], p))
-            return true;
-    return false;
+    ed_prop_view_t v;
+
+    ed_prop_view(lv, &v);
+    return v.applies[p];
 }
 
 void ed_prop_text(const ed_level_t *lv, ed_prop_t p, char *out, size_t size)
 {
-    char one[64];
-    bool first = true;
+    ed_prop_view_t v;
 
-    snprintf(out, size, "%s", "");
-    for (size_t i = 0; i < lv->count; i++) {
-        if (!lv->objects[i].selected || !has(&lv->objects[i], p))
-            continue;
-        text_of(&lv->objects[i], p, one, sizeof(one));
-        if (!first && strcmp(one, out) != 0) {
-            snprintf(out, size, "mixed");
-            return;
-        }
-        snprintf(out, size, "%s", one);
-        first = false;
-    }
+    ed_prop_view(lv, &v);
+    snprintf(out, size, "%s", v.text[p]);
 }
 
 static double turned(double deg)
@@ -239,7 +258,10 @@ bool ed_prop_step(ed_level_t *lv, ed_history_t *h, ed_prop_t p, int dir)
         if (o != NULL && has(o, p))
             step_one(o, p, dir);
     }
-    return commit_if_changed(lv, h, &g);
+    if (!commit_if_changed(lv, h, &g))
+        return false;
+    ed_set_layer(lv, lv->layer);             /* moved to another layer (11.15) */
+    return true;
 }
 
 /* The middle of everything grabbed, each as it is drawn: turned. */

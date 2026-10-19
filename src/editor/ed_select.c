@@ -23,6 +23,21 @@ size_t ed_selected(const ed_level_t *lv)
     return n;
 }
 
+/* FNV-1a over the selected ids, then their count. */
+uint64_t ed_selection_key(const ed_level_t *lv)
+{
+    uint64_t key = 14695981039346656037ull;
+    uint64_t n = 0;
+
+    for (size_t i = 0; i < lv->count; i++)
+        if (lv->objects[i].selected) {
+            key = (key ^ (uint64_t)(unsigned int)lv->objects[i].id)
+                * 1099511628211ull;
+            n += 1;
+        }
+    return (key ^ n) * 1099511628211ull;
+}
+
 static void select_every(ed_level_t *lv, bool on)
 {
     for (size_t i = 0; i < lv->count; i++)
@@ -126,15 +141,9 @@ void ed_select_box(ed_level_t *lv, rect_t box, bool add)
     }
 }
 
-/* From the end, so removing one doesn't move those still to look at. */
 bool ed_delete_selected(ed_level_t *lv, ed_history_t *h)
 {
-    bool any = false;
-
-    for (size_t i = lv->count; i > 0; i--)
-        if (lv->objects[i - 1].selected)
-            any = ed_do_remove(lv, h, lv->objects[i - 1].id) || any;
-    return any;
+    return ed_do_remove_selected(lv, h);
 }
 
 void ed_grab(ed_level_t *lv, ed_grab_t *g)

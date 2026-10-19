@@ -143,6 +143,82 @@ ed_object_t *ed_find_from(ed_level_t *lv, int id, size_t *hint)
 }
 
 /* The order of the others is kept: it decides what is drawn on top. */
+static int by_id(const void *a, const void *b)
+{
+    int ia = *(const int *)a;
+    int ib = *(const int *)b;
+
+    return (ia > ib) - (ia < ib);
+}
+
+/* The ids sorted once, the list compacted once: a big paste's undo is
+** n log n, not n times a search and a shift (11.7). */
+size_t ed_remove_ids(ed_level_t *lv, const int *ids, size_t n)
+{
+    int *sorted = sim_xcalloc(n + 1, sizeof(int));
+    size_t kept = 0;
+
+    if (n > 0)
+        memcpy(sorted, ids, n * sizeof(int));
+    qsort(sorted, n, sizeof(int), by_id);
+    for (size_t i = 0; i < lv->count; i++) {
+        ed_object_t *o = &lv->objects[i];
+
+        if (bsearch(&o->id, sorted, n, sizeof(int), by_id) != NULL)
+            free(o->extra);
+        else
+            lv->objects[kept++] = *o;
+    }
+    free(sorted);
+    n = lv->count - kept;
+    lv->count = kept;
+    lv->dirty = lv->dirty || n > 0;
+    return n;
+}
+
+size_t ed_remove_selected(ed_level_t *lv)
+{
+    size_t kept = 0;
+    size_t n = 0;
+
+    for (size_t i = 0; i < lv->count; i++) {
+        if (lv->objects[i].selected)
+            free(lv->objects[i].extra);
+        else
+            lv->objects[kept++] = lv->objects[i];
+    }
+    n = lv->count - kept;
+    lv->count = kept;
+    lv->dirty = lv->dirty || n > 0;
+    return n;
+}
+
+/* One merge: each object lands at its place, those between move once. */
+void ed_insert_many(ed_level_t *lv, const ed_object_t *const *objs,
+    const size_t *at, size_t n)
+{
+    size_t total = lv->count + n;
+    ed_object_t *merged = sim_xcalloc(total + 1, sizeof(ed_object_t));
+    size_t from = 0;
+    size_t k = 0;
+
+    for (size_t i = 0; i < total; i++) {
+        if (k < n && (at[k] <= i || from == lv->count)) {
+            copy_into(&merged[i], objs[k], objs[k]->id);
+            lv->next_id = objs[k]->id >= lv->next_id ? objs[k]->id + 1
+                : lv->next_id;
+            k += 1;
+        } else {
+            merged[i] = lv->objects[from++];
+        }
+    }
+    free(lv->objects);
+    lv->objects = merged;
+    lv->count = total;
+    lv->cap = total + 1;
+    lv->dirty = lv->dirty || n > 0;
+}
+
 bool ed_remove(ed_level_t *lv, int id)
 {
     ed_object_t *o = ed_find(lv, id);

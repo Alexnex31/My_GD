@@ -306,6 +306,87 @@ static void test_select_in_layer(void)
     ed_level_free(&lv);
 }
 
+/*
+** A change that puts a selected object in another editor layer than the
+** one worked in drops it from the selection: a property step, an undo
+** (11.15). Delete can then never reach another layer.
+*/
+static void test_layer_kept(void)
+{
+    ed_level_t lv;
+    int a;
+
+    begin(&lv);
+    a = add(&lv, "block 100 700 2");
+    add(&lv, "block 300 700 2");
+    ed_set_layer(&lv, 0);
+    ed_select_click(&lv, a, false);
+    ed_gesture(&H);
+    CHECK(ed_prop_step(&lv, &H, ED_PROP_LAYER, 1));
+    CHECK(ed_find(&lv, a)->obj.editor_layer == 1 && ed_selected(&lv) == 0);
+    CHECK(!ed_delete_selected(&lv, &H) && lv.count == 2);
+    ed_set_layer(&lv, 1);
+    ed_select_all(&lv);
+    CHECK(ed_selected(&lv) == 1);
+    CHECK(ed_undo(&lv, &H) && ed_find(&lv, a)->obj.editor_layer == 0);
+    CHECK(ed_selected(&lv) == 0);
+    ed_level_free(&lv);
+}
+
+/* An undo or a redo with nothing to take back computes nothing again. */
+static void test_edits_count(void)
+{
+    ed_level_t lv;
+    unsigned int was;
+
+    begin(&lv);
+    was = H.edits;
+    CHECK(!ed_undo(&lv, &H) && !ed_redo(&lv, &H) && H.edits == was);
+    ed_gesture(&H);
+    add(&lv, "block 100 700 2");
+    CHECK(H.edits == was + 1);
+    CHECK(ed_undo(&lv, &H) && H.edits == was + 2);
+    CHECK(ed_redo(&lv, &H) && H.edits == was + 3);
+    CHECK(!ed_redo(&lv, &H) && H.edits == was + 3);
+    ed_level_free(&lv);
+}
+
+/*
+** Thousands at once: every third deleted and put back, a whole paste
+** taken back, each in one pass, the order exactly as it was.
+*/
+static void test_many(void)
+{
+    ed_clip_t clip = {0};
+    ed_level_t lv;
+    char line[64];
+    char *s0;
+
+    begin(&lv);
+    ed_gesture(&H);
+    for (int i = 0; i < 30000; i++) {
+        snprintf(line, sizeof(line), "block %d %d 2", (i * 37) % 9000,
+            100 + (i % 13) * 50);
+        add(&lv, line);
+    }
+    s0 = state(&lv);
+    for (size_t i = 0; i < lv.count; i += 3)
+        lv.objects[i].selected = true;
+    ed_gesture(&H);
+    CHECK(ed_delete_selected(&lv, &H) && lv.count == 20000);
+    CHECK(ed_undo(&lv, &H) && is_state(&lv, s0));
+    CHECK(ed_redo(&lv, &H) && lv.count == 20000 && ed_undo(&lv, &H));
+    ed_select_all(&lv);
+    CHECK(ed_copy(&lv, &clip));
+    ed_gesture(&H);
+    CHECK(ed_paste(&lv, &H, &clip, (vec2_t){10000.0, 700.0}, 50.0));
+    CHECK(lv.count == 60000);
+    CHECK(ed_undo(&lv, &H) && is_state(&lv, s0));
+    free(s0);
+    ed_clip_free(&clip);
+    ed_level_free(&lv);
+}
+
 /* A drag: from where it was grabbed, the travel snapped, one command. */
 static void test_move(void)
 {
@@ -420,6 +501,9 @@ static void test_clipboard(void)
 void test_edit(void)
 {
     test_select_in_layer();
+    test_layer_kept();
+    test_edits_count();
+    test_many();
     test_undo_redo();
     test_gestures();
     test_random();

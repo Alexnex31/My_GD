@@ -8,10 +8,14 @@
 #ifndef EDITOR_ED_SELECT_H
     #define EDITOR_ED_SELECT_H
 
+    #include <stdint.h>
     #include "editor/ed_history.h"
 
 /* The selection is each object's own flag (FEATURES 11.1). */
 size_t ed_selected(const ed_level_t *lv);
+/* Which objects are selected, as one number: equal keys, same selection
+** (but for a hash's rare collision). What was computed from it is kept. */
+uint64_t ed_selection_key(const ed_level_t *lv);
 void ed_select_none(ed_level_t *lv);
 void ed_select_all(ed_level_t *lv);           /* of the layer worked in */
 /* The editor layer worked in, ED_LAYER_ALL to LEVEL_EDITOR_LAYER_MAX: what

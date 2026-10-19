@@ -85,6 +85,15 @@ ed_object_t *ed_find(ed_level_t *lv, int id);
 ed_object_t *ed_find_from(ed_level_t *lv, int id, size_t *hint);
 /* Puts an object back where it was, with the id it had: an undo (11.7). */
 void ed_insert(ed_level_t *lv, const ed_object_t *o, size_t at);
+/* Every object with one of these ids, in one pass; how many went. */
+size_t ed_remove_ids(ed_level_t *lv, const int *ids, size_t n);
+size_t ed_remove_selected(ed_level_t *lv);
+/*
+** Puts n objects back at once: objs[k] ends at index at[k] of the list
+** after, the at[] increasing. A big delete's undo is one pass.
+*/
+void ed_insert_many(ed_level_t *lv, const ed_object_t *const *objs,
+    const size_t *at, size_t n);
 
 /* In the editor layer worked in: start positions are in all of them. */
 bool ed_in_layer(const ed_level_t *lv, const ed_object_t *o);

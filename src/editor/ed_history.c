@@ -126,6 +126,22 @@ bool ed_do_remove(ed_level_t *lv, ed_history_t *h, int id)
     return ed_remove(lv, id);
 }
 
+/* From the end, so each place kept is the one it had before any left;
+** then the list is compacted once. */
+bool ed_do_remove_selected(ed_level_t *lv, ed_history_t *h)
+{
+    ed_cmd_t *c = NULL;
+
+    for (size_t i = lv->count; i > 0; i--) {
+        if (!lv->objects[i - 1].selected)
+            continue;
+        if (c == NULL)
+            c = record(h, ED_REMOVE);
+        keep_object(c, &lv->objects[i - 1], i - 1);
+    }
+    return ed_remove_selected(lv) > 0;
+}
+
 bool ed_do_place(ed_level_t *lv, ed_history_t *h, const ed_entry_t *e,
     vec2_t at, double grid)
 {
@@ -160,21 +176,58 @@ void ed_do_change(ed_level_t *lv, ed_history_t *h, const int *ids,
     lv->dirty = true;
 }
 
+/* Removed from the end first, each place is the one it had before any left. */
+static bool from_the_end(const ed_cmd_t *c)
+{
+    for (size_t i = 1; i < c->count; i++)
+        if (c->at[i] >= c->at[i - 1])
+            return false;
+    return true;
+}
+
 /*
 ** Removed objects went one after the other, each from the place it then
 ** had: they come back last first, each to that place, and the list is the
-** one it was, order included (the order is what is drawn on top).
+** one it was, order included (the order is what is drawn on top). A delete
+** of the selection went from the end: they all come back in one pass.
 */
 static void put_back(ed_level_t *lv, const ed_cmd_t *c)
 {
-    for (size_t i = c->count; i > 0; i--)
-        ed_insert(lv, &c->objs[i - 1], c->at[i - 1]);
+    const ed_object_t **objs;
+    size_t *at;
+
+    if (!from_the_end(c)) {
+        for (size_t i = c->count; i > 0; i--)
+            ed_insert(lv, &c->objs[i - 1], c->at[i - 1]);
+        return;
+    }
+    objs = sim_xcalloc(c->count + 1, sizeof(ed_object_t *));
+    at = sim_xcalloc(c->count + 1, sizeof(size_t));
+    for (size_t i = 0; i < c->count; i++) {
+        objs[i] = &c->objs[c->count - 1 - i];
+        at[i] = c->at[c->count - 1 - i];
+    }
+    ed_insert_many(lv, objs, at, c->count);
+    free(objs);
+    free(at);
 }
 
 static void take_out(ed_level_t *lv, const ed_cmd_t *c)
 {
+    int *ids = sim_xcalloc(c->count + 1, sizeof(int));
+
     for (size_t i = 0; i < c->count; i++)
-        ed_remove(lv, c->objs[i].id);
+        ids[i] = c->objs[i].id;
+    ed_remove_ids(lv, ids, c->count);
+    free(ids);
+}
+
+/* What a change put in another editor layer can't stay selected (11.15). */
+static void keep_layer(ed_level_t *lv)
+{
+    for (size_t i = 0; i < lv->count; i++)
+        lv->objects[i].selected = lv->objects[i].selected
+            && ed_in_layer(lv, &lv->objects[i]);
 }
 
 static void apply(ed_level_t *lv, const ed_cmd_t *c, bool forward)
@@ -201,6 +254,7 @@ static void apply(ed_level_t *lv, const ed_cmd_t *c, bool forward)
         o->obj = to->obj;
         o->start = to->start;
     }
+    keep_layer(lv);
     lv->dirty = true;
 }
 
@@ -216,14 +270,19 @@ static bool step(ed_level_t *lv, ed_cmd_t *from, size_t *nb_from, ed_cmd_t *to,
     return true;
 }
 
+/* Nothing to undo changes nothing: what was computed still holds. */
 bool ed_undo(ed_level_t *lv, ed_history_t *h)
 {
+    if (!step(lv, h->undo, &h->nb_undo, h->redo, &h->nb_redo, false))
+        return false;
     h->edits += 1;
-    return step(lv, h->undo, &h->nb_undo, h->redo, &h->nb_redo, false);
+    return true;
 }
 
 bool ed_redo(ed_level_t *lv, ed_history_t *h)
 {
+    if (!step(lv, h->redo, &h->nb_redo, h->undo, &h->nb_undo, true))
+        return false;
     h->edits += 1;
-    return step(lv, h->redo, &h->nb_redo, h->undo, &h->nb_undo, true);
+    return true;
 }

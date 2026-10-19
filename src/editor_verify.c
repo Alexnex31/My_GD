@@ -21,13 +21,14 @@ static const sfColor LOUD = {255, 230, 120, 255};
 */
 void editor_measure(editor_t *ed, gd_t *gd)
 {
-    if (ed->measured)
+    if (ed->measured && ed->measured_edits == ed->hist.edits)
         return;
     ed_level_measure(&ed->lv, &ed->end_x, &ed->kill_y);
     ed_check(&ed->lv, &ed->report);
     ed->song_short = ed_song_short_by(&ed->lv, &gd->library, ed->end_x);
     ed->level_seconds = ed_level_seconds(&ed->lv, ed->end_x);
     ed->measured = true;
+    ed->measured_edits = ed->hist.edits;
 }
 
 void editor_verify_start(editor_t *ed)
@@ -87,7 +88,27 @@ void editor_verify_events(editor_t *ed, gd_t *gd)
     verified(ed);
 }
 
-/* N, or a click on the strip: the canvas goes to the next flagged object. */
+/* The next flagged object after `issue_at` in the layer worked in, or NULL. */
+static const ed_object_t *next_in_layer(editor_t *ed)
+{
+    const ed_report_t *r = &ed->report;
+
+    for (size_t k = 0; k < r->count; k++) {
+        int i = (ed->issue_at + 1 + (int)k) % (int)r->count;
+        const ed_object_t *o = ed_find(&ed->lv, r->issues[i].id);
+
+        if (o != NULL && ed_in_layer(&ed->lv, o)) {
+            ed->issue_at = i;
+            return o;
+        }
+    }
+    return NULL;
+}
+
+/*
+** N, or a click on the strip: the canvas goes to the next flagged object.
+** Only those of the layer worked in: another's can't be selected (11.15).
+*/
 void editor_next_issue(editor_t *ed)
 {
     const ed_report_t *r = &ed->report;
@@ -97,11 +118,10 @@ void editor_next_issue(editor_t *ed)
 
     if (r->count == 0)
         return editor_notice(ed, "Nothing looks wrong");
-    ed->issue_at = (ed->issue_at + 1) % (int)r->count;
-    at = &r->issues[ed->issue_at];
-    o = ed_find(&ed->lv, at->id);
+    o = next_in_layer(ed);
     if (o == NULL)
-        return;
+        return editor_notice(ed, "Nothing looks wrong in this layer");
+    at = &r->issues[ed->issue_at];
     ed->cam = (vec2_t){o->obj.rect.x + o->obj.rect.w / 2.0,
         o->obj.rect.y + o->obj.rect.h / 2.0};
     ed_select_none(&ed->lv);

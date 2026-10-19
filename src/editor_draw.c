@@ -315,7 +315,7 @@ static void draw_toolbar(editor_t *ed, gd_t *gd)
     snprintf(text, sizeof(text), "%s%s   -   level %s   -   %zu objects, "
         "%zu selected   -   Grid %.0f   -   Zoom %.0f%%   -   Layer %s",
         ed->lv.hdr.name, ed->lv.dirty ? " *" : "", ed->lv.id, ed->lv.count,
-        ed_selected(&ed->lv), ed->grid, 100.0f / ed->zoom, layer);
+        editor_props(ed)->selected, ed->grid, 100.0f / ed->zoom, layer);
     editor_label(ed, gd, text, 20.0f, 8.0f, 28, sfWhite);
     snprintf(text, sizeof(text), "%s   Ctrl+Z / Ctrl+Y: undo, redo   Wheel, "
         "Ctrl+wheel: view   G: grid   , .: layer   L: song   P: hear it   "

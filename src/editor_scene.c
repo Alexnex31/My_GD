@@ -236,7 +236,6 @@ static void key_press(editor_t *ed, gd_t *gd, const sfEvent *ev)
     if (ed->mouse != ED_IDLE)
         return;
     ed_gesture(&ed->hist);
-    ed->measured = false;
     if (ev->key.control)
         return ctrl_key(ed, gd, ev);
     if (k == sfKeyLeft || k == sfKeyRight || k == sfKeyUp || k == sfKeyDown)
