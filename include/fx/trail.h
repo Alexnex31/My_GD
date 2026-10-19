@@ -24,6 +24,8 @@ typedef struct trail {
     vec2_t pts[TRAIL_CAP];
     size_t n;
     int dir;                  /* the last tick's way: up 1, down -1, level 0  */
+    bool tick_mini;           /* the last tick's slope: mini's is steeper     */
+    bool mini;                /* the player's size after the last tick        */
     bool was_wave;            /* the player was a wave after the last tick    */
 } trail_t;
 

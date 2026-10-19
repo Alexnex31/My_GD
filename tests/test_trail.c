@@ -100,6 +100,27 @@ static void test_portals(void)
     sim_free(&s);
 }
 
+/*
+** A size portal keeps the way but steepens it (10.4): a corner too, where
+** the first tick of the new slope started, the end of the portal's tick.
+*/
+static void test_size_portal(void)
+{
+    sim_t s;
+    trail_t t;
+    vec2_t at = {0};
+
+    load(&s, &t, "start_gamemode wave\nstart_y 780\nmini 700 430 2 on\n" FAR);
+    while (!s.st.player.mini && s.st.tick < 400)
+        run(&s, &t, 1, HELD);
+    CHECK(s.st.player.mini && t.n == 1);
+    at = s.st.player.pos;
+    run(&s, &t, 10, HELD);
+    CHECK(s.st.player.alive && t.n == 2);
+    CHECK(t.pts[1].x == at.x && t.pts[1].y == at.y);
+    sim_free(&s);
+}
+
 /* A new attempt starts a new trail; a death leaves the old one to be drawn. */
 static void test_attempts(void)
 {
@@ -178,6 +199,7 @@ void test_trail(void)
     test_corners();
     test_surfaces();
     test_portals();
+    test_size_portal();
     test_attempts();
     test_capacity();
     test_level_is_level();

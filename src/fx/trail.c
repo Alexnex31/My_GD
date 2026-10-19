@@ -22,11 +22,13 @@ static void push(trail_t *t, vec2_t pt)
     t->n += 1;
 }
 
-static void begin(trail_t *t, vec2_t at)
+static void begin(trail_t *t, const player_t *p)
 {
     t->n = 0;
-    push(t, at);
+    push(t, p->pos);
     t->dir = DIR_UNKNOWN;
+    t->mini = p->mini;
+    t->tick_mini = p->mini;
     t->was_wave = true;
 }
 
@@ -36,7 +38,7 @@ void trail_reset(trail_t *t, const player_t *p)
     t->n = 0;
     t->was_wave = false;
     if (p->mode == MODE_WAVE)
-        begin(t, p->pos);
+        begin(t, p);
 }
 
 /* Which way the tick really went: a wave sliding on a surface goes level. */
@@ -50,9 +52,11 @@ static int tick_dir(const player_t *p)
 }
 
 /*
-** A corner is where the tick that turned started. A portal acts at the end
-** of its tick, so a trail begins where that tick ended, and the tick that
-** leaves wave mode ends it.
+** A corner is where the tick that turned started: a new way, or a new slope
+** after a size portal, which keeps the way. A portal acts at the end of its
+** tick, so a trail begins where that tick ended, the tick after a size
+** portal is the first of the new slope, and the tick that leaves wave mode
+** ends the trail.
 */
 void trail_after_tick(trail_t *t, const player_t *p)
 {
@@ -64,11 +68,14 @@ void trail_after_tick(trail_t *t, const player_t *p)
         return;
     }
     if (!t->was_wave)
-        return begin(t, p->pos);
+        return begin(t, p);
     dir = tick_dir(p);
-    if (t->dir != DIR_UNKNOWN && dir != t->dir)
+    if (t->dir != DIR_UNKNOWN && (dir != t->dir
+        || (dir != 0 && t->mini != t->tick_mini)))
         push(t, p->prev_pos);
     t->dir = dir;
+    t->tick_mini = t->mini;
+    t->mini = p->mini;
 }
 
 /*
