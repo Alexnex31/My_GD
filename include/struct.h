@@ -16,6 +16,7 @@
     #include "sim/progress.h"
     #include "sim/settings.h"
     #include "music/library.h"
+    #include "editor/ed_select.h"
     #include "ui/ui.h"
     #include "level.h"
 
@@ -175,6 +176,8 @@ typedef struct gd {
     settings_t settings;          /* save/settings.txt (FEATURES 2)           */
     sfRectangleShape *ui_shape;   /* the widgets', reused (FEATURES 3)        */
     sfText *ui_text;
+    ed_clip_t clip;               /* the editor's copies: pasted into any level,
+                                     until the game closes (11.6)           */
 } gd_t;
 
 #endif

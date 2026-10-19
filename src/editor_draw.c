@@ -267,14 +267,43 @@ static void draw_canvas(editor_t *ed, gd_t *gd)
             (sfColor){255, 255, 255, 25}, (sfColor){255, 255, 255, 160});
 }
 
+/* Names are UTF-8: a level called "Café" shows as it is typed (7.2). */
+float editor_label_width(editor_t *ed, const char *s, unsigned int size)
+{
+    sfFloatRect b;
+
+    sfText_setUnicodeString(ed->text, utf8_to_utf32(s));
+    sfText_setCharacterSize(ed->text, size);
+    b = sfText_getLocalBounds(ed->text);
+    return b.left + b.width;
+}
+
 void editor_label(editor_t *ed, gd_t *gd, const char *s, float x, float y,
     unsigned int size, sfColor c)
 {
-    sfText_setString(ed->text, s);
+    sfText_setUnicodeString(ed->text, utf8_to_utf32(s));
     sfText_setCharacterSize(ed->text, size);
     sfText_setFillColor(ed->text, c);
     sfText_setPosition(ed->text, (sfVector2f){x, y});
     draw_text(gd, ed->text);
+}
+
+/* Cut, a whole character at a time, and "..." put after: it fits in w. */
+void editor_label_fit(editor_t *ed, gd_t *gd, const char *s, sfVector2f at,
+    float w, unsigned int size, sfColor c)
+{
+    char buf[400];
+    size_t n = 0;
+
+    snprintf(buf, sizeof(buf), "%s", s);
+    n = strlen(buf);
+    while (n > 0 && editor_label_width(ed, buf, size) > w) {
+        do
+            n -= 1;
+        while (n > 0 && ((unsigned char)buf[n] & 0xC0) == 0x80);
+        snprintf(buf + n, sizeof(buf) - n, "%s", "...");
+    }
+    editor_label(ed, gd, buf, at.x, at.y, size, c);
 }
 
 /* One row per thing that can be placed; the first nine have a key. */
@@ -316,12 +345,14 @@ static void draw_toolbar(editor_t *ed, gd_t *gd)
         "%zu selected   -   Grid %.0f   -   Zoom %.0f%%   -   Layer %s",
         ed->lv.hdr.name, ed->lv.dirty ? " *" : "", ed->lv.id, ed->lv.count,
         editor_props(ed)->selected, ed->grid, 100.0f / ed->zoom, layer);
-    editor_label(ed, gd, text, 20.0f, 8.0f, 28, sfWhite);
+    editor_label_fit(ed, gd, text, (sfVector2f){20.0f, 8.0f}, VIEW_W - 40.0f,
+        28, sfWhite);
     snprintf(text, sizeof(text), "%s   Ctrl+Z / Ctrl+Y: undo, redo   Wheel, "
         "Ctrl+wheel: view   G: grid   , .: layer   L: song   P: hear it   "
         "Enter: play   V: verify   Ctrl+S",
         HELP[ed->tool]);
-    editor_label(ed, gd, text, 20.0f, 48.0f, 18, (sfColor){180, 190, 210, 255});
+    editor_label_fit(ed, gd, text, (sfVector2f){20.0f, 48.0f}, VIEW_W - 40.0f,
+        18, (sfColor){180, 190, 210, 255});
     if (ui_now_ms() < ed->notice_until_ms)
         editor_label(ed, gd, ed->notice, ED_PALETTE_W + 30.0f,
             ED_STATUS_Y - 60.0f, 30,

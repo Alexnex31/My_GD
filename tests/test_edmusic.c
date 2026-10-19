@@ -122,7 +122,7 @@ static void test_own_offset(void)
 
     ed_level_new(&lv, "1");
     snprintf(lv.hdr.music, sizeof(lv.hdr.music), "a.ogg");
-    CHECK(text_is(&lv, ED_SONG_OFFSET, "0.50 s, the song's"));
+    CHECK(text_is(&lv, ED_SONG_OFFSET, "0.50 s (song)"));
     CHECK(ed_song_prop_step(&lv, &LIB, ED_SONG_OFFSET, 1, false));
     CHECK(lv.hdr.music_offset == 0.55 && lv.hdr.music_offset_set);
     CHECK(text_is(&lv, ED_SONG_OFFSET, "0.55 s"));    /* no jump to 0.05 */

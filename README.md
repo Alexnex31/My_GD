@@ -161,7 +161,7 @@ With a BPM set in the level's panel, the canvas shows a line at every beat of th
 
 A **playtest** plays the level as it is, saved or not, and records nothing. Escape or a death bring the editor back where the player was (the level's end doesn't stop it: the player runs on), with the path of that attempt drawn as a line until the next edit.
 
-The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects sorted by position, comments and blank lines gone.
+The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects in the order they were placed (later ones are drawn on top), comments and blank lines gone.
 
 **Verify** (V) runs the bot on the level as it is. It answers "found a path", "found no path: furthest 58%" or "undecided", and draws its run as a blue line; with no path, a red cross marks where it got no further and the canvas goes there. It is information only: the bot's search is coarser than a player's and can miss a path, so nothing is ever blocked by it.
 

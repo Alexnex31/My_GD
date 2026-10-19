@@ -25,31 +25,45 @@ void editor_apply_camera(editor_t *ed, gd_t *gd)
         (float)ed->cam.y});
 }
 
-vec2_t editor_mouse_world(editor_t *ed, gd_t *gd)
+/* A window pixel, an event's, in the world. */
+vec2_t editor_px_world(editor_t *ed, gd_t *gd, sfVector2i px)
 {
-    sfVector2i px = sfMouse_getPositionRenderWindow(gd->w);
     sfVector2f at = sfRenderWindow_mapPixelToCoords(gd->w, px, ed->view);
 
     return (vec2_t){at.x, at.y};
 }
 
-bool editor_mouse_on_canvas(gd_t *gd)
+vec2_t editor_mouse_world(editor_t *ed, gd_t *gd)
 {
-    sfVector2i px = sfMouse_getPositionRenderWindow(gd->w);
+    return editor_px_world(ed, gd, sfMouse_getPositionRenderWindow(gd->w));
+}
+
+bool editor_px_on_canvas(gd_t *gd, sfVector2i px)
+{
     sfVector2f at = sfRenderWindow_mapPixelToCoords(gd->w, px, gd->ui_view);
 
     return at.x >= ED_PALETTE_W && at.x < VIEW_W && at.y >= ED_TOOLBAR_H
         && at.y < ED_STATUS_Y;
 }
 
-/* Around the mouse: the world point under the cursor stays under it (11.3). */
-void editor_zoom_at(editor_t *ed, gd_t *gd, float factor)
+bool editor_mouse_on_canvas(gd_t *gd)
+{
+    return editor_px_on_canvas(gd, sfMouse_getPositionRenderWindow(gd->w));
+}
+
+/*
+** Around the mouse: the world point under the cursor stays under it (11.3).
+** Whole steps, so the limits are steps too and 100% is always reached again.
+*/
+void editor_zoom_at(editor_t *ed, gd_t *gd, int steps)
 {
     vec2_t before = editor_mouse_world(ed, gd);
     vec2_t after;
-    float z = ed->zoom * factor;
+    int n = ed->zoom_step + steps;
 
-    ed->zoom = z < ED_ZOOM_MIN ? ED_ZOOM_MIN : (z > ED_ZOOM_MAX ? ED_ZOOM_MAX : z);
+    ed->zoom_step = n < -ED_ZOOM_STEPS ? -ED_ZOOM_STEPS
+        : (n > ED_ZOOM_STEPS ? ED_ZOOM_STEPS : n);
+    ed->zoom = powf(ED_ZOOM_STEP, (float)ed->zoom_step);
     editor_apply_camera(ed, gd);
     after = editor_mouse_world(ed, gd);
     ed->cam.x += before.x - after.x;

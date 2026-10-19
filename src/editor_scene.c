@@ -66,7 +66,6 @@ void editor_free(editor_t *ed)
     ed_verify_free(&ed->verify);
     ed_report_free(&ed->report);
     ed_history_free(&ed->hist);
-    ed_clip_free(&ed->clip);
     ed_grab_cancel(&ed->lv, &ed->grab);
     ed_level_free(&ed->lv);
     free(ed);
@@ -110,8 +109,9 @@ static void wheel(editor_t *ed, gd_t *gd, const sfEvent *ev)
         return;
     if (ctrl)
         return editor_zoom_at(ed, gd,
-            ev->mouseWheelScroll.delta > 0.0f ? 0.8f : 1.25f);
-    if (sfKeyboard_isKeyPressed(sfKeyLShift))
+            ev->mouseWheelScroll.delta > 0.0f ? -1 : 1);
+    if (sfKeyboard_isKeyPressed(sfKeyLShift)
+        || sfKeyboard_isKeyPressed(sfKeyRShift))
         ed->cam.y -= ev->mouseWheelScroll.delta * 200.0 * ed->zoom;
     else
         ed->cam.x -= ev->mouseWheelScroll.delta * 200.0 * ed->zoom;
@@ -135,10 +135,10 @@ static void ctrl_key(editor_t *ed, gd_t *gd, const sfEvent *ev)
         ed_select_all(&ed->lv);
         ed->tool = ED_TOOL_SELECT;
     }
-    if (k == sfKeyC && ed_copy(&ed->lv, &ed->clip))
+    if (k == sfKeyC && ed_copy(&ed->lv, &gd->clip))
         editor_notice(ed, "Copied");
     if (k == sfKeyV && editor_mouse_on_canvas(gd) && ed_paste(&ed->lv,
-        &ed->hist, &ed->clip, editor_mouse_world(ed, gd), ed->grid))
+        &ed->hist, &gd->clip, editor_mouse_world(ed, gd), ed->grid))
         ed->tool = ED_TOOL_SELECT;
     if (k == sfKeyD)
         ed_duplicate(&ed->lv, &ed->hist, ed->grid);
@@ -212,9 +212,11 @@ static void plain_key(editor_t *ed, gd_t *gd, sfKeyCode k)
         ed->grid = ed->grid == 50.0 ? 25.0 : 50.0;
     if (k == sfKeyComma || k == sfKeyPeriod)        /* All, 0, 1, ... (11.15) */
         ed_set_layer(&ed->lv, ed->lv.layer + (k == sfKeyPeriod ? 1 : -1));
-    if (k == sfKeyHome)
-        ed->cam = (vec2_t){ED_CANVAS_W / 2.0 * ed->zoom - 100.0,
-            GROUND_Y - 300.0};
+    if (k == sfKeyHome) {                    /* where it opened, at 100% */
+        ed->zoom = 1.0f;
+        ed->zoom_step = 0;
+        ed->cam = (vec2_t){ED_CANVAS_W / 2.0 - 100.0, GROUND_Y - 300.0};
+    }
 }
 
 /*
@@ -306,7 +308,7 @@ void editor_events(editor_t *ed, gd_t *gd)
         if (ev->type == sfEvtMouseWheelScrolled)
             wheel(ed, gd, ev);
         if (ev->type == sfEvtMouseButtonReleased)
-            editor_mouse_release(ed, gd);
+            editor_mouse_release(ed, gd, ev);
         if (ev->type == sfEvtLostFocus)
             editor_mouse_cancel(ed);
     }

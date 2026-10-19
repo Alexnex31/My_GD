@@ -25,8 +25,8 @@
     #define ED_STATUS_Y (VIEW_H - ED_STATUS_H)
     #define ED_VERIFY_FRAME_MS 10 /* the bot's share of a frame (11.10)      */
     #define ED_VERIFY_SLICE 1000  /* ticks between two looks at the clock    */
-    #define ED_ZOOM_MIN 0.25f
-    #define ED_ZOOM_MAX 4.0f
+    #define ED_ZOOM_STEP 1.25f    /* one wheel notch with Ctrl               */
+    #define ED_ZOOM_STEPS 6       /* each way: 26% to 381%                   */
     #define ED_BIG_STEP 100.0     /* Z, Q, S, D: a whole block               */
     #define ED_REPEAT_DELAY_MS 350    /* a held key waits, then repeats      */
     #define ED_REPEAT_EVERY_MS 60
@@ -63,13 +63,15 @@ typedef enum ed_dialog {
 typedef struct editor {
     ed_level_t lv;
     ed_history_t hist;            /* every edit, to undo and redo            */
-    ed_clip_t clip;
     ed_grab_t grab;               /* the selection, while it is dragged      */
     ed_tool_t tool;
     ed_mouse_t mouse;
-    sfVector2i press_px;          /* where the left button went down         */
+    sfVector2i press_px;          /* where the button went down              */
     vec2_t press_at;              /* the same, in the world                  */
     int press_id;                 /* the object it went down on              */
+    sfMouseButton press_button;   /* only its release ends what it began     */
+    vec2_t stroke_at;             /* a stroke's last point: the next one     */
+    bool stroke_on;               /* paints every cell on the way from it    */
     bool level_panel;             /* L: the level's song and beat (11.11)    */
     bool song_on;                 /* P: its song plays from the canvas       */
     level_t *play;                /* the playtest, while it runs (11.9)      */
@@ -100,6 +102,8 @@ typedef struct editor {
     char path[64];                /* levels/<id>.gd                          */
     vec2_t cam;                   /* the canvas's center, world coordinates  */
     float zoom;                   /* world px per UI px: 2 is zoomed out     */
+    int zoom_step;                /* zoom is ED_ZOOM_STEP to this: 100% is   */
+                                  /* always a few notches away               */
     double grid;                  /* 50 or 25                                */
     sfView *view;                 /* the canvas                              */
     ed_entry_t entries[ED_MAX_ENTRIES];
@@ -130,7 +134,7 @@ void editor_draw(editor_t *ed, gd_t *gd);
 /* editor_mouse.c: the tools */
 void editor_mouse_press(editor_t *ed, gd_t *gd, const sfEvent *ev);
 void editor_mouse_move(editor_t *ed, gd_t *gd, const sfEvent *ev);
-void editor_mouse_release(editor_t *ed, gd_t *gd);
+void editor_mouse_release(editor_t *ed, gd_t *gd, const sfEvent *ev);
 bool editor_mouse_cancel(editor_t *ed);      /* false: nothing to cancel */
 rect_t editor_box(editor_t *ed, gd_t *gd);   /* the selection box, world */
 void editor_notice(editor_t *ed, const char *what);
@@ -140,6 +144,10 @@ void editor_fill(gd_t *gd, editor_t *ed, sfFloatRect r, sfColor c,
     sfColor outline);
 void editor_label(editor_t *ed, gd_t *gd, const char *s, float x, float y,
     unsigned int size, sfColor c);
+float editor_label_width(editor_t *ed, const char *s, unsigned int size);
+/* Ends in "..." where it would run past w. */
+void editor_label_fit(editor_t *ed, gd_t *gd, const char *s, sfVector2f at,
+    float w, unsigned int size, sfColor c);
 
 /* editor_panel.c: the selection's properties, over the canvas's corner */
 const ed_prop_view_t *editor_props(editor_t *ed);
@@ -181,8 +189,10 @@ void editor_play_stop(editor_t *ed, gd_t *gd);
 
 /* editor_canvas.c */
 void editor_apply_camera(editor_t *ed, gd_t *gd);
-vec2_t editor_mouse_world(editor_t *ed, gd_t *gd);
+vec2_t editor_px_world(editor_t *ed, gd_t *gd, sfVector2i px);
+vec2_t editor_mouse_world(editor_t *ed, gd_t *gd);     /* where it is now */
+bool editor_px_on_canvas(gd_t *gd, sfVector2i px);
 bool editor_mouse_on_canvas(gd_t *gd);
-void editor_zoom_at(editor_t *ed, gd_t *gd, float factor);
+void editor_zoom_at(editor_t *ed, gd_t *gd, int steps);   /* + zooms out */
 
 #endif

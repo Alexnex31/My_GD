@@ -55,7 +55,7 @@ void editor_playtest(editor_t *ed, gd_t *gd, bool from_start_position)
     ed_level_doc(&ed->lv, &doc);
     ed->play = level_start_doc(gd, &doc, &ed->lv.hdr, ed->lv.id, at);
     ed_doc_free(&doc);
-    ed->mouse = ED_IDLE;
+    editor_mouse_cancel(ed);                 /* nothing half done under it */
     ed->repeating = false;
     banner(ed->play);
 }

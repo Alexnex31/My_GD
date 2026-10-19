@@ -87,6 +87,7 @@ textures_t *load_textures(void)
 void free_gd(gd_t *gd)
 {
     settings_free(&gd->settings);
+    ed_clip_free(&gd->clip);
     ui_gfx_free(gd);
     progress_free(&gd->progress);
     sfTexture_destroy(gd->atlas);

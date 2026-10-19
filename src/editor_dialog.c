@@ -108,13 +108,9 @@ void editor_dialog_events(editor_t *ed, gd_t *gd)
 
 static void centered(editor_t *ed, gd_t *gd, const char *s, float y)
 {
-    sfFloatRect b;
+    float w = editor_label_width(ed, s, 34);
 
-    sfText_setString(ed->text, s);
-    sfText_setCharacterSize(ed->text, 34);
-    b = sfText_getLocalBounds(ed->text);
-    editor_label(ed, gd, s, VIEW_W / 2.0f - b.width / 2.0f - b.left, y, 34,
-        sfWhite);
+    editor_label(ed, gd, s, VIEW_W / 2.0f - w / 2.0f, y, 34, sfWhite);
 }
 
 void editor_dialog_draw(editor_t *ed, gd_t *gd)

@@ -156,8 +156,8 @@ static void draw_row(editor_t *ed, gd_t *gd, int k, float y)
     editor_fill(gd, ed, (sfFloatRect){MINUS_X, y + 5.0f, BUTTON, BUTTON},
         BUTTON_FILL, sfTransparent);
     editor_label(ed, gd, "-", MINUS_X + 13.0f, y + 6.0f, 26, sfWhite);
-    editor_label(ed, gd, value, MINUS_X + BUTTON + 16.0f, y + 10.0f, 22,
-        sfWhite);
+    editor_label_fit(ed, gd, value, (sfVector2f){MINUS_X + BUTTON + 12.0f,
+        y + 10.0f}, PLUS_X - MINUS_X - BUTTON - 18.0f, 22, sfWhite);
     editor_fill(gd, ed, (sfFloatRect){PLUS_X, y + 5.0f, BUTTON, BUTTON},
         BUTTON_FILL, sfTransparent);
     editor_label(ed, gd, "+", PLUS_X + 11.0f, y + 6.0f, 26, sfWhite);
@@ -174,7 +174,8 @@ void editor_panel_draw(editor_t *ed, gd_t *gd)
     editor_fill(gd, ed, (sfFloatRect){PANEL_X, PANEL_Y, PANEL_W,
         ROW_H * (float)rows(v) + 10.0f}, PANEL, (sfColor){90, 255, 140, 255});
     title(ed, text, sizeof(text));
-    editor_label(ed, gd, text, PANEL_X + 14.0f, PANEL_Y + 12.0f, 22, sfWhite);
+    editor_label_fit(ed, gd, text, (sfVector2f){PANEL_X + 14.0f,
+        PANEL_Y + 12.0f}, PANEL_W - 28.0f, 22, sfWhite);
     for (int k = 0; k < MAX_ROWS; k++) {
         if (!row_applies(v, k))
             continue;

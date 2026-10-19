@@ -179,7 +179,7 @@ void ed_song_prop_text(const ed_level_t *lv, const library_t *lib,
         snprintf(out, size, "%s", lv->hdr.music[0] != '\0' ? "missing"
             : "none");
     if (p == ED_SONG_OFFSET && !lv->hdr.music_offset_set)
-        snprintf(out, size, "%.2f s, the song's", ed_song_offset(lv, lib));
+        snprintf(out, size, "%.2f s (song)", ed_song_offset(lv, lib));
     else if (p == ED_SONG_OFFSET)
         snprintf(out, size, "%.2f s", lv->hdr.music_offset);
     if (p == ED_SONG_BPM)
