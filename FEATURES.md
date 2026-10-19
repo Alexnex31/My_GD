@@ -246,6 +246,7 @@ value   = any chars up to end of line
 | `checkpoint_key` | binding name, or empty | not a jump binding, not Escape, not `restart_key` | `Z` | practice (PLAN 13.1) |
 | `remove_checkpoint_key` | binding name, or empty | not a jump binding, not Escape, not an earlier action key | `X` | practice |
 | `audio_offset_ms` | int | −300–300 | 0 | music sync (4.8) |
+| `editor_<action>` (45 of them: `editor_save`, `editor_undo`, … `editor_entry_9`) | a combination: a key name with `Ctrl+`, `Shift+`, `Alt+` before it in any order (written in that order), or empty | a key, never a mouse or gamepad button, never `Escape` or a modifier alone; no two actions alike | 11.6's table (`include/sim/editor_keys.h`) | editor (11.6) |
 
 ### 2.3 Loading rules
 
@@ -254,6 +255,7 @@ value   = any chars up to end of line
 3. Unknown keys: **keep them** in a list of raw lines and write them back unchanged on save. A newer version's settings survive being opened by an older build.
 4. Missing file: defaults, no warning. Unreadable file (no read permission, a read error, not a regular file): defaults, one warning, and the file is **never overwritten** (`unreadable`), so a permission problem can't turn into lost settings.
 5. Then the action keys, in table order (`restart_key`, `checkpoint_key`, `remove_checkpoint_key`): one that is also a jump binding, or the same as an earlier action key, falls back to its default, or is left unbound if the default is taken too; logged. This runs after the whole file, so the order of the lines doesn't matter.
+6. Then the editor's, the same way among themselves only (they act in another scene than the game's keys): one with the combination of an earlier one falls back to its default, or is left unbound if another action has that. The game's bindings take no modifiers: `restart_key=Ctrl+R` is invalid.
 
 Binding names are SFML's, any case: `A`–`Z`, `Num0`–`Num9`, `Space`, `Up`, `F1`–`F15`, `Numpad0`–`Numpad9` and every other `sfKeyCode` name; `MouseLeft`, `MouseRight`, `MouseMiddle`; `Joy0`–`Joy15`. They live in `include/sim/binding.h` as an X-macro list in `sfKeyCode`'s order, and `input.c` checks each one against `sfKey<name>` with a `_Static_assert`, so the stored codes are SFML's without a translation table. Gamepad buttons are read and saved, but not polled yet: SFML refreshes joysticks while the main thread reads its events, which the input thread (1.3) can't share.
 
@@ -694,7 +696,7 @@ The end-of-level screen shows `♪ Title — Artist (License)`. A Credits screen
 
 ### 5.1 Layout
 
-UI view, 1920×1080. Left column: section tabs (Audio, Gameplay, Controls, Display, Data) at x = 120, one per 110 px. Right area: rows starting at x = 560, y = 200, 100 px apart; label left-aligned, widget right-aligned at x = 1400–1780. Back button bottom-left at (120, 940).
+UI view, 1920×1080. Left column: section tabs (Audio, Gameplay, Controls, Editor, Display, Data) at x = 120, one per 110 px. Right area: rows starting at x = 560, y = 200, 100 px apart; label left-aligned, widget right-aligned at x = 1400–1780. Back button bottom-left at (120, 940).
 
 Keyboard: Up/Down move through rows, Tab / Shift+Tab switch sections, Left/Right change values, Enter activates, Escape = Back.
 
@@ -712,6 +714,8 @@ Keyboard: Up/Down move through rows, Tab / Shift+Tab switch sections, Left/Right
 | Controls | Jump 1–6 | 6 capture rows ("—" when empty); keys, mouse buttons and gamepad buttons | `jump_bindings` | on capture |
 | Controls | Restart | capture | `restart_key` | on capture |
 | Controls | Place / remove checkpoint | 2 capture rows | `checkpoint_key`, `remove_checkpoint_key` | on capture |
+| Editor | Page | cycler: Edit, Move, Blocks and turns, Play, View, Palette | — | the rows below become that page's |
+| Editor | one row per action of the page (9 at most) | combination capture (5.5) | `editor_<action>` | on capture |
 | Display | Fullscreen | toggle | `fullscreen` | 5.4, with confirmation |
 | Display | Window size | cycler: 1280×720, 1600×900, 1920×1080 (only sizes that fit the desktop) | `window_width/height` | 5.4, disabled while fullscreen |
 | Display | VSync | toggle | `vsync` | on change |
@@ -788,6 +792,8 @@ Default focus on **Revert**, so a player who can't see the screen (unsupported m
 
 The left mouse button is a jump binding by default like Space and Up, and can be removed or moved like any other. Clicking the UI always uses the left button, independently of the bindings (1.5).
 
+The editor's rows (11.6) capture a **combination**: "Press a key, with Ctrl, Shift or Alt if you like". A modifier pressed alone, a mouse button, a gamepad button or a click inside the prompt changes nothing: the prompt waits for a key, then takes it with the modifiers held at that moment (Ctrl+Shift+Z is one binding). Escape with any modifier cancels; Backspace alone clears, with a modifier it is a key like another (Ctrl+Backspace). A combination another editor action has swaps the two; the game's keys are not looked at.
+
 ### 5.6 Reset progress
 
 1. Button opens a modal: "Delete all attempts and best percentages? This cannot be undone." Buttons: **Cancel** (focused by default) and Delete.
@@ -815,6 +821,7 @@ Mark settings dirty on every change. On leaving the options screen: save if dirt
 - **Display (5.4):** `window_apply` makes the new window before destroying the old one; a window that didn't open (CSFML always returns one) is a failure: the settings go back and "Display mode not supported" shows. Otherwise the dialog counts down from 10 with Revert focused; Escape and the timeout revert. The new mode is on trial (`display_trial_t`, pure and tested): only Keep marks the settings to be saved, and a game closed during the countdown saves the mode before it. The rows rebuilt after Keep or Revert keep the focus on the row it was on.
 - **Reset (5.6):** the dialog says it deletes song choices too (they live in the same file), with Cancel focused. Nothing is cleared if the backup can't be written. The notice names `progress.txt.bak` only when a copy was written (an empty or missing file has nothing to keep). "Open save folder" says when `xdg-open` couldn't be started.
 - **Saving (5.7):** every change marks the settings dirty (a display change once kept); leaving the screen saves if dirty; quitting saves if dirty, or if `settings.txt` doesn't exist yet (so a first run still writes one to edit).
+- **Editor keys (11.6):** `editor_rebind` (pure, tested) swaps among the editor's own, refuses what `ed_key_bindable` refuses (a mouse button, Escape, a modifier alone), and has no minimum. The rows point into the settings themselves. The toolkit's keybind has a `combo` flag for this, and `ui_event_t` carries the modifiers of a key (`mods`). The Page cycler only asks for the rows to be rebuilt after the events; the focus stays on it.
 - **Not yet:** the audio offset's Calibrate button (it needs a click sound and a flashing square) and joystick polling for jumps (1.3).
 
 ---
@@ -1667,7 +1674,9 @@ void ed_zoom_at(editor_t *ed, gd_t *gd, float factor)
 }
 ```
 
-Wheel: scroll horizontally by 200 px × zoom. Ctrl+wheel: `ed_zoom_at(ed, gd, delta > 0 ? 0.8f : 1.25f)`. Middle-drag or Space+drag: pan by the mouse movement × zoom.
+Wheel: scroll horizontally by 200 px × zoom (Shift, either one: vertically). Ctrl+wheel: `ed_zoom_at(ed, gd, delta > 0 ? 0.8f : 1.25f)`. Middle-drag or Space+drag: pan by the mouse movement × zoom.
+
+As built, the zoom is a whole number of steps, `zoom = 1.25^n` with n from −6 to 6 (26% to 381%), and each notch is one step. Multiplying by 0.8 and clamping to 0.25–4 left the zoom off the ladder once a limit was reached, and 100% could never come back. Home (11.6) goes back to where the level opened, at 100%.
 
 ### 11.4 Grid and snapping
 
@@ -1680,7 +1689,7 @@ Wheel: scroll horizontally by 200 px × zoom. Ctrl+wheel: `ed_zoom_at(ed, gd, de
 **Rotation and size.**
 
 - `R` rotates the selection by +90°, `Shift+R` by −90°: each object's `rotation` changes, and with several objects selected, their positions also rotate around the selection's center (like GD), then snap their top-left to the grid.
-- `[` and `]` rotate by −15° and +15° for free angles; the properties panel takes an exact angle.
+- `T` and `Shift+T` rotate by +15° and −15° for free angles (`[` and `]` at first: an AZERTY keyboard can't type them the way SFML reads keys, 11.6); the properties panel takes an exact angle.
 - The properties panel edits `w` and `h` in grid units (and `size` for square objects). Dragging a handle on a single selected object resizes it in grid steps.
 - Every rotation or resize is one `MODIFY` command (11.7).
 
@@ -1705,30 +1714,49 @@ Wheel: scroll horizontally by 200 px × zoom. Ctrl+wheel: `ed_zoom_at(ed, gd, de
 
 The 4 px threshold stops a slightly shaky click from becoming a 1-grid move.
 
+As built:
+
+- **Only the button that began a gesture ends it**: a stray right click during a left drag commits nothing.
+- **Each mouse event is read at its own pixel**, not at where the cursor is when the frame reads it. A stroke of painting or erasing goes from its last point to the new one half a cell at a time, so a fast swipe between two samples still covers every cell it crossed. When the world moves under a still mouse (the wheel), the stroke starts again from there and is never drawn across the jump.
+- **No stroke under the panel**: over the properties panel the stroke stops, and starts again where it comes out; what it would do there can't be seen.
+- A drag moves the objects again, and the level is measured again (its end, what looks wrong), only when the snapped move changes, not at every mouse event; keys measure again only through an edit (the history's `edits`). Undo or redo with nothing to take back changes nothing, so a playtest's line stays.
+
 Hit test: objects whose **rotated** rect contains the mouse (the point-in-rectangle test in the object's own rotated frame: rotate the mouse point by `-rotation` around the rect's center, then test the unrotated rect). If several, the one drawn **on top** wins, matching what's visible: by Z layer, then Z order, then the later in the editor's list (11.15), which is the canvas's and the game's own order. Only objects of the editor layer worked in can be hit. Linear search is fine for thousands of objects.
 
 ### 11.6 Shortcuts
 
-| Keys | Action |
-|---|---|
-| 1–9 | Pick palette entry |
-| R / Shift+R | Rotate selection +90° / −90° |
-| [ / ] | Rotate selection −15° / +15° |
-| Tab | Toggle Place / Select tool |
-| Delete / Backspace | Delete selection |
-| Arrows | Move selection 1 grid step |
-| Shift+arrows | Move selection 1 px |
-| Ctrl+A | Select all |
-| Ctrl+C / Ctrl+V | Copy / paste at mouse |
-| Ctrl+D | Duplicate selection one grid step to the right |
-| Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) | Undo / redo |
-| Ctrl+S | Save |
-| Enter / Shift+Enter | Playtest from start / from start position |
-| G | Grid 50 / 25 |
-| F3 | Hitboxes (PLAN 9.6) |
-| Escape | Cancel drag / close dialog / leave editor (asks if dirty) |
+Every action is bound to a **combination**: a key with its own Ctrl, Shift and Alt, so S and Ctrl+S are two bindings. They are settings (`editor_<action>`, 2.2), rebound in the options' Editor section (5.2, 5.5), and the defaults below are the table in `include/sim/editor_keys.h` (name, label, page, key, modifiers, whether holding it repeats). A key press is the action whose combination is exactly the key with the modifiers held (`ed_key_find`).
+
+| Default | Action | Holding repeats |
+|---|---|---|
+| Ctrl+S | Save | |
+| Ctrl+Z / Ctrl+Y | Undo / redo | yes |
+| Ctrl+A | Select all (of the editor layer) | |
+| Ctrl+C / Ctrl+V | Copy / paste at the mouse; the copies stay until the game closes, for any level | |
+| Ctrl+D | Duplicate the selection one grid step to the right | |
+| Delete | Delete the selection | |
+| Tab | Place / Select tool | |
+| Arrows | Move the selection 1 grid step; with nothing selected, Up and Down go through the palette | yes |
+| Shift+arrows | Move the selection 1 px | yes |
+| Q, D, Z, S | Move the selection a block (100 px) left, right, up, down | yes |
+| R / Shift+R | Turn the selection +90° / −90° | |
+| T / Shift+T | Turn the selection +15° / −15° | yes |
+| Enter / Shift+Enter | Playtest from the start / from a start position | |
+| P | Hear the song from here | |
+| V | Verify | |
+| N | Next warning, of the editor layer | |
+| L | The level's panel | |
+| G | Grid 50 / 25 | |
+| Page Down / Page Up | Editor layer: All, 0, 1… | |
+| Home | Back to the level's start, at 100% | |
+| F1 | The list of every key, as bound | |
+| 1–9 (the number row) | Palette entry 1 to 9 | |
+| Escape (fixed) | Close the key list / cancel drag / drop the selection / leave (asks if dirty) | |
+| F3 (fixed, in a playtest) | Hitboxes (PLAN 9.6) | |
 
 Keyboard shortcuts don't fire while a text field has focus (level name, typed coordinates).
+
+**Why rebindable (2026-10-19).** The first keys used `,` `.` for the editor layer and `[` `]` for 15-degree turns. SFML 2.6 on X11 reports a key by its first, unshifted symbol: on a French AZERTY keyboard `.` (Shift + the `;` key) arrives as Semicolon, `[` (AltGr+5) as Num5, which picked a palette entry, and `]` as nothing. The defaults now use letters, arrows and named keys only, the number row included (its keys arrive as Num1–Num9 on both layouts), and every player can change them. The wheel and the mouse buttons keep their fixed meanings (11.3, 11.5).
 
 ### 11.7 Undo and redo
 
@@ -1758,6 +1786,8 @@ Rules:
 1. Every edit goes through `editor_do(ed, cmd)`: apply, push on the undo stack, **free and clear the redo stack**, set `dirty`.
 2. `undo`: pop, apply the inverse, push on redo. `redo`: the reverse.
 3. One user gesture = one command: a drag, a paste, a multi-object property change.
+
+As built: an undo or a redo with nothing to take back is no edit (the history's `edits` doesn't move, so what was computed from the level, a playtest's line included, stays). A command of thousands of objects is applied in one pass: a delete of the selection records them from the end, so each one's place is the one it had before any left, and its undo merges them all back at once (`ed_insert_many`); taking out a paste's copies, or a delete's on redo, compacts the list once (`ed_remove_ids`). Undoing a paste of 30 000 objects took 9 s one by one.
 4. Removed objects keep their ids, so an undo brings back the *same* objects (and a later redo of a MOVE still finds them).
 5. Stack capped at 256 commands; when full, free the oldest.
 6. Commands own their arrays; freeing a command frees them.
@@ -1810,12 +1840,14 @@ Music: `music_play_from(offset + ed_time_at_x(x) + audio_offset)`.
 ### 11.9 Playtest
 
 1. Build a sorted `sim_t` from the editor objects (`sim_init`), excluding `start` objects.
-2. Reset from the level start, or from the start position (Shift+Enter).
+2. Reset from the level start, or from the start position (Shift+Enter, 11.6).
 3. Run the normal level loop (PLAN 3.6) inside the editor scene, with a banner "Playtest — Esc to stop". Progress is **not** saved.
 4. Record the player's position every 4 ticks into a path array.
 5. On death: show the explosion for the usual delay, then return to the editor with the camera centered on the death point.
 6. On completion or Escape: return to the editor.
 7. In the editor, draw the recorded path as a thin line until the next edit. It shows exactly where jumps happen and how close hazards are: most of level design is reading this line.
+
+As built: a playtest plays the level's own song, as P and the level panel do, never a song the player chose for the level in the level list (4.4). The window losing the focus ends it like Escape ("Playtest stopped: the window lost the focus"): the keys are someone else's, and a run left going would come back dead. The banner doesn't hide a "Song missing" notice, and the cursor isn't drawn over it, as in a level.
 
 ### 11.10 Verify (bot)
 
@@ -1873,6 +1905,8 @@ Draw only beats in view: compute `k_min` and `k_max` from the view's left and ri
 Autosave: every 60 s if dirty, and before every playtest, write to `save/editor_autosave/<file>` (not over the real file). When opening a level whose autosave is newer than the level file, ask "Restore unsaved changes from <time>?". Delete the autosave after a successful normal save.
 
 Leaving with unsaved changes: dialog "Save changes to <name>?" with Save / Discard / Cancel (focused).
+
+As built: the list of levels holds every file of `levels/` (it stopped at 256, in directory order, so a new level could be given an id that existed, and its first save wrote over that level). A new level's id is checked against `levels/` once more when it is created, and its first save refuses to replace a file that appeared since. A save makes `levels/` when it isn't there (a fresh install). A level that can't be opened says so on the list ("Could not open levels/30.gd"), and the list is read again.
 
 ### 11.13 Validation shown in the editor
 
@@ -1950,6 +1984,14 @@ Show counts in the toolbar; clicking cycles the camera through the flagged objec
 - **Tests:** `tests/test_edcheck.c` (each warning and hint with the cases right beside it that must say nothing, the order, the song's length; a path found, no path and undecided with the line each leaves and where it stops, the search stopped half way; the autosave written beside the file, newer, older, with no level file, restored and removed) and in `tests/test_bot.c` the furthest run played again and a search in steps of three giving exactly what one call gives.
 - **Checked in a window:** a level with a wall too tall says "Bot found no path: furthest 58%" with the canvas and the cross at the wall; N and a click on the strip go through 2 warnings and 2 hints; the leave dialog's three answers; the autosave after 60 s and after closing the window, the restore dialog and both its answers; "Undecided" with its count going up while it searches.
 
+### 11.13h As built: after the review of the editor's window (2026-10-19)
+
+- **The properties panel** is found in one pass over the level (`ed_prop_view`: every row, whether it applies and its value or "mixed") and kept while the selection (`ed_selection_key`, a hash of the selected ids) and the edit count are the same. It cost 5.9 ms a frame with 10 000 objects selected, 19 ms with 30 000; the toolbar's count comes from it too.
+- **Text:** the editor's labels read UTF-8 (a level called "Café" shows as typed, in the toolbar and the leave dialog), and a value too long for its place ends in "..." (`editor_label_fit`): the panel's values, the song title, the toolbar's two lines. The offset the song gives reads "0.50 s (song)".
+- **The clipboard** belongs to the game, not to one editor: copies made in one level paste into another, until the game closes.
+- **P past the song's end** says so before anything is loaded: the menu song goes on.
+- **Tests:** `tests/test_edit.c` (a step of the Layer row and an undo drop the selection outside the layer; undo and redo with nothing count no edit; 30 000 objects, every third deleted and put back, a whole paste taken back, the list exactly as it was), `tests/test_props.c` (the panel's rows in one pass), `tests/test_settings.c`, `tests/test_options.c` and `tests/test_ui.c` (the editor's keys: names, defaults, the file, swaps, the combination prompt).
+
 ### 11.14 Stages
 
 | Stage | Contents | Done when |
@@ -1971,7 +2013,7 @@ As in GD, as the user described it:
 - **Z layer**: B5, B4, B3, B2, B1 are drawn behind the player, T1, T2, T3, T4 in front of it, each over the ones before. An object with a hitbox the player cares about starts on **T1**; a background object that is only a picture (none exist yet) will start on **B1**. There is **no order between object types**: a spike isn't drawn over a block because it is a spike.
 - **Z order**: a whole number, 0 by default for every object; inside a Z layer the higher is drawn over.
 - **Ties**: same Z layer and Z order, the object **placed last** is on top. The file keeps the objects in the order they were placed (PLAN 7.2), the editor's list is that order, and a removed object comes back to its place on undo.
-- **Editor layer**: a number from 0, the editor's only. With one chosen (`,` and `.` go through All, 0, 1, 2…; the toolbar shows it), the objects of the other layers are drawn faint and can't be clicked, box-selected, selected with Ctrl+A or erased. Placed, pasted and duplicated objects go into the chosen layer. Start positions are in every layer. Choosing a layer drops the selection outside it.
+- **Editor layer**: a number from 0, the editor's only. With one chosen (Page Down and Page Up go through All, 0, 1, 2…, 11.6; the toolbar shows it), the objects of the other layers are drawn faint and can't be clicked, box-selected, selected with Ctrl+A or erased. Placed, pasted and duplicated objects go into the chosen layer. Start positions are in every layer. Choosing a layer drops the selection outside it, and so does anything that puts a selected object in another layer: its Layer row in the panel, an undo or a redo. N only goes to the flagged objects of the layer worked in ("Nothing looks wrong in this layer" when the others have them all).
 - The file: `zl=b5`…`zl=t4`, `z=<n>`, `el=<n>`, each written only when not its default (PLAN 7.2). The properties panel steps all three (Z layer, Z order, Layer), each step one undo step; a start position has none of them. The game draws by Z layer, then Z order, then line; the editor's canvas and click by Z layer, then Z order, then place in the list: the same order (PLAN 9.2). The simulation never reads any of them: a T4 spike kills exactly like a T1 one. Two objects are "twice in the same place" (`object_same`, in `src/sim/modes.c`) only when everything the game sees matches, kind fields and Z layer and order included; the editor's placement, its level check and `--check` all use that one test, and `--check` finds every copy wherever it is in the level, a column of blocks at one x included.
 - The order is pure and tested: `src/fx/draw_order.c` builds it once per level (the draw order, the chunks) and gathers what is in view each frame; `tests/test_draw_order.c` checks, on random levels seen from random places, that nothing in view is missed, that the order is the draw order and never the array's (which is sorted by x), and that what is behind the player comes first. `src/level_chunks.c` only keeps the vertices.
 

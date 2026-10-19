@@ -99,18 +99,21 @@ show_progress_bar=1
 show_attempts=1
 jump_bindings=Space,Up,MouseLeft,Joy0
 restart_key=R
+editor_redo=Ctrl+Shift+Z   # the editor's: a key with Ctrl, Shift or Alt
 ```
 
 - **Key names** are SFML's: `A`–`Z`, `Num0`–`Num9`, `Space`, `Up`, `LShift`, `F1`–`F15`, `Numpad0`–`Numpad9` and the rest of `sfKeyCode`; `MouseLeft`, `MouseRight`, `MouseMiddle`; `Joy0`–`Joy15`. Case doesn't matter. Up to 6 jump inputs.
 - An empty `restart_key=` unbinds it. `Escape` can't be bound, and a key can't both jump and restart.
+- The editor's shortcuts are `editor_<action>=` lines, one each: a key, with `Ctrl+`, `Shift+` and `Alt+` before it in any order, never a mouse button, `Escape` or a modifier alone. Two actions with the same combination: the one the game writes second goes back to its default (or is left unbound if that's taken too), whatever the order of the lines. The game's keys take no modifiers.
 - An invalid value keeps its default, with a warning naming the line. Unknown keys are kept and written back; comments aren't.
 - If the file exists but can't be read, the game uses the defaults and never overwrites it. The same goes for `save/progress.txt`: an unreadable one is left alone, and that session's progress isn't saved.
 - `sfx_volume`, `menu_song`, `checkpoint_key`, `remove_checkpoint_key` and `audio_offset_ms` are read and kept for the features that will use them. Gamepad buttons are read but not polled yet.
 
 The full list is in `FEATURES.md` 2.2. The **options screen** (the main menu's options button) edits them, with the keyboard or the mouse:
 
-- **Sections:** Audio, Gameplay, Controls, Display and Data, switched with `Tab` / `Shift+Tab` or a click. `Up`/`Down` move through the rows, `Left`/`Right` change a value, `Enter` activates, `Escape` goes back and saves what changed.
+- **Sections:** Audio, Gameplay, Controls, Editor, Display and Data, switched with `Tab` / `Shift+Tab` or a click. `Up`/`Down` move through the rows, `Left`/`Right` change a value, `Enter` activates, `Escape` goes back and saves what changed.
 - **Controls:** activate a row, then press any key, mouse button or gamepad button. `Escape` or the Cancel button cancels, `Backspace` or the Clear button clears, a click outside the prompt cancels. An input another row has swaps the two rows, and the last key or mouse button that jumps can't be removed (gamepads aren't read for jumps yet).
+- **Editor:** the editor's shortcuts, a page at a time (the Page row chooses which: Edit, Move, Blocks and turns, Play, View, Palette). Each is a whole combination: hold Ctrl, Shift or Alt, then press the key, and the prompt takes them together, so `S` and `Ctrl+S` are two shortcuts. Only keys: the mouse buttons are the canvas's, and `Escape` always cancels. A combination another action has swaps the two; the game's keys are another matter, so `R` can restart a level and turn in the editor.
 - **Display:** a new fullscreen setting or window size asks to be kept, and reverts by itself after 10 s, so an unsupported mode fixes itself. It is saved only once kept: closing the game during the countdown keeps the old one.
 - **Data:** Reset progress asks first, and keeps the old file as `save/progress.txt.bak` (a reset of an empty store leaves the last `.bak` alone). Open save folder opens `save/` and prints its path.
 
@@ -120,38 +123,48 @@ The third button of the main menu opens it: a list of the levels to open, and a 
 
 Two tools, `Tab` switches between them: **Place** and **Select**.
 
+The mouse:
+
 | Input | Action |
 |---|---|
-| Left click, or drag (Place) | Place the palette's entry in the cell under the mouse (and drop the selection) |
+| Left click, or drag (Place) | Place the palette's entry in each cell the mouse goes through (and drop the selection) |
 | Left click (Select) | Select the object; with Shift, add or remove it |
 | Left drag from an object (Select) | Move the selection, by grid steps |
 | Left drag from nothing (Select) | A box: selects what it touches; with Shift, adds it |
 | Right click, or drag | Delete what is under the mouse |
-| Arrows / Shift+arrows | Move the selection a grid step / one pixel |
+| A click on the palette | Choose what to place |
+| Wheel / Shift+wheel | Scroll along the level / up and down |
+| Ctrl+wheel | Zoom around the mouse, by steps, 26% to 381% |
+| Middle button, or Space and drag | Pan |
+
+The keys, as they are by default. Every one can be changed in the options' **Editor** section, to any key with any of Ctrl, Shift and Alt (`settings.txt` writes them `editor_save=Ctrl+S`), and **F1** lists them all as they are set. They avoid punctuation keys, which an AZERTY keyboard can't type the way the game reads them.
+
+| Keys | Action |
+|---|---|
+| Arrows / Shift+arrows | Move the selection a grid step / one pixel; with nothing selected, Up and Down go through the palette |
 | Z, Q, S, D | Move the selection a whole block (100 px) up, left, down, right |
 | R / Shift+R | Turn the selection 90 degrees (several objects turn as one piece) |
-| `[` / `]` | Turn it 15 degrees |
-| Delete or Backspace | Delete the selection |
+| T / Shift+T | Turn it 15 degrees |
+| Delete | Delete the selection |
 | Ctrl+A | Select everything |
-| Ctrl+C / Ctrl+V | Copy the selection / paste it at the mouse |
+| Ctrl+C / Ctrl+V | Copy the selection / paste it at the mouse, in this level or another one |
 | Ctrl+D | Duplicate the selection one grid step to the right |
-| Ctrl+Z / Ctrl+Y or Ctrl+Shift+Z | Undo / redo, 256 steps |
-| 1 to 9, Up / Down with nothing selected, or a click on the palette | Choose what to place |
-| Wheel / Shift+wheel | Scroll along the level / up and down |
-| Ctrl+wheel | Zoom around the mouse, 25% to 400% |
-| Middle button, or Space and drag | Pan |
+| Ctrl+Z / Ctrl+Y | Undo / redo, 256 steps |
+| 1 to 9 (the number row, no Shift needed) | Choose one of the palette's first nine entries |
 | G | Grid 50 / 25 |
-| , / . | Editor layer: All, 0, 1, 2… (the others fade and can't be picked) |
+| Page Down / Page Up | Editor layer: All, 0, 1, 2… (the others fade and can't be picked) |
+| Home | Back to the level's start, at 100% |
 | L | The level's panel: its song, offset, BPM and first beat (Shift+click: bigger steps) |
 | P | Hear the level's song from the middle of the canvas; again to stop |
 | Enter | Playtest from the level's start |
 | Shift+Enter | Playtest from a start position: the selected one, or the last one before the middle of the canvas |
 | V | Verify: the bot looks for a way through the level (Escape stops it) |
-| N, or a click on the strip at the bottom | Go to the next object that looks wrong |
+| N, or a click on the strip at the bottom | Go to the next object of this editor layer that looks wrong |
 | Ctrl+S | Save |
-| Escape | Cancel a drag or end a stroke, then drop the selection, then leave (asks to save, discard or cancel if there are unsaved changes) |
+| F1 | The list of every key |
+| Escape (not a setting) | Close the list of keys, cancel a drag or end a stroke, then drop the selection, then leave (asks to save, discard or cancel if there are unsaved changes) |
 
-Holding a move key, Ctrl+Z or Ctrl+Y repeats it.
+Holding a move, a 15-degree turn, undo or redo repeats it.
 
 With something selected, a panel in the canvas's top right corner shows its properties, each with a minus and a plus: turn (15 degrees), width and height (grid units), kind (a portal's mode, a pad's or an orb's colour, a gravity portal's direction). Every object also has its Z layer (B5 to T4: behind or in front of the player), its Z order (higher is on top) and its editor layer. A saw stays round: its width and height change together. A speed portal has a speed row instead of a kind.
 
@@ -159,7 +172,7 @@ With something selected, a panel in the canvas's top right corner shows its prop
 
 With a BPM set in the level's panel, the canvas shows a line at every beat of the song, every fourth one brighter. While the song plays (P), a pink line shows where it is in the level and the canvas follows it.
 
-A **playtest** plays the level as it is, saved or not, and records nothing. Escape or a death bring the editor back where the player was (the level's end doesn't stop it: the player runs on), with the path of that attempt drawn as a line until the next edit.
+A **playtest** plays the level as it is, saved or not, with the level's own song (not a song you chose for it in the level list), and records nothing. Escape, a death, or the window losing the focus bring the editor back where the player was (the level's end doesn't stop it: the player runs on), with the path of that attempt drawn as a line until the next edit.
 
 The white line is the ground, the green one the level's end, the red one the kill ceiling of a flipped player. A save rewrites the file: objects in the order they were placed (later ones are drawn on top), comments and blank lines gone.
 
