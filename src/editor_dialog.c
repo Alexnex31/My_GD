@@ -76,14 +76,19 @@ static void answer_leave(editor_t *ed, int answer)
 
 /* Restored, the level is the autosave's, with unsaved changes: nothing of
 ** the file is lost until Ctrl+S. */
-static void answer_restore(editor_t *ed, int answer)
+static void answer_restore(editor_t *ed, gd_t *gd, int answer)
 {
+    char key[BINDING_NAME_MAX];
+    char text[96];
+
     if (answer == 2)
         return ed_autosave_remove(ED_AUTOSAVE_DIR, ed->lv.id);
     if (ed_autosave_restore(&ed->lv, ED_AUTOSAVE_DIR) != 0)
         return editor_notice(ed, "The autosave could not be read");
     ed->measured = false;
-    editor_notice(ed, "Restored: Ctrl+S saves it, leaving can still discard it");
+    snprintf(text, sizeof(text), "Restored: %s saves it, leaving can still "
+        "discard it", editor_key_name(gd, ED_KEY_SAVE, key, sizeof(key)));
+    editor_notice(ed, text);
 }
 
 void editor_dialog_events(editor_t *ed, gd_t *gd)
@@ -103,7 +108,7 @@ void editor_dialog_events(editor_t *ed, gd_t *gd)
     if (which == ED_DIALOG_LEAVE)
         answer_leave(ed, ed->answer);
     else
-        answer_restore(ed, ed->answer);
+        answer_restore(ed, gd, ed->answer);
 }
 
 static void centered(editor_t *ed, gd_t *gd, const char *s, float y)

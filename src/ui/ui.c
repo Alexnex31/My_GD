@@ -10,7 +10,7 @@
 
 #include "ui/ui.h"
 
-static const binding_t NO_KEY = {BIND_NONE, 0};
+static const binding_t NO_KEY = {BIND_NONE, 0, 0};
 
 bool ui_rect_contains(ui_rect_t r, float x, float y)
 {
@@ -343,17 +343,38 @@ static bool cancels(const ui_event_t *ev)
         ev->x, ev->y) || !ui_rect_contains(UI_CAPTURE_PANEL, ev->x, ev->y));
 }
 
-static bool clears(const ui_event_t *ev)
+/* Backspace alone: with a modifier, a combination may be it. */
+static bool clears(const ui_event_t *ev, bool combo)
 {
-    return is_key(ev->input, KEY_Backspace) || (is_left_click(ev->input)
-        && ui_rect_contains(UI_CAPTURE_CLEAR, ev->x, ev->y));
+    if (is_key(ev->input, KEY_Backspace))
+        return !combo || ev->mods == 0;
+    return is_left_click(ev->input)
+        && ui_rect_contains(UI_CAPTURE_CLEAR, ev->x, ev->y);
+}
+
+static bool is_modifier_key(binding_t b)
+{
+    return b.kind == BIND_KEY && (b.code == KEY_LControl
+        || b.code == KEY_LShift || b.code == KEY_LAlt || b.code == KEY_LSystem
+        || b.code == KEY_RControl || b.code == KEY_RShift
+        || b.code == KEY_RAlt || b.code == KEY_RSystem);
+}
+
+/* A combination's prompt waits through a modifier, a click on nothing, a
+** gamepad: none of them is a combination. */
+static bool waits(const ui_event_t *ev, bool combo)
+{
+    if (!combo || cancels(ev) || clears(ev, combo))
+        return false;
+    return ev->input.kind != BIND_KEY || is_modifier_key(ev->input);
 }
 
 /*
 ** The modal of a keybind (5.5): Escape cancels, Backspace clears, and so do
 ** its two buttons; any other key, mouse button or gamepad button is the
 ** result, the left button clicked inside the prompt. Only presses count, so
-** the click that opened it doesn't.
+** the click that opened it doesn't. A combination's (11.6) is the first
+** key that isn't a modifier, with the modifiers held then.
 */
 static void capture_event(ui_screen_t *ui, const ui_event_t *ev)
 {
@@ -364,13 +385,15 @@ static void capture_event(ui_screen_t *ui, const ui_event_t *ev)
         ui->mouse_x = ev->x;                 /* the prompt's buttons light up */
         ui->mouse_y = ev->y;
     }
-    if (ev->kind != UI_PRESS)
+    if (ev->kind != UI_PRESS || waits(ev, w->combo))
         return;
     ui->capturing = -1;
     if (cancels(ev))
         return;
-    if (clears(ev))
+    if (clears(ev, w->combo))
         b = NO_KEY;
+    else if (w->combo)
+        b.mods = ev->mods;
     if (w->on_capture != NULL)
         return w->on_capture(ui->ctx, w, b);
     if (w->binding != NULL && !binding_equal(*w->binding, b)) {

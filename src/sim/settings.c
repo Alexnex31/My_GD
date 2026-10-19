@@ -24,7 +24,8 @@ typedef enum setting_type {
     ST_BOOL,
     ST_FILE,                      /* a plain file name, no folder            */
     ST_BINDING,
-    ST_BINDINGS
+    ST_BINDINGS,
+    ST_COMBO                      /* an editor shortcut: a key and modifiers */
 } setting_type_t;
 
 typedef struct setting_def {
@@ -39,6 +40,8 @@ typedef struct setting_def {
 static const int FPS_CHOICES[] = {0, 60, 120, 144, 240, -1};
 
 #define FIELD(name) offsetof(settings_t, name)
+#define ED_KEY_SETTING(id, name, label, page, key, mods, rep) \
+    {"editor_" name, ST_COMBO, FIELD(editor_keys[ED_KEY_##id]), 0, 0, NULL},
 
 /* A new setting is one line here, one field and one default (2.3). */
 static const setting_def_t DEFS[] = {
@@ -60,6 +63,7 @@ static const setting_def_t DEFS[] = {
     {"remove_checkpoint_key", ST_BINDING, FIELD(remove_checkpoint_key), 0, 0,
         NULL},
     {"audio_offset_ms", ST_INT, FIELD(audio_offset_ms), -300, 300, NULL},
+    ED_KEY_LIST(ED_KEY_SETTING)
 };
 
 #define NB_DEFS (sizeof(DEFS) / sizeof(DEFS[0]))
@@ -71,7 +75,7 @@ static const size_t ACTION_KEYS[] = {
 
 #define NB_ACTION_KEYS (sizeof(ACTION_KEYS) / sizeof(ACTION_KEYS[0]))
 
-static const binding_t ESCAPE = {BIND_KEY, KEY_Escape};
+static const binding_t ESCAPE = {BIND_KEY, KEY_Escape, 0};
 
 void settings_defaults(settings_t *s)
 {
@@ -85,12 +89,14 @@ void settings_defaults(settings_t *s)
         .show_percent = true,
         .show_progress_bar = true,
         .show_attempts = true,
-        .jump_bindings = {{{BIND_KEY, KEY_Space}, {BIND_KEY, KEY_Up},
-            {BIND_MOUSE, MOUSE_Left}, {BIND_JOY, 0}}, 4},
-        .restart_key = {BIND_KEY, KEY_R},
-        .checkpoint_key = {BIND_KEY, KEY_Z},
-        .remove_checkpoint_key = {BIND_KEY, KEY_X},
+        .jump_bindings = {{{BIND_KEY, KEY_Space, 0}, {BIND_KEY, KEY_Up, 0},
+            {BIND_MOUSE, MOUSE_Left, 0}, {BIND_JOY, 0, 0}}, 4},
+        .restart_key = {BIND_KEY, KEY_R, 0},
+        .checkpoint_key = {BIND_KEY, KEY_Z, 0},
+        .remove_checkpoint_key = {BIND_KEY, KEY_X, 0},
     };
+    for (int k = 0; k < ED_KEY_COUNT; k++)
+        s->editor_keys[k] = ed_key_default((ed_key_t)k);
 }
 
 bool bindings_contain(const bindings_t *b, binding_t one)
@@ -145,13 +151,28 @@ static bool valid_file_name(const char *v)
     return true;
 }
 
-/* "" is unbound. Escape is the pause, it can't be bound to anything. */
+/*
+** "" is unbound. Escape is the pause, it can't be bound to anything. The
+** game's inputs are single: no modifiers.
+*/
 static bool parse_binding(const char *v, binding_t *out)
 {
-    binding_t b = {BIND_NONE, 0};
+    binding_t b = {BIND_NONE, 0, 0};
 
-    if (v[0] != '\0' && (!binding_parse(v, &b) || binding_equal(b, ESCAPE)))
+    if (v[0] != '\0' && (!binding_parse(v, &b) || binding_equal(b, ESCAPE)
+        || b.mods != 0))
         return false;                        /* `out` untouched: the default stays */
+    *out = b;
+    return true;
+}
+
+/* An editor shortcut: "" or a key with modifiers (ed_key_bindable). */
+static bool parse_combo(const char *v, binding_t *out)
+{
+    binding_t b = {BIND_NONE, 0, 0};
+
+    if (v[0] != '\0' && (!binding_parse(v, &b) || !ed_key_bindable(b)))
+        return false;
     *out = b;
     return true;
 }
@@ -218,6 +239,8 @@ static bool parse_value(settings_t *s, const setting_def_t *d, const char *v)
         return parse_binding(v, field(s, d));
     case ST_BINDINGS:
         return parse_bindings(v, field(s, d));
+    case ST_COMBO:
+        return parse_combo(v, field(s, d));
     }
     return false;
 }
@@ -240,6 +263,7 @@ static void format_value(const settings_t *s, const setting_def_t *d,
         snprintf(buf, size, "%s", (const char *)cfield(s, d));
         return;
     case ST_BINDING:
+    case ST_COMBO:
         binding_format(*(const binding_t *)cfield(s, d), buf, size);
         return;
     case ST_BINDINGS:
@@ -354,9 +378,45 @@ static void check_action_keys(settings_t *s, sim_log_fn log)
         if (!action_taken(s, k, *b))
             continue;
         binding_format(*b, name, sizeof(name));
-        *b = action_taken(s, k, *def) ? (binding_t){BIND_NONE, 0} : *def;
+        *b = action_taken(s, k, *def) ? (binding_t){BIND_NONE, 0, 0} : *def;
         snprintf(msg, sizeof(msg), "%s: %s=%s is already used, %s",
             s->path, def_at(ACTION_KEYS[k])->key, name,
+            b->kind == BIND_NONE ? "unbound" : "using its default");
+        say(log, msg);
+    }
+}
+
+/*
+** Two editor actions can't share a combination: the later one falls back to
+** its default, or is left unbound if that's taken too. The game's keys are
+** another place: the editor's can be the same.
+*/
+static bool editor_taken(const settings_t *s, int k, binding_t b)
+{
+    for (int j = 0; j < ED_KEY_COUNT && b.kind != BIND_NONE; j++)
+        if (j != k && binding_equal(s->editor_keys[j], b))
+            return true;
+    return false;
+}
+
+static void check_editor_keys(settings_t *s, sim_log_fn log)
+{
+    char msg[MSG_LEN];
+    char name[BINDING_NAME_MAX];
+
+    for (int k = 1; k < ED_KEY_COUNT; k++) {
+        binding_t *b = &s->editor_keys[k];
+        binding_t def = ed_key_default((ed_key_t)k);
+        bool earlier = false;
+
+        for (int j = 0; j < k && b->kind != BIND_NONE; j++)
+            earlier = earlier || binding_equal(s->editor_keys[j], *b);
+        if (!earlier)
+            continue;
+        binding_format(*b, name, sizeof(name));
+        *b = editor_taken(s, k, def) ? (binding_t){BIND_NONE, 0, 0} : def;
+        snprintf(msg, sizeof(msg), "%s: editor_%s=%s is already used, %s",
+            s->path, ed_key_name((ed_key_t)k), name,
             b->kind == BIND_NONE ? "unbound" : "using its default");
         say(log, msg);
     }
@@ -398,6 +458,7 @@ int settings_load(settings_t *s, const char *path, sim_log_fn log)
     read_lines(s, text, log);
     free(text);
     check_action_keys(s, log);
+    check_editor_keys(s, log);
     return 0;
 }
 

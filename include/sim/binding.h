@@ -35,7 +35,7 @@
     #define MOUSE_LIST(m) m(Left) m(Right) m(Middle)
 
     #define JOY_BUTTONS 16            /* "Joy0" to "Joy15" */
-    #define BINDING_NAME_MAX 16
+    #define BINDING_NAME_MAX 32       /* "Ctrl+Shift+Alt+Backspace" fits */
 
     #define KEY_ENUM(name) KEY_##name,
     #define MOUSE_ENUM(name) MOUSE_##name,
@@ -50,17 +50,32 @@ typedef enum binding_kind {
     BIND_JOY                          /* code: a button of the first gamepad  */
 } binding_kind_t;
 
+/* Held with a key: the editor's shortcuts are whole combinations. */
+typedef enum binding_mod {
+    MOD_CTRL = 1,
+    MOD_SHIFT = 2,
+    MOD_ALT = 4
+} binding_mod_t;
+
 typedef struct binding {
     binding_kind_t kind;
     int code;
+    int mods;                         /* MOD_*: 0 for the game's bindings     */
 } binding_t;
 
-/* A name of the settings file, any case ("space" is Space). */
+/*
+** A name of the settings file, any case ("space" is Space). A key can have
+** "Ctrl+", "Shift+" and "Alt+" before it, in any order: "ctrl+shift+z".
+*/
 bool binding_parse(const char *name, binding_t *out);
 
-/* The name the file gets: "Space", "MouseLeft", "Joy3"; "" when unbound. */
+/*
+** The name the file gets: "Space", "MouseLeft", "Joy3", "Ctrl+Shift+Z"
+** (always in that order); "" when unbound.
+*/
 void binding_format(binding_t b, char *buf, size_t size);
 
+/* The same input with the same modifiers: S is not Ctrl+S. */
 bool binding_equal(binding_t a, binding_t b);
 
 #endif

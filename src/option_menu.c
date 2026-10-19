@@ -8,7 +8,7 @@
 #include "mygd.h"
 
 static const char *const SECTIONS[NB_SECTIONS] = {"Audio", "Gameplay",
-    "Controls", "Display", "Data"};
+    "Controls", "Editor", "Display", "Data"};
 
 static void tab_pressed(void *ctx, widget_t *w)
 {
@@ -146,7 +146,9 @@ static void act(option_m_t **om, gd_t *gd)
         o->section = (options_section_t)o->pending_section;
         label_tabs(o);
         options_build_rows(o);
-    }
+    } else if (o->pending_rows)
+        options_build_rows(o);               /* the page's focus row stays */
+    o->pending_rows = false;
     o->pending_answer = 0;
     o->pending_dialog = DIALOG_NONE;
     o->pending_display = false;

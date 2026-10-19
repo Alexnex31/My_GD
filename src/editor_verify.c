@@ -138,16 +138,18 @@ bool editor_status_holds(sfVector2f at)
     return at.x >= ED_PALETTE_W && at.y >= ED_STATUS_Y;
 }
 
-static void issues_text(const editor_t *ed, char *out, size_t size)
+static void issues_text(const editor_t *ed, gd_t *gd, char *out, size_t size)
 {
     const ed_report_t *r = &ed->report;
+    char key[BINDING_NAME_MAX];
 
     if (r->count == 0)
         snprintf(out, size, "Nothing looks wrong");
     else
-        snprintf(out, size, "%zu warning%s, %zu hint%s   (N: next)",
+        snprintf(out, size, "%zu warning%s, %zu hint%s   (%s: next)",
             r->warnings, r->warnings == 1 ? "" : "s", r->hints,
-            r->hints == 1 ? "" : "s");
+            r->hints == 1 ? "" : "s", editor_key_name(gd, ED_KEY_NEXT_ISSUE,
+            key, sizeof(key)));
 }
 
 /* The level's length against its song's (11.10, 4.9). */
@@ -168,15 +170,18 @@ static void times_text(editor_t *ed, gd_t *gd, char *out, size_t size)
 }
 
 /* What the bot is doing, what it last said, or how to ask it. */
-static void verdict_text(editor_t *ed, char *out, size_t size)
+static void verdict_text(editor_t *ed, gd_t *gd, char *out, size_t size)
 {
+    char key[BINDING_NAME_MAX];
+
     if (ed_verify_running(&ed->verify))
         return ed_verify_text(&ed->verify, out, size);
     if (ed->verdict[0] != '\0' && ed->trace_bot
         && ed->trace_edits == ed->hist.edits)
         snprintf(out, size, "%s", ed->verdict);
     else
-        snprintf(out, size, "V: verify with the bot");
+        snprintf(out, size, "%s: verify with the bot",
+            editor_key_name(gd, ED_KEY_VERIFY, key, sizeof(key)));
 }
 
 void editor_status_draw(editor_t *ed, gd_t *gd)
@@ -185,12 +190,12 @@ void editor_status_draw(editor_t *ed, gd_t *gd)
 
     editor_fill(gd, ed, (sfFloatRect){ED_PALETTE_W, ED_STATUS_Y, ED_CANVAS_W,
         ED_STATUS_H}, STRIP, sfTransparent);
-    issues_text(ed, text, sizeof(text));
+    issues_text(ed, gd, text, sizeof(text));
     editor_label(ed, gd, text, ED_PALETTE_W + 20.0f, ED_STATUS_Y + 8.0f, 20,
         ed->report.warnings > 0 ? LOUD : QUIET);
     times_text(ed, gd, text, sizeof(text));
     editor_label(ed, gd, text, TIMES_X, ED_STATUS_Y + 8.0f, 20,
         ed->song_short > 0.0 ? LOUD : QUIET);
-    verdict_text(ed, text, sizeof(text));
+    verdict_text(ed, gd, text, sizeof(text));
     editor_label(ed, gd, text, VERDICT_X, ED_STATUS_Y + 8.0f, 20, QUIET);
 }

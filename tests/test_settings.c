@@ -78,11 +78,11 @@ static void test_missing_file(void)
     CHECK(s.show_percent && s.show_progress_bar && s.show_attempts);
     CHECK(s.jump_bindings.count == 4);
     CHECK(binding_equal(s.jump_bindings.items[0], (binding_t){BIND_KEY,
-        KEY_Space}));
+        KEY_Space, 0}));
     CHECK(binding_equal(s.jump_bindings.items[2], (binding_t){BIND_MOUSE,
-        MOUSE_Left}));
-    CHECK(binding_equal(s.jump_bindings.items[3], (binding_t){BIND_JOY, 0}));
-    CHECK(binding_equal(s.restart_key, (binding_t){BIND_KEY, KEY_R}));
+        MOUSE_Left, 0}));
+    CHECK(binding_equal(s.jump_bindings.items[3], (binding_t){BIND_JOY, 0, 0}));
+    CHECK(binding_equal(s.restart_key, (binding_t){BIND_KEY, KEY_R, 0}));
     CHECK(s.audio_offset_ms == 0);
     settings_free(&s);
 }
@@ -99,8 +99,8 @@ static void test_values_and_spaces(void)
     CHECK(s.music_volume == 42 && !s.vsync && s.fps_limit == 144);
     CHECK(s.jump_bindings.count == 3);
     CHECK(binding_equal(s.jump_bindings.items[1], (binding_t){BIND_MOUSE,
-        MOUSE_Right}));
-    CHECK(binding_equal(s.jump_bindings.items[2], (binding_t){BIND_JOY, 15}));
+        MOUSE_Right, 0}));
+    CHECK(binding_equal(s.jump_bindings.items[2], (binding_t){BIND_JOY, 15, 0}));
     CHECK(s.audio_offset_ms == -300);
     CHECK(s.restart_key.kind == BIND_NONE);          /* "" is unbound */
     CHECK(strcmp(s.menu_song, "My Song.ogg") == 0);
@@ -149,7 +149,7 @@ static void test_action_keys(void)
     settings_t s;
 
     load(&s, "checkpoint_key=Space\n");
-    CHECK(binding_equal(s.checkpoint_key, (binding_t){BIND_KEY, KEY_Z}));
+    CHECK(binding_equal(s.checkpoint_key, (binding_t){BIND_KEY, KEY_Z, 0}));
     CHECK(nb_logged == 1 && strstr(logged, "checkpoint_key=Space") != NULL);
     settings_free(&s);
     load(&s, "jump_bindings=R,Space\n");             /* R's default is taken */
@@ -157,14 +157,14 @@ static void test_action_keys(void)
     CHECK(strstr(logged, "unbound") != NULL);
     settings_free(&s);
     load(&s, "restart_key=Z\n");                     /* checkpoint's default */
-    CHECK(binding_equal(s.restart_key, (binding_t){BIND_KEY, KEY_Z}));
-    CHECK(binding_equal(s.checkpoint_key, (binding_t){BIND_KEY, KEY_Z})
+    CHECK(binding_equal(s.restart_key, (binding_t){BIND_KEY, KEY_Z, 0}));
+    CHECK(binding_equal(s.checkpoint_key, (binding_t){BIND_KEY, KEY_Z, 0})
         == false);
     CHECK(s.checkpoint_key.kind == BIND_NONE);
     settings_free(&s);
     load(&s, "restart_key=MouseRight\n");
     CHECK(nb_logged == 0);
-    CHECK(binding_equal(s.restart_key, (binding_t){BIND_MOUSE, MOUSE_Right}));
+    CHECK(binding_equal(s.restart_key, (binding_t){BIND_MOUSE, MOUSE_Right, 0}));
     settings_free(&s);
 }
 
@@ -182,9 +182,9 @@ static void test_round_trip(void)
     s.window_width = 1920;
     s.fps_limit = 240;
     s.show_attempts = false;
-    s.jump_bindings = (bindings_t){{{BIND_KEY, KEY_Numpad0},
-        {BIND_MOUSE, MOUSE_Middle}}, 2};
-    s.remove_checkpoint_key = (binding_t){BIND_NONE, 0};
+    s.jump_bindings = (bindings_t){{{BIND_KEY, KEY_Numpad0, 0},
+        {BIND_MOUSE, MOUSE_Middle, 0}}, 2};
+    s.remove_checkpoint_key = (binding_t){BIND_NONE, 0, 0};
     s.audio_offset_ms = 120;
     snprintf(s.menu_song, sizeof(s.menu_song), "%s", "x.ogg");
     CHECK(settings_save(&s) == 0);
@@ -198,7 +198,7 @@ static void test_round_trip(void)
     CHECK(back.fps_limit == 240 && !back.show_attempts);
     CHECK(back.jump_bindings.count == 2);
     CHECK(binding_equal(back.jump_bindings.items[1], (binding_t){BIND_MOUSE,
-        MOUSE_Middle}));
+        MOUSE_Middle, 0}));
     CHECK(back.remove_checkpoint_key.kind == BIND_NONE);
     CHECK(back.audio_offset_ms == 120);
     CHECK(strcmp(back.menu_song, "x.ogg") == 0);
@@ -310,21 +310,108 @@ static void test_binding_names(void)
     binding_t b;
 
     for (int k = 0; k < KEY_COUNT; k++) {
-        binding_format((binding_t){BIND_KEY, k}, name, sizeof(name));
+        binding_format((binding_t){BIND_KEY, k, 0}, name, sizeof(name));
         CHECK(binding_parse(name, &b) && b.kind == BIND_KEY && b.code == k);
     }
     for (int m = 0; m < MOUSE_COUNT; m++) {
-        binding_format((binding_t){BIND_MOUSE, m}, name, sizeof(name));
+        binding_format((binding_t){BIND_MOUSE, m, 0}, name, sizeof(name));
         CHECK(binding_parse(name, &b) && b.kind == BIND_MOUSE && b.code == m);
     }
     for (int j = 0; j < JOY_BUTTONS; j++) {
-        binding_format((binding_t){BIND_JOY, j}, name, sizeof(name));
+        binding_format((binding_t){BIND_JOY, j, 0}, name, sizeof(name));
         CHECK(binding_parse(name, &b) && b.kind == BIND_JOY && b.code == j);
     }
     CHECK(binding_parse("pAgEuP", &b) && b.code == KEY_PageUp);
     CHECK(!binding_parse("Joy", &b) && !binding_parse("Joy-1", &b));
     CHECK(!binding_parse("Joy1x", &b) && !binding_parse("MouseX1", &b));
     CHECK(!binding_parse("", &b) && !binding_parse("Space ", &b));
+}
+
+/* Combinations: modifiers in any order and case, written in one order. */
+static void test_combo_names(void)
+{
+    char name[BINDING_NAME_MAX];
+    binding_t b;
+
+    CHECK(binding_parse("shift+CTRL+z", &b) && b.kind == BIND_KEY
+        && b.code == KEY_Z && b.mods == (MOD_CTRL | MOD_SHIFT));
+    binding_format(b, name, sizeof(name));
+    CHECK(strcmp(name, "Ctrl+Shift+Z") == 0);
+    binding_format((binding_t){BIND_KEY, KEY_Backspace, MOD_CTRL | MOD_SHIFT
+        | MOD_ALT}, name, sizeof(name));
+    CHECK(strcmp(name, "Ctrl+Shift+Alt+Backspace") == 0);
+    CHECK(binding_parse(name, &b) && b.mods == 7 && b.code == KEY_Backspace);
+    CHECK(!binding_parse("Ctrl+Ctrl+S", &b) && !binding_parse("Ctrl+", &b));
+    CHECK(!binding_parse("Ctrl+MouseLeft", &b) && !binding_parse("Alt+Joy1", &b));
+    CHECK(!binding_equal((binding_t){BIND_KEY, KEY_S, 0},
+        (binding_t){BIND_KEY, KEY_S, MOD_CTRL}));
+}
+
+/*
+** The editor's shortcuts (11.6): defaults with no two alike and none a
+** punctuation key; combinations read and written back; what can't be one
+** keeps its default; two alike, the later one gives way. The game's keys
+** take no modifiers.
+*/
+static void test_editor_keys(void)
+{
+    settings_t s;
+    settings_t back;
+    ed_key_t page[ED_KEY_PAGE_MAX];
+    int listed = 0;
+
+    load(&s, NULL);
+    for (int k = 0; k < ED_KEY_COUNT; k++) {
+        binding_t b = s.editor_keys[k];
+
+        CHECK(ed_key_bindable(b) && b.kind == BIND_KEY);
+        CHECK(ed_key_find(s.editor_keys, b) == k);   /* no two alike */
+        CHECK(b.code < KEY_LBracket || b.code > KEY_Hyphen);
+    }
+    for (int p = 0; p < ED_KEY_PAGES; p++)
+        listed += ed_key_page_list(p, page);
+    CHECK(listed == ED_KEY_COUNT);                   /* every one on a page */
+    settings_free(&s);
+    load(&s, "editor_save=alt+shift+s\neditor_undo=Escape\n"
+        "editor_redo=LControl\neditor_copy=Ctrl+MouseLeft\n"
+        "editor_grid=\nrestart_key=Ctrl+R\n");
+    CHECK(binding_equal(s.editor_keys[ED_KEY_SAVE],
+        (binding_t){BIND_KEY, KEY_S, MOD_ALT | MOD_SHIFT}));
+    CHECK(binding_equal(s.editor_keys[ED_KEY_UNDO],
+        ed_key_default(ED_KEY_UNDO)));
+    CHECK(binding_equal(s.editor_keys[ED_KEY_REDO],
+        ed_key_default(ED_KEY_REDO)));
+    CHECK(binding_equal(s.editor_keys[ED_KEY_COPY],
+        ed_key_default(ED_KEY_COPY)));
+    CHECK(s.editor_keys[ED_KEY_GRID].kind == BIND_NONE);
+    CHECK(binding_equal(s.restart_key, (binding_t){BIND_KEY, KEY_R, 0}));
+    CHECK(nb_logged == 4);
+    s.dirty = true;
+    CHECK(settings_save(&s) == 0);
+    CHECK(strstr(read_file(), "editor_save=Ctrl+S") == NULL);
+    CHECK(strstr(read_file(), "editor_save=Shift+Alt+S\n") != NULL);
+    CHECK(strstr(read_file(), "editor_grid=\n") != NULL);
+    settings_load(&back, path, NULL);
+    for (int k = 0; k < ED_KEY_COUNT; k++)
+        CHECK(binding_equal(back.editor_keys[k], s.editor_keys[k]));
+    settings_free(&back);
+    settings_free(&s);
+    load(&s, "editor_copy=Ctrl+S\n");               /* Save's: Copy gives way */
+    CHECK(binding_equal(s.editor_keys[ED_KEY_SAVE],
+        (binding_t){BIND_KEY, KEY_S, MOD_CTRL}));
+    CHECK(binding_equal(s.editor_keys[ED_KEY_COPY],
+        ed_key_default(ED_KEY_COPY)));
+    CHECK(nb_logged == 1 && strstr(logged, "editor_copy=Ctrl+S") != NULL);
+    settings_free(&s);
+    load(&s, "editor_copy=Ctrl+S\neditor_save=Ctrl+C\n");   /* swapped: fine */
+    CHECK(nb_logged == 0);
+    CHECK(binding_equal(s.editor_keys[ED_KEY_COPY],
+        (binding_t){BIND_KEY, KEY_S, MOD_CTRL}));
+    settings_free(&s);
+    load(&s, "editor_save=Ctrl+C\neditor_copy=Ctrl+C\n");   /* its default
+                                                        taken too: none */
+    CHECK(s.editor_keys[ED_KEY_COPY].kind == BIND_NONE);
+    settings_free(&s);
 }
 
 void test_settings(void)
@@ -343,6 +430,8 @@ void test_settings(void)
     test_long_lines();
     test_save_makes_its_folder();
     test_binding_names();
+    test_combo_names();
+    test_editor_keys();
     remove(path);
     rmdir(tmp_dir);
 }

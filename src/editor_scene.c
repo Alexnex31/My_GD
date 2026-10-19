@@ -137,162 +137,66 @@ static void wheel(editor_t *ed, gd_t *gd, const sfEvent *ev)
     editor_mouse_move(ed, gd, NULL);         /* the world moved under it */
 }
 
-/* Ctrl and a letter: the edits that aren't made with the mouse. */
-static void ctrl_key(editor_t *ed, gd_t *gd, const sfEvent *ev)
+/* The key with the modifiers held, as the options capture one (11.6). */
+static binding_t pressed(const sfKeyEvent *key)
 {
-    sfKeyCode k = ev->key.code;
-    bool redo = k == sfKeyY || (k == sfKeyZ && ev->key.shift);
-
-    if (k == sfKeyS)
-        return (void)editor_save(ed);
-    if (redo && !ed_redo(&ed->lv, &ed->hist))
-        editor_notice(ed, "Nothing to redo");
-    if (k == sfKeyZ && !ev->key.shift && !ed_undo(&ed->lv, &ed->hist))
-        editor_notice(ed, "Nothing to undo");
-    if (k == sfKeyA) {
-        ed_select_all(&ed->lv);
-        ed->tool = ED_TOOL_SELECT;
-    }
-    if (k == sfKeyC && ed_copy(&ed->lv, &gd->clip))
-        editor_notice(ed, "Copied");
-    if (k == sfKeyV && editor_mouse_on_canvas(gd) && ed_paste(&ed->lv,
-        &ed->hist, &gd->clip, editor_mouse_world(ed, gd), ed->grid))
-        ed->tool = ED_TOOL_SELECT;
-    if (k == sfKeyD)
-        ed_duplicate(&ed->lv, &ed->hist, ed->grid);
-}
-
-/* With a selection the arrows move it, a grid step or with Shift a pixel;
-** with none, Up and Down still go through the palette. */
-static void arrow_key(editor_t *ed, const sfEvent *ev)
-{
-    sfKeyCode k = ev->key.code;
-    double step = ev->key.shift ? 1.0 : ed->grid;
-    double dx = k == sfKeyRight ? step : (k == sfKeyLeft ? -step : 0.0);
-    double dy = k == sfKeyDown ? step : (k == sfKeyUp ? -step : 0.0);
-
-    if (ed_selected(&ed->lv) > 0) {
-        ed_nudge(&ed->lv, &ed->hist, dx, dy);
-        return;
-    }
-    if (dy != 0.0) {
-        ed->entry = (ed->entry + (dy > 0.0 ? 1 : ed->nb_entries - 1))
-            % ed->nb_entries;
-        ed->tool = ED_TOOL_PLACE;
-    }
-}
-
-/* Z, Q, S, D: the selection moves a whole block, whatever the grid. */
-static void block_key(editor_t *ed, sfKeyCode k)
-{
-    double dx = k == sfKeyD ? ED_BIG_STEP : (k == sfKeyQ ? -ED_BIG_STEP : 0.0);
-    double dy = k == sfKeyS ? ED_BIG_STEP : (k == sfKeyZ ? -ED_BIG_STEP : 0.0);
-
-    if (dx != 0.0 || dy != 0.0)
-        ed_nudge(&ed->lv, &ed->hist, dx, dy);
-}
-
-/* R turns the selection a quarter, the brackets 15 degrees (11.4). */
-static void turn_key(editor_t *ed, const sfEvent *ev)
-{
-    sfKeyCode k = ev->key.code;
-
-    if (k == sfKeyR)
-        ed_rotate(&ed->lv, &ed->hist, ev->key.shift ? -90.0 : 90.0, ed->grid);
-    if (k == sfKeyLBracket || k == sfKeyRBracket)
-        ed_prop_step(&ed->lv, &ed->hist, ED_PROP_TURN,
-            k == sfKeyRBracket ? 1 : -1);
-}
-
-static void plain_key(editor_t *ed, gd_t *gd, sfKeyCode k)
-{
-    block_key(ed, k);
-    if (k == sfKeyReturn)
-        return editor_playtest(ed, gd, sfKeyboard_isKeyPressed(sfKeyLShift)
-            || sfKeyboard_isKeyPressed(sfKeyRShift));
-    if (k == sfKeyL)
-        ed->level_panel = !ed->level_panel;
-    if (k == sfKeyP)
-        editor_song_toggle(ed, gd);
-    if (k == sfKeyV)
-        editor_verify_start(ed);
-    if (k == sfKeyN)
-        editor_next_issue(ed);
-    if (k == sfKeyTab)
-        ed->tool = ed->tool == ED_TOOL_PLACE ? ED_TOOL_SELECT : ED_TOOL_PLACE;
-    if (k == sfKeyDelete || k == sfKeyBackspace)
-        ed_delete_selected(&ed->lv, &ed->hist);
-    if (k >= sfKeyNum1 && k <= sfKeyNum9 && k - sfKeyNum1 < ed->nb_entries) {
-        ed->entry = k - sfKeyNum1;
-        ed->tool = ED_TOOL_PLACE;
-    }
-    if (k == sfKeyG)
-        ed->grid = ed->grid == 50.0 ? 25.0 : 50.0;
-    if (k == sfKeyComma || k == sfKeyPeriod)        /* All, 0, 1, ... (11.15) */
-        ed_set_layer(&ed->lv, ed->lv.layer + (k == sfKeyPeriod ? 1 : -1));
-    if (k == sfKeyHome) {                    /* where it opened, at 100% */
-        ed->zoom = 1.0f;
-        ed->zoom_step = 0;
-        ed->cam = (vec2_t){ED_CANVAS_W / 2.0 - 100.0, GROUND_Y - 300.0};
-    }
+    return (binding_t){BIND_KEY, (int)key->code,
+        (key->control ? MOD_CTRL : 0) | (key->shift ? MOD_SHIFT : 0)
+        | (key->alt ? MOD_ALT : 0)};
 }
 
 /*
-** Escape first cancels what the mouse is doing, then drops the selection,
-** then leaves. No key edits while the mouse is in the middle of something:
-** an undo under a drag would pull the objects from under it.
+** Escape first closes the list of keys, cancels what the mouse is doing,
+** then drops the selection, then leaves. No key edits while the mouse is in
+** the middle of something: an undo under a drag would pull the objects
+** from under it. Every other key is the action it is bound to, if any.
 */
-static void key_press(editor_t *ed, gd_t *gd, const sfEvent *ev)
+static void key_press(editor_t *ed, gd_t *gd, const sfKeyEvent *key)
 {
-    sfKeyCode k = ev->key.code;
+    int k = ed_key_find(gd->settings.editor_keys, pressed(key));
 
-    if (k == sfKeyEscape) {
+    if (key->code == sfKeyEscape) {
+        if (ed->show_keys) {
+            ed->show_keys = false;
+            return;
+        }
         if (editor_mouse_cancel(ed))
             return;
         if (ed_selected(&ed->lv) > 0)
             return ed_select_none(&ed->lv);
         return leave(ed);
     }
-    if (ed->mouse != ED_IDLE)
+    if (ed->mouse != ED_IDLE || k < 0)
         return;
     ed_gesture(&ed->hist);
-    if (ev->key.control)
-        return ctrl_key(ed, gd, ev);
-    if (k == sfKeyLeft || k == sfKeyRight || k == sfKeyUp || k == sfKeyDown)
-        return arrow_key(ed, ev);
-    turn_key(ed, ev);
-    plain_key(ed, gd, k);
-}
-
-/* The keys worth holding: the moves, and going through the history. */
-static bool repeats(const sfKeyEvent *k)
-{
-    if (k->control)
-        return k->code == sfKeyZ || k->code == sfKeyY;
-    return k->code == sfKeyLeft || k->code == sfKeyRight || k->code == sfKeyUp
-        || k->code == sfKeyDown || k->code == sfKeyZ || k->code == sfKeyQ
-        || k->code == sfKeyS || k->code == sfKeyD;
+    editor_key_action(ed, gd, (ed_key_t)k);
+    ed->repeating = ed_key_repeats((ed_key_t)k);
+    ed->repeat = *key;
+    ed->repeat_at_ms = ui_now_ms() + ED_REPEAT_DELAY_MS;
 }
 
 /*
 ** The window has the system's key repeat off, for the game's input
 ** (FEATURES 1.3), so the editor repeats a held key itself: once at the
-** press, then after a wait, at a steady pace until it is released.
+** press, then after a wait, at a steady pace until it is released. The
+** moves and the history repeat (ed_key_repeats).
 */
 static void key_repeat(editor_t *ed, gd_t *gd)
 {
-    sfEvent again = {.key = ed->repeat};
+    int k = ed_key_find(gd->settings.editor_keys, pressed(&ed->repeat));
 
     if (!ed->repeating)
         return;
-    if (!sfKeyboard_isKeyPressed(ed->repeat.code)) {
+    if (!sfKeyboard_isKeyPressed(ed->repeat.code) || k < 0
+        || ed->mouse != ED_IDLE) {
         ed->repeating = false;
         return;
     }
     if (ui_now_ms() < ed->repeat_at_ms)
         return;
     ed->repeat_at_ms = ui_now_ms() + ED_REPEAT_EVERY_MS;
-    key_press(ed, gd, &again);
+    ed_gesture(&ed->hist);
+    editor_key_action(ed, gd, (ed_key_t)k);
 }
 
 void editor_events(editor_t *ed, gd_t *gd)
@@ -312,10 +216,8 @@ void editor_events(editor_t *ed, gd_t *gd)
         if (ev->type == sfEvtClosed)
             return editor_close(ed, gd);
         if (ev->type == sfEvtKeyPressed) {
-            key_press(ed, gd, ev);
-            ed->repeat = ev->key;
-            ed->repeating = repeats(&ev->key);
-            ed->repeat_at_ms = ui_now_ms() + ED_REPEAT_DELAY_MS;
+            ed->repeating = false;           /* a new key: the old one stops */
+            key_press(ed, gd, &ev->key);
         }
         if (ev->type == sfEvtLostFocus)
             ed->repeating = false;

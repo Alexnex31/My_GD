@@ -306,10 +306,24 @@ void editor_label_fit(editor_t *ed, gd_t *gd, const char *s, sfVector2f at,
     editor_label(ed, gd, buf, at.x, at.y, size, c);
 }
 
+/* A digit key reads as its digit: "1", not "Num1". */
+static const char *palette_key(gd_t *gd, int i, char *buf, size_t size)
+{
+    binding_t b = gd->settings.editor_keys[ED_KEY_ENTRY_1 + i];
+
+    if (b.kind == BIND_KEY && b.mods == 0 && b.code >= KEY_Num0
+        && b.code <= KEY_Num9)
+        snprintf(buf, size, "%d", b.code - KEY_Num0);
+    else
+        editor_key_name(gd, (ed_key_t)(ED_KEY_ENTRY_1 + i), buf, size);
+    return buf;
+}
+
 /* One row per thing that can be placed; the first nine have a key. */
 static void draw_palette(editor_t *ed, gd_t *gd)
 {
-    char row[48];
+    char row[96];
+    char key[BINDING_NAME_MAX];
 
     editor_fill(gd, ed, (sfFloatRect){0.0f, ED_TOOLBAR_H, ED_PALETTE_W,
         VIEW_H - ED_TOOLBAR_H}, PANEL_FILL, sfTransparent);
@@ -320,20 +334,38 @@ static void draw_palette(editor_t *ed, gd_t *gd)
             editor_fill(gd, ed, (sfFloatRect){6.0f, y, ED_PALETTE_W - 12.0f,
                 ED_PALETTE_ROW - 3.0f}, PICKED, sfTransparent);
         if (i < 9)
-            snprintf(row, sizeof(row), "%d  %s", i + 1, ed->entries[i].label);
+            snprintf(row, sizeof(row), "%s  %s", palette_key(gd, i, key,
+                sizeof(key)), ed->entries[i].label);
         else
             snprintf(row, sizeof(row), "    %s", ed->entries[i].label);
-        editor_label(ed, gd, row, 14.0f, y + 3.0f, 19, sfWhite);
+        editor_label_fit(ed, gd, row, (sfVector2f){14.0f, y + 3.0f},
+            ED_PALETTE_W - 20.0f, 19, sfWhite);
     }
+}
+
+/* The tool's mouse, and the keys of what is used most: the rest on F1. */
+static void help_line(editor_t *ed, gd_t *gd, char *out, size_t size)
+{
+    char k[6][BINDING_NAME_MAX];
+
+    editor_key_name(gd, ED_KEY_TOOL, k[0], sizeof(k[0]));
+    editor_key_name(gd, ED_KEY_KEYS, k[1], sizeof(k[1]));
+    editor_key_name(gd, ED_KEY_UNDO, k[2], sizeof(k[2]));
+    editor_key_name(gd, ED_KEY_PLAYTEST, k[3], sizeof(k[3]));
+    editor_key_name(gd, ED_KEY_SAVE, k[4], sizeof(k[4]));
+    editor_key_name(gd, ED_KEY_DELETE, k[5], sizeof(k[5]));
+    if (ed->tool == ED_TOOL_PLACE)
+        snprintf(out, size, "PLACE (%s: select)   Left: place   Right: "
+            "delete   Wheel: scroll   %s: undo   %s: play   %s: save   "
+            "%s: all the keys", k[0], k[2], k[3], k[4], k[1]);
+    else
+        snprintf(out, size, "SELECT (%s: place)   Click, Shift+click, box   "
+            "Drag: move   %s: delete   %s: undo   %s: play   %s: save   "
+            "%s: all the keys", k[0], k[5], k[2], k[3], k[4], k[1]);
 }
 
 static void draw_toolbar(editor_t *ed, gd_t *gd)
 {
-    static const char *const HELP[] = {
-        "PLACE (Tab: select)   Left: place   Right: delete   1-9: entry",
-        "SELECT (Tab: place)   Click, Shift+click, box   Drag or arrows: "
-        "move   ZQSD: a block   R: turn   Del   Ctrl+A C V D",
-    };
     char text[320];
     char layer[16] = "All";
 
@@ -347,10 +379,7 @@ static void draw_toolbar(editor_t *ed, gd_t *gd)
         editor_props(ed)->selected, ed->grid, 100.0f / ed->zoom, layer);
     editor_label_fit(ed, gd, text, (sfVector2f){20.0f, 8.0f}, VIEW_W - 40.0f,
         28, sfWhite);
-    snprintf(text, sizeof(text), "%s   Ctrl+Z / Ctrl+Y: undo, redo   Wheel, "
-        "Ctrl+wheel: view   G: grid   , .: layer   L: song   P: hear it   "
-        "Enter: play   V: verify   Ctrl+S",
-        HELP[ed->tool]);
+    help_line(ed, gd, text, sizeof(text));
     editor_label_fit(ed, gd, text, (sfVector2f){20.0f, 48.0f}, VIEW_W - 40.0f,
         18, (sfColor){180, 190, 210, 255});
     if (ui_now_ms() < ed->notice_until_ms)
@@ -374,5 +403,6 @@ void editor_draw(editor_t *ed, gd_t *gd)
     draw_toolbar(ed, gd);
     editor_status_draw(ed, gd);
     editor_panel_draw(ed, gd);
+    editor_keys_draw(ed, gd);
     editor_dialog_draw(ed, gd);
 }

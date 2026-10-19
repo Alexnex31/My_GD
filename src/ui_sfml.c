@@ -88,7 +88,7 @@ static bool mouse_event(gd_t *gd, const sfEvent *ev, ui_event_t *out)
         || (int)ev->mouseButton.button >= MOUSE_COUNT)
         return false;
     out->kind = ev->type == sfEvtMouseButtonPressed ? UI_PRESS : UI_RELEASE;
-    out->input = (binding_t){BIND_MOUSE, (int)ev->mouseButton.button};
+    out->input = (binding_t){BIND_MOUSE, (int)ev->mouseButton.button, 0};
     ui_pos(gd, ev->mouseButton.x, ev->mouseButton.y, out);
     return true;
 }
@@ -109,8 +109,10 @@ bool ui_from_sf(gd_t *gd, const sfEvent *ev, ui_event_t *out)
     if ((ev->type == sfEvtKeyPressed || ev->type == sfEvtKeyReleased)
         && ev->key.code >= 0 && (int)ev->key.code < KEY_COUNT) {
         out->kind = ev->type == sfEvtKeyPressed ? UI_PRESS : UI_RELEASE;
-        out->input = (binding_t){BIND_KEY, (int)ev->key.code};
+        out->input = (binding_t){BIND_KEY, (int)ev->key.code, 0};
         out->shift = ev->key.shift;
+        out->mods = (ev->key.control ? MOD_CTRL : 0)
+            | (ev->key.shift ? MOD_SHIFT : 0) | (ev->key.alt ? MOD_ALT : 0);
         return true;
     }
     if ((ev->type == sfEvtJoystickButtonPressed
@@ -119,7 +121,7 @@ bool ui_from_sf(gd_t *gd, const sfEvent *ev, ui_event_t *out)
         && ev->joystickButton.button < JOY_BUTTONS) {
         out->kind = ev->type == sfEvtJoystickButtonPressed ? UI_PRESS
             : UI_RELEASE;
-        out->input = (binding_t){BIND_JOY, (int)ev->joystickButton.button};
+        out->input = (binding_t){BIND_JOY, (int)ev->joystickButton.button, 0};
         return true;
     }
     return mouse_event(gd, ev, out);
@@ -258,7 +260,8 @@ static void draw_capture(gd_t *gd, const ui_screen_t *ui, const widget_t *w)
 
     rect(gd, (ui_rect_t){0.0f, 0.0f, VIEW_W, VIEW_H}, DIM, 0.0f);
     rect(gd, UI_CAPTURE_PANEL, PANEL, OUTLINE_W);
-    text(gd, "Press a key, mouse button or gamepad button",
+    text(gd, w->combo ? "Press a key, with Ctrl, Shift or Alt if you like"
+        : "Press a key, mouse button or gamepad button",
         (sfVector2f){VIEW_W / 2.0f, 430.0f}, 1, 1.0f);
     snprintf(line, sizeof(line), "for %s", w->label != NULL ? w->label
         : "this action");

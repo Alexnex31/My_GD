@@ -9,7 +9,7 @@
 
 #include "ui/options_rules.h"
 
-static const binding_t NONE = {BIND_NONE, 0};
+static const binding_t NONE = {BIND_NONE, 0, 0};
 
 void slots_from_settings(const settings_t *s, binding_t slots[NB_SLOTS])
 {
@@ -78,6 +78,23 @@ rebind_result_t rebind(binding_t slots[NB_SLOTS], int slot, binding_t b,
         return REBIND_REFUSED;
     }
     return result;
+}
+
+rebind_result_t editor_rebind(binding_t keys[ED_KEY_COUNT], int k, binding_t b,
+    int *other)
+{
+    *other = -1;
+    if (!ed_key_bindable(b))
+        return REBIND_REFUSED;
+    if (binding_equal(keys[k], b))
+        return REBIND_SAME;
+    *other = b.kind == BIND_NONE ? -1 : ed_key_find(keys, b);
+    if (*other >= 0)
+        keys[*other] = keys[k];
+    keys[k] = b;
+    if (b.kind == BIND_NONE)
+        return REBIND_CLEARED;
+    return *other >= 0 ? REBIND_SWAPPED : REBIND_SET;
 }
 
 void slot_name(int slot, char *buf, size_t size)

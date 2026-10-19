@@ -9,6 +9,7 @@
     #define SIM_SETTINGS_H
 
     #include "sim/binding.h"
+    #include "sim/editor_keys.h"
     #include "sim/sim_types.h"
 
     #define SETTINGS_PATH "save/settings.txt"
@@ -40,6 +41,7 @@ typedef struct settings {
     binding_t checkpoint_key;
     binding_t remove_checkpoint_key;
     int audio_offset_ms;          /* -300-300 (4.8)                          */
+    binding_t editor_keys[ED_KEY_COUNT];   /* combinations, BIND_NONE unbound */
     char **extra;                 /* unknown "key=value" lines, kept as is   */
     size_t nb_extra;
     bool dirty;                   /* changed since loaded or saved (5.7)     */

@@ -21,6 +21,17 @@ void editor_song_stop(editor_t *ed, gd_t *gd)
     music_menu(gd);                          /* the menus' song, where it was */
 }
 
+static void no_song(editor_t *ed, gd_t *gd)
+{
+    char key[BINDING_NAME_MAX];
+    char text[96];
+
+    snprintf(text, sizeof(text), "No song to play: the level panel (%s) "
+        "chooses it", editor_key_name(gd, ED_KEY_LEVEL_PANEL, key,
+        sizeof(key)));
+    editor_notice(ed, text);
+}
+
 /*
 ** P: the song the level will play, from the time the middle of the canvas
 ** is reached at; P again stops it. Before the level's start there is no
@@ -36,12 +47,12 @@ void editor_song_toggle(editor_t *ed, gd_t *gd)
     if (ed->song_on)
         return editor_song_stop(ed, gd);
     if (c.song == NULL)
-        return editor_notice(ed, "No song to play: L chooses the level's");
+        return no_song(ed, gd);
     from = (from < c.offset ? c.offset : from) + gd->music.audio_offset;
     if (from >= c.song->duration)             /* before the menu song goes */
         return editor_notice(ed, "The song is over before this point");
     if (music_load(&gd->music, c.song->file) != 0)
-        return editor_notice(ed, "No song to play: L chooses the level's");
+        return no_song(ed, gd);
     music_set_loop(&gd->music, false);
     music_play_from(&gd->music, from);
     ed->song_on = true;

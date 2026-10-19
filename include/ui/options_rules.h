@@ -46,6 +46,14 @@ void slots_to_settings(settings_t *s, const binding_t slots[NB_SLOTS]);
 rebind_result_t rebind(binding_t slots[NB_SLOTS], int slot, binding_t b,
     int *other);
 
+/*
+** An editor action captured `b` (5.5, 11.6): the same rules among the
+** editor's own shortcuts, a whole combination at a time. Refused: what
+** can't be one (ed_key_bindable). No minimum: the mouse still edits.
+*/
+rebind_result_t editor_rebind(binding_t keys[ED_KEY_COUNT], int k, binding_t b,
+    int *other);
+
 /* "Jump 2", "Restart", "Place checkpoint", "Remove checkpoint". */
 void slot_name(int slot, char *buf, size_t size);
 

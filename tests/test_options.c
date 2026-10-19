@@ -14,11 +14,11 @@
 #include "test.h"
 #include "ui/options_rules.h"
 
-static const binding_t SPACE = {BIND_KEY, KEY_Space};
-static const binding_t UP = {BIND_KEY, KEY_Up};
-static const binding_t W = {BIND_KEY, KEY_W};
-static const binding_t R = {BIND_KEY, KEY_R};
-static const binding_t NONE = {BIND_NONE, 0};
+static const binding_t SPACE = {BIND_KEY, KEY_Space, 0};
+static const binding_t UP = {BIND_KEY, KEY_Up, 0};
+static const binding_t W = {BIND_KEY, KEY_W, 0};
+static const binding_t R = {BIND_KEY, KEY_R, 0};
+static const binding_t NONE = {BIND_NONE, 0, 0};
 
 static void defaults(settings_t *s, binding_t slots[NB_SLOTS])
 {
@@ -40,7 +40,7 @@ static void test_slots_round_trip(void)
     slots_to_settings(&s, slots);
     CHECK(s.jump_bindings.count == 4);
     CHECK(binding_equal(s.jump_bindings.items[1], (binding_t){BIND_MOUSE,
-        MOUSE_Left}));
+        MOUSE_Left, 0}));
     CHECK(binding_equal(s.jump_bindings.items[3], W));
 }
 
@@ -71,11 +71,46 @@ static void test_rebind(void)
     CHECK(binding_equal(slots[2], UP) && other == -1);    /* nothing moved */
     CHECK(rebind(slots, 3, UP, &other) == REBIND_SWAPPED);    /* jump to jump */
     CHECK(binding_equal(slots[3], UP) && slots[2].kind == BIND_NONE);
-    slots[5] = (binding_t){BIND_JOY, 0};      /* gamepads aren't read yet */
+    slots[5] = (binding_t){BIND_JOY, 0, 0};      /* gamepads aren't read yet */
     CHECK(rebind(slots, 3, NONE, &other) == REBIND_REFUSED);
-    CHECK(rebind(slots, 3, (binding_t){BIND_JOY, 1}, &other)
+    CHECK(rebind(slots, 3, (binding_t){BIND_JOY, 1, 0}, &other)
         == REBIND_REFUSED);
     CHECK(binding_equal(slots[3], UP));
+}
+
+/* The editor's: swaps among its own, whole combinations (11.6). */
+static void test_editor_rebind(void)
+{
+    settings_t s;
+    binding_t ctrl_s = {BIND_KEY, KEY_S, MOD_CTRL};
+    binding_t s_key = {BIND_KEY, KEY_S, 0};
+    int other = 0;
+
+    settings_defaults(&s);
+    CHECK(editor_rebind(s.editor_keys, ED_KEY_COPY, ctrl_s, &other)
+        == REBIND_SWAPPED && other == ED_KEY_SAVE);
+    CHECK(binding_equal(s.editor_keys[ED_KEY_SAVE],
+        (binding_t){BIND_KEY, KEY_C, MOD_CTRL}));
+    CHECK(binding_equal(s.editor_keys[ED_KEY_COPY], ctrl_s));
+    CHECK(editor_rebind(s.editor_keys, ED_KEY_COPY, ctrl_s, &other)
+        == REBIND_SAME);
+    CHECK(editor_rebind(s.editor_keys, ED_KEY_GRID, (binding_t){BIND_KEY,
+        KEY_F5, MOD_ALT}, &other) == REBIND_SET && other == -1);
+    CHECK(binding_equal(s.editor_keys[ED_KEY_BLOCK_DOWN], s_key));  /* not Ctrl+S */
+    CHECK(editor_rebind(s.editor_keys, ED_KEY_GRID, NONE, &other)
+        == REBIND_CLEARED && s.editor_keys[ED_KEY_GRID].kind == BIND_NONE);
+    CHECK(editor_rebind(s.editor_keys, ED_KEY_HOME, NONE, &other)
+        == REBIND_CLEARED);
+    CHECK(editor_rebind(s.editor_keys, ED_KEY_GRID, NONE, &other)
+        == REBIND_SAME);                          /* two unbound: no swap */
+    CHECK(editor_rebind(s.editor_keys, ED_KEY_SAVE, (binding_t){BIND_MOUSE,
+        MOUSE_Left, 0}, &other) == REBIND_REFUSED);
+    CHECK(editor_rebind(s.editor_keys, ED_KEY_SAVE, (binding_t){BIND_KEY,
+        KEY_Escape, MOD_CTRL}, &other) == REBIND_REFUSED);
+    CHECK(editor_rebind(s.editor_keys, ED_KEY_SAVE, (binding_t){BIND_KEY,
+        KEY_LShift, 0}, &other) == REBIND_REFUSED);
+    CHECK(binding_equal(s.editor_keys[ED_KEY_SAVE],
+        (binding_t){BIND_KEY, KEY_C, MOD_CTRL}));
 }
 
 static void test_slot_names(void)
@@ -257,6 +292,7 @@ void test_options(void)
 {
     test_slots_round_trip();
     test_rebind();
+    test_editor_rebind();
     test_slot_names();
     test_window_sizes();
     test_display_trial();

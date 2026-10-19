@@ -97,6 +97,7 @@ typedef struct editor {
     time_t restore_when;          /* the autosave's date                     */
     int64_t autosave_at_ms;       /* when the next one is due                */
     sfKeyEvent repeat;            /* the held key that repeats, if any       */
+    bool show_keys;               /* the list of every shortcut (11.6)       */
     bool repeating;
     int64_t repeat_at_ms;         /* when it acts again                      */
     char path[64];                /* levels/<id>.gd                          */
@@ -164,6 +165,11 @@ void editor_song_lines(editor_t *ed, gd_t *gd, double left, double right,
     double top, double bottom);
 void editor_line(editor_t *ed, double x0, double y0, double x1, double y1,
     sfColor c);
+
+/* editor_keys.c: the shortcuts, as the options bind them (11.6) */
+void editor_key_action(editor_t *ed, gd_t *gd, ed_key_t k);
+const char *editor_key_name(gd_t *gd, ed_key_t k, char *buf, size_t size);
+void editor_keys_draw(editor_t *ed, gd_t *gd);
 
 /* editor_scene.c */
 bool editor_save(editor_t *ed);              /* false: it couldn't */

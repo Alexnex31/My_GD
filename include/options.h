@@ -19,6 +19,7 @@ typedef enum options_section {
     SEC_AUDIO,
     SEC_GAMEPLAY,
     SEC_CONTROLS,
+    SEC_EDITOR,                   /* the editor's shortcuts (11.6)          */
     SEC_DISPLAY,
     SEC_DATA,
     NB_SECTIONS
@@ -63,6 +64,9 @@ typedef struct option_menu {
     int vsync;
     int fps;
     binding_t slots[NB_SLOTS];
+    int editor_page;              /* which of the editor's actions are rows */
+    ed_key_t page_keys[ED_KEY_PAGE_MAX];   /* row 1 + i is page_keys[i]     */
+    const char *page_names[ED_KEY_PAGES];
     const char **song_titles;
     window_sizes_t sizes;
     options_dialog_t dialog;
@@ -73,6 +77,7 @@ typedef struct option_menu {
     int64_t notice_until_ms;
     bool pending_leave;
     bool pending_display;
+    bool pending_rows;            /* another page of the Editor section     */
     int pending_section;          /* -1 none                                */
     options_dialog_t pending_dialog;
     int pending_answer;           /* 0 none, 1 the first button, 2 the second */

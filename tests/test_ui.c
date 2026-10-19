@@ -72,7 +72,7 @@ static ui_rect_t row_at(int i)
 static void setup(fixture_t *f)
 {
     *f = (fixture_t){.slider = 50, .cycler = 2, .row = 0,
-        .bound = {BIND_KEY, KEY_Space}};
+        .bound = {BIND_KEY, KEY_Space, 0}};
     for (int i = 0; i < COUNT; i++)
         f->w[i] = (widget_t){.kind = W_BUTTON, .label = "x",
             .bounds = row_at(i), .enabled = true, .on_change = on_change,
@@ -105,11 +105,11 @@ static void send(fixture_t *f, ui_event_kind_t kind, binding_t in, float x,
     ui_event(&f->ui, &ev, 0);
 }
 
-static const binding_t LEFT_CLICK = {BIND_MOUSE, MOUSE_Left};
+static const binding_t LEFT_CLICK = {BIND_MOUSE, MOUSE_Left, 0};
 
 static void move(fixture_t *f, float x, float y)
 {
-    send(f, UI_MOVE, (binding_t){BIND_NONE, 0}, x, y);
+    send(f, UI_MOVE, (binding_t){BIND_NONE, 0, 0}, x, y);
 }
 
 static void press_at(fixture_t *f, float x, float y)
@@ -130,8 +130,8 @@ static void click_at(fixture_t *f, float x, float y)
 
 static void key(fixture_t *f, key_id_t k, int64_t now)
 {
-    ui_event_t down = {.kind = UI_PRESS, .input = {BIND_KEY, (int)k}};
-    ui_event_t up = {.kind = UI_RELEASE, .input = {BIND_KEY, (int)k}};
+    ui_event_t down = {.kind = UI_PRESS, .input = {BIND_KEY, (int)k, 0}};
+    ui_event_t up = {.kind = UI_RELEASE, .input = {BIND_KEY, (int)k, 0}};
 
     ui_event(&f->ui, &down, now);
     ui_event(&f->ui, &up, now);
@@ -221,7 +221,7 @@ static void test_keyboard_navigation(void)
     key(&f, KEY_Escape, 0);
     CHECK(f.backs == 1 && f.keys == 0);
     ui_event(&f.ui, &(ui_event_t){.kind = UI_PRESS,
-        .input = {BIND_KEY, KEY_Tab}, .shift = true}, 0);
+        .input = {BIND_KEY, KEY_Tab, 0}, .shift = true}, 0);
     CHECK(f.keys == 1 && f.shift);
 }
 
@@ -260,8 +260,8 @@ static void test_left_right(void)
 static void test_key_repeat(void)
 {
     fixture_t f;
-    ui_event_t down = {.kind = UI_PRESS, .input = {BIND_KEY, KEY_Right}};
-    ui_event_t up = {.kind = UI_RELEASE, .input = {BIND_KEY, KEY_Right}};
+    ui_event_t down = {.kind = UI_PRESS, .input = {BIND_KEY, KEY_Right, 0}};
+    ui_event_t up = {.kind = UI_RELEASE, .input = {BIND_KEY, KEY_Right, 0}};
 
     setup(&f);
     f.ui.focused = SLIDER;
@@ -291,8 +291,8 @@ static void test_repeat_let_go(void)
 {
     fixture_t f;
     fixture_t dialog;
-    ui_event_t down = {.kind = UI_PRESS, .input = {BIND_KEY, KEY_Down}};
-    ui_event_t up = {.kind = UI_RELEASE, .input = {BIND_KEY, KEY_Down}};
+    ui_event_t down = {.kind = UI_PRESS, .input = {BIND_KEY, KEY_Down, 0}};
+    ui_event_t up = {.kind = UI_RELEASE, .input = {BIND_KEY, KEY_Down, 0}};
     ui_event_t gone = {.kind = UI_LET_GO};
 
     setup(&f);
@@ -332,28 +332,74 @@ static void test_capture(void)
     setup(&f);
     click_at(&f, 1500, 620);                         /* opens it */
     CHECK(f.ui.capturing == KEYBIND);
-    send(&f, UI_PRESS, (binding_t){BIND_MOUSE, MOUSE_Right}, 0, 0);
+    send(&f, UI_PRESS, (binding_t){BIND_MOUSE, MOUSE_Right, 0}, 0, 0);
     CHECK(f.ui.capturing == -1);
-    CHECK(binding_equal(f.bound, (binding_t){BIND_MOUSE, MOUSE_Right}));
+    CHECK(binding_equal(f.bound, (binding_t){BIND_MOUSE, MOUSE_Right, 0}));
     CHECK(f.changes == 1);
     f.ui.focused = KEYBIND;
     key(&f, KEY_Enter, 0);                           /* its release: ignored */
     CHECK(f.ui.capturing == KEYBIND);
     key(&f, KEY_Escape, 0);
     CHECK(f.ui.capturing == -1 && f.backs == 0);
-    CHECK(binding_equal(f.bound, (binding_t){BIND_MOUSE, MOUSE_Right}));
+    CHECK(binding_equal(f.bound, (binding_t){BIND_MOUSE, MOUSE_Right, 0}));
     key(&f, KEY_Enter, 0);
     key(&f, KEY_Backspace, 0);
     CHECK(f.bound.kind == BIND_NONE && f.changes == 2);
     key(&f, KEY_Enter, 0);
-    send(&f, UI_PRESS, (binding_t){BIND_JOY, 3}, 0, 0);
-    CHECK(binding_equal(f.bound, (binding_t){BIND_JOY, 3}));
+    send(&f, UI_PRESS, (binding_t){BIND_JOY, 3, 0}, 0, 0);
+    CHECK(binding_equal(f.bound, (binding_t){BIND_JOY, 3, 0}));
     f.w[KEYBIND].on_capture = on_capture;            /* the screen decides */
     key(&f, KEY_Enter, 0);
     key(&f, KEY_W, 0);
     CHECK(f.captures == 1 && binding_equal(f.captured, (binding_t){BIND_KEY,
-        KEY_W}));
-    CHECK(binding_equal(f.bound, (binding_t){BIND_JOY, 3}));
+        KEY_W, 0}));
+    CHECK(binding_equal(f.bound, (binding_t){BIND_JOY, 3, 0}));
+}
+
+static void combo_key(fixture_t *f, key_id_t k, int mods)
+{
+    ui_event_t down = {.kind = UI_PRESS, .input = {BIND_KEY, (int)k, 0},
+        .mods = mods};
+
+    ui_event(&f->ui, &down, 0);
+}
+
+/*
+** A combination's prompt (11.6): the modifiers alone wait, then the key is
+** taken with them; plain Backspace clears, with a modifier it is a key;
+** no mouse or gamepad button, but its Cancel and Clear still work.
+*/
+static void test_capture_combo(void)
+{
+    fixture_t f;
+    ui_rect_t clear = UI_CAPTURE_CLEAR;
+
+    setup(&f);
+    f.w[KEYBIND].combo = true;
+    click_at(&f, 1500, 620);
+    combo_key(&f, KEY_LControl, MOD_CTRL);
+    combo_key(&f, KEY_RShift, MOD_CTRL | MOD_SHIFT);
+    send(&f, UI_PRESS, (binding_t){BIND_JOY, 3, 0}, 0, 0);
+    send(&f, UI_PRESS, (binding_t){BIND_MOUSE, MOUSE_Right, 0}, 0, 0);
+    click_at(&f, 960, 450);                          /* inside: not a key */
+    CHECK(f.ui.capturing == KEYBIND && f.changes == 0);
+    combo_key(&f, KEY_Z, MOD_CTRL | MOD_SHIFT);
+    CHECK(f.ui.capturing == -1 && binding_equal(f.bound,
+        (binding_t){BIND_KEY, KEY_Z, MOD_CTRL | MOD_SHIFT}));
+    f.ui.focused = KEYBIND;
+    key(&f, KEY_Enter, 0);
+    combo_key(&f, KEY_Backspace, MOD_CTRL);
+    CHECK(binding_equal(f.bound, (binding_t){BIND_KEY, KEY_Backspace,
+        MOD_CTRL}));
+    key(&f, KEY_Enter, 0);
+    combo_key(&f, KEY_Escape, MOD_SHIFT);            /* any Escape cancels */
+    CHECK(f.ui.capturing == -1 && f.bound.code == KEY_Backspace);
+    key(&f, KEY_Enter, 0);
+    combo_key(&f, KEY_Backspace, 0);
+    CHECK(f.bound.kind == BIND_NONE);
+    key(&f, KEY_Enter, 0);
+    click_at(&f, clear.x + 10, clear.y + 10);
+    CHECK(f.ui.capturing == -1 && f.bound.kind == BIND_NONE);
 }
 
 /* The mouse alone: Cancel, Clear, a click away, a click inside (5.5, 5.8). */
@@ -397,7 +443,7 @@ static void test_list(void)
     CHECK(f.row == 9 && f.ui.focused == LIST);
     key(&f, KEY_Down, 0);
     CHECK(f.ui.focused == BUTTON);                   /* off the end: next widget */
-    send(&f, UI_WHEEL, (binding_t){BIND_NONE, 0}, 1500, 750);
+    send(&f, UI_WHEEL, (binding_t){BIND_NONE, 0, 0}, 1500, 750);
     f.ui.widgets[LIST].scroll = 0;
     ui_event(&f.ui, &(ui_event_t){.kind = UI_WHEEL, .x = 1500,
         .y = 750, .wheel = -1}, 0);
@@ -526,6 +572,7 @@ void test_ui(void)
     test_repeat_let_go();
     test_capture();
     test_capture_mouse();
+    test_capture_combo();
     test_list();
     test_looks();
     test_modal();

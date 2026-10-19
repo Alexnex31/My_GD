@@ -98,6 +98,36 @@ static void slot_captured(void *ctx, widget_t *w, binding_t b)
     options_notice(om, text);
 }
 
+/* An editor shortcut captured (11.6): the editor's own swaps, no others. */
+static void editor_key_captured(void *ctx, widget_t *w, binding_t b)
+{
+    option_m_t *om = ctx;
+    settings_t *s = &om->gd->settings;
+    ed_key_t k = om->page_keys[w - om->row_widgets - 1];
+    int other = -1;
+    char name[BINDING_NAME_MAX];
+    char text[200];
+    rebind_result_t r = editor_rebind(s->editor_keys, (int)k, b, &other);
+
+    if (r == REBIND_REFUSED)
+        return options_notice(om, "Not an editor key");
+    if (r == REBIND_SAME)
+        return;
+    menu_of(ctx);
+    if (r != REBIND_SWAPPED)
+        return;
+    binding_format(b, name, sizeof(name));
+    snprintf(text, sizeof(text), "%s moved: %s <-> %s", name,
+        ed_key_label((ed_key_t)other), ed_key_label(k));
+    options_notice(om, text);
+}
+
+static void editor_page_changed(void *ctx, widget_t *w)
+{
+    (void)w;
+    ((option_m_t *)ctx)->pending_rows = true;   /* the rows, after the events */
+}
+
 /* Not saved yet: only Keep makes it the settings' (5.4). */
 static void display_changed(void *ctx, widget_t *w)
 {
@@ -197,6 +227,31 @@ static int controls_rows(option_m_t *om, widget_t *r)
     return NB_SLOTS;
 }
 
+/*
+** A page of the editor's actions at a time: they don't all fit. Its rows
+** point into the settings themselves, as each change is applied at once.
+*/
+static int editor_rows(option_m_t *om, widget_t *r)
+{
+    int n = ed_key_page_list(om->editor_page, om->page_keys);
+
+    for (int i = 0; i < ED_KEY_PAGES; i++)
+        om->page_names[i] = ed_key_page_name(i);
+    r[0] = row(0, W_CYCLER, "Page", &om->editor_page);
+    r[0].max = ED_KEY_PAGES - 1;
+    r[0].choices = om->page_names;
+    r[0].on_change = editor_page_changed;
+    for (int i = 0; i < n; i++) {
+        r[1 + i] = row(1 + i, W_KEYBIND, ed_key_label(om->page_keys[i]), NULL);
+        r[1 + i].binding = &om->gd->settings.editor_keys[om->page_keys[i]];
+        r[1 + i].on_capture = editor_key_captured;
+        r[1 + i].combo = true;
+    }
+    for (int i = 0; i <= n; i++)
+        r[i].bounds.y = OPT_ROW_Y - 50.0f + 85.0f * (float)i;   /* 10 fit */
+    return 1 + n;
+}
+
 static int display_rows(option_m_t *om, widget_t *r)
 {
     r[0] = row(0, W_TOGGLE, "Fullscreen", &om->fullscreen);
@@ -276,7 +331,8 @@ static void read_values(option_m_t *om)
 void options_build_rows(option_m_t *om)
 {
     static int (*const BUILD[NB_SECTIONS])(option_m_t *, widget_t *) = {
-        audio_rows, gameplay_rows, controls_rows, display_rows, data_rows};
+        audio_rows, gameplay_rows, controls_rows, editor_rows, display_rows,
+        data_rows};
     int keep = om->rows_of == (int)om->section ? om->rows.focused : -1;
     int n = 0;
 

@@ -55,6 +55,7 @@ typedef struct ui_event {
     float y;
     int wheel;
     bool shift;
+    int mods;                     /* a key's: MOD_CTRL, MOD_SHIFT, MOD_ALT   */
     unsigned int ch;
 } ui_event_t;
 
@@ -95,6 +96,9 @@ struct widget {
     capture_fn on_capture;        /* NULL: the binding is set as captured   */
     char *text;                   /* text field: the caller's buffer        */
     int text_cap;                 /* its size, the NUL included             */
+    bool combo;                   /* keybind: a key with the Ctrl, Shift and
+                                     Alt held, the modifiers alone wait;
+                                     no mouse or gamepad button            */
 };
 
 typedef struct ui_screen ui_screen_t;
