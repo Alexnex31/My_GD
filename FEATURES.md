@@ -575,17 +575,29 @@ int music_load(music_manager_t *m, const char *file)
 
 void music_play_from(music_manager_t *m, float seconds)
 {
+    sfSoundStatus st;
+
     if (m->current == NULL)
         return;
-    if (sfMusic_getStatus(m->current) == sfStopped)
+    st = sfMusic_getStatus(m->current);
+    if (st == sfStopped)
         sfMusic_play(m->current);
     sfMusic_setPlayingOffset(m->current, sfSeconds(seconds));
-    sfMusic_play(m->current);
+    if (st == sfPaused)
+        sfMusic_play(m->current);
     sfClock_restart(m->sync_clock);
 }
 ```
 
-SFML only moves a stream that is playing or paused: a stopped one starts from 0 whatever it was told (`play()` seeks to 0), so a stopped song is started first, then moved. Stop, move, play would restart every resume and respawn from the song's start.
+What SFML 2.6 does with each state, timed by when the song ends (`sfMusic_getPlayingOffset` can't tell: it reports the position asked for even when the sound restarted from 0):
+
+| State | Plays from the place | Plays from 0 |
+|---|---|---|
+| Stopped (new, stopped or ended) | `play()`, then move | move, then `play()` |
+| Playing | move, or `play()` then move | move, then `play()` |
+| Paused | move, then `play()`, or `play()` then move | |
+
+So a `play()` after the move restarts the song unless it was paused: a stopped song is started first, then moved, and a playing one is only moved. Stop, move, play would restart every resume and respawn from the song's start.
 
 Only one `sfMusic` exists at a time. Switching songs destroys the old one after the new one opened, so a missing file never leaves you with silence *and* a dangling pointer.
 

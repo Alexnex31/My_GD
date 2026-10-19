@@ -71,12 +71,16 @@ static double loop_len(const music_manager_t *m)
 }
 
 /*
-** SFML only seeks a stream that plays or is paused: a stopped one starts
-** from 0 whatever it was told, so it is started first. A position before
-** the song's start is a song due later: it starts from 0 when it's time.
+** What SFML 2.6 does, timed by when the song ends: a stopped stream's play()
+** starts from 0 whatever it was told, so it is started, then moved; a
+** playing one is only moved (a play() would restart it from 0); a paused
+** one is moved, then played. A position before the song's start is a song
+** due later: it starts from 0 when it's time.
 */
 void music_play_from(music_manager_t *m, double seconds)
 {
+    sfSoundStatus st;
+
     if (m->current == NULL)
         return;
     m->last_check_ms = ui_now_ms();
@@ -86,11 +90,13 @@ void music_play_from(music_manager_t *m, double seconds)
         m->start_at_ms = m->last_check_ms + (int64_t)(-seconds * 1000.0) + 1;
         return;
     }
-    if (sfMusic_getStatus(m->current) == sfStopped)
+    st = sfMusic_getStatus(m->current);
+    if (st == sfStopped)
         sfMusic_play(m->current);
     sfMusic_setPlayingOffset(m->current,
         sfSeconds((float)music_seek_point(seconds, loop_len(m))));
-    sfMusic_play(m->current);
+    if (st == sfPaused)
+        sfMusic_play(m->current);
 }
 
 /* Where the level's song is at that tick, `ahead` seconds past it (4.8). */
