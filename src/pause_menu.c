@@ -97,8 +97,7 @@ static void resume(level_t *lv, gd_t *gd, bool song)
     lv->last_frame_us = input_now_us(gd);
     input_resume(gd);
     if (song && lv->state == LEVEL_PLAYING && lv->song.song != NULL)
-        music_play_from(&gd->music, music_expected(lv->song.offset,
-            lv->sim.st.tick, gd->music.audio_offset));
+        music_play_at_tick(&gd->music, lv->sim.st.tick, 0.0);
 }
 
 /*

@@ -24,7 +24,8 @@ void editor_song_stop(editor_t *ed, gd_t *gd)
 /*
 ** P: the song the level will play, from the time the middle of the canvas
 ** is reached at; P again stops it. Before the level's start there is no
-** song yet: it plays from its offset.
+** song yet: it plays from its offset. The audio offset applies, as in a
+** level (4.8).
 */
 void editor_song_toggle(editor_t *ed, gd_t *gd)
 {
@@ -36,10 +37,11 @@ void editor_song_toggle(editor_t *ed, gd_t *gd)
         return editor_song_stop(ed, gd);
     if (c.song == NULL || music_load(&gd->music, c.song->file) != 0)
         return editor_notice(ed, "No song to play: L chooses the level's");
+    from = (from < c.offset ? c.offset : from) + gd->music.audio_offset;
     if (from >= c.song->duration)
         return editor_notice(ed, "The song is over before this point");
     music_set_loop(&gd->music, false);
-    music_play_from(&gd->music, from < c.offset ? c.offset : from);
+    music_play_from(&gd->music, from);
     ed->song_on = true;
 }
 
@@ -52,9 +54,11 @@ void editor_song_follow(editor_t *ed, gd_t *gd)
     double half = ED_CANVAS_W * ed->zoom / 2.0;
     double x;
 
+    music_update(gd);                        /* a song due later starts */
     if (!ed->song_on || !music_is_playing(&gd->music))
         return;
-    x = ed_x_at_time(&ed->lv, &gd->library, music_position(&gd->music));
+    x = ed_x_at_time(&ed->lv, &gd->library, music_position(&gd->music)
+        - gd->music.audio_offset);
     if (x > ed->cam.x + half * 0.9 && x < ed->cam.x + half * 1.5)
         ed->cam.x = x + half * 0.8;
 }
@@ -84,7 +88,8 @@ void editor_song_lines(editor_t *ed, gd_t *gd, double left, double right,
         return;
     if (!music_is_playing(&gd->music))
         return editor_song_stop(ed, gd);     /* it reached its end */
-    x = ed_x_at_time(&ed->lv, &gd->library, music_position(&gd->music));
+    x = ed_x_at_time(&ed->lv, &gd->library, music_position(&gd->music)
+        - gd->music.audio_offset);
     editor_line(ed, x, top, x, bottom, PLAYHEAD);
     editor_line(ed, x + 2.0 * ed->zoom, top, x + 2.0 * ed->zoom, bottom,
         PLAYHEAD);

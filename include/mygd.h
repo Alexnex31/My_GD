@@ -96,7 +96,10 @@ void apply_letterbox(gd_t *gd, unsigned int w, unsigned int h);
 bool music_probe(const char *path, float *duration);
 int music_load(music_manager_t *m, const char *file);
 void music_play_from(music_manager_t *m, double seconds);
+/* The level's song where tick is, `ahead` seconds further on (4.8). */
+void music_play_at_tick(music_manager_t *m, long tick, double ahead);
 void music_stop(music_manager_t *m);
+void music_silence(music_manager_t *m);    /* stop, the menu's place kept */
 void music_pause(music_manager_t *m);       /* where it is: resumed by play_from */
 double music_position(const music_manager_t *m);   /* seconds into the song */
 bool music_is_playing(const music_manager_t *m);

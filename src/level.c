@@ -119,12 +119,11 @@ static void level_music_start(level_t *lv, gd_t *gd)
     if (song_went_missing(lv, override))
         show_song_notice(lv, override);
     if (lv->song.song == NULL)
-        return music_stop(&gd->music);
+        return music_silence(&gd->music);
     gd->music.level_offset = lv->song.offset;
     music_set_loop(&gd->music, lv->song.offset + level_duration(&lv->sim.lvl)
         > lv->song.song->duration);          /* better a loop than silence (4.9) */
-    music_play_from(&gd->music, music_expected(lv->song.offset,
-        lv->sim.st.tick, gd->music.audio_offset));
+    music_play_at_tick(&gd->music, lv->sim.st.tick, 0.0);
 }
 
 static level_t *level_setup(level_t *lv, gd_t *gd, const char *id);
@@ -265,8 +264,7 @@ void level_on_death(level_t *lv, gd_t *gd)
 static void song_from_run(level_t *lv, gd_t *gd, double ahead)
 {
     if (lv->song.song != NULL)
-        music_play_from(&gd->music, music_expected(lv->song.offset,
-            lv->sim.st.tick, gd->music.audio_offset) + ahead);
+        music_play_at_tick(&gd->music, lv->sim.st.tick, ahead);
 }
 
 /*

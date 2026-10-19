@@ -235,9 +235,19 @@ void library_free(library_t *lib)
     *lib = (library_t){0};
 }
 
+/* Where song s starts: the level's offset when s is the level's music file. */
+static double song_offset(const song_t *s, const level_header_t *hdr)
+{
+    if (strcmp(s->file, hdr->music) == 0 && hdr->music_offset_set
+        && hdr->music_offset >= 0.0)
+        return hdr->music_offset;
+    return s->default_offset;
+}
+
 /*
 ** The override, the level's song, the default (4.4). The level's offset
-** only goes with the level's own song: an override starts at its own.
+** goes with the level's own song, even chosen as an override: any other
+** song starts at its own.
 */
 song_choice_t music_choose(const library_t *lib, const char *override,
     const level_header_t *hdr, song_source_t from)
@@ -246,12 +256,10 @@ song_choice_t music_choose(const library_t *lib, const char *override,
 
     if (from <= SONG_OVERRIDE && override != NULL && override[0] != '\0'
         && (s = library_find(lib, override)) != NULL)
-        return (song_choice_t){s, SONG_OVERRIDE, s->default_offset};
+        return (song_choice_t){s, SONG_OVERRIDE, song_offset(s, hdr)};
     if (from <= SONG_LEVEL && hdr->music[0] != '\0'
         && (s = library_find(lib, hdr->music)) != NULL)
-        return (song_choice_t){s, SONG_LEVEL, hdr->music_offset_set
-            && hdr->music_offset >= 0.0 ? hdr->music_offset
-            : s->default_offset};
+        return (song_choice_t){s, SONG_LEVEL, song_offset(s, hdr)};
     if (from <= SONG_DEFAULT
         && (s = library_find(lib, DEFAULT_LEVEL_SONG)) != NULL)
         return (song_choice_t){s, SONG_DEFAULT, s->default_offset};
@@ -272,9 +280,24 @@ double music_expected(double level_offset, long tick, double audio_offset)
     return level_offset + (double)tick / TICK_RATE + audio_offset;
 }
 
-bool music_drifted(double expected, double actual)
+/* A looping song wraps: past its end, the position is from its start again. */
+double music_seek_point(double expected, double loop_len)
 {
-    return fabs(actual - expected) > RESYNC_S;
+    if (expected <= 0.0)
+        return 0.0;
+    if (loop_len > 0.0)
+        return fmod(expected, loop_len);
+    return expected;
+}
+
+/* Across a loop's seam, 0.01 s and loop_len - 0.01 s are 0.02 s apart. */
+bool music_drifted(double expected, double actual, double loop_len)
+{
+    double d = fabs(actual - music_seek_point(expected, loop_len));
+
+    if (loop_len > 0.0)
+        d = fmin(d, loop_len - d);
+    return d > RESYNC_S;
 }
 
 float music_volume_curve(int volume)

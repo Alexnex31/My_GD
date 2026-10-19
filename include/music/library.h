@@ -84,7 +84,13 @@ const song_t *music_menu_song(const library_t *lib, const char *menu_song);
 /* Where the song should be at this tick (4.8). */
 double music_expected(double level_offset, long tick, double audio_offset);
 
-bool music_drifted(double expected, double actual);
+/*
+** Where the song can be put for that (4.8, 4.9): never before its start, and
+** a looping song (loop_len, its length; 0 when it doesn't loop) wraps.
+*/
+double music_seek_point(double expected, double loop_len);
+/* More than RESYNC_S from where it should be, the seam of a loop included. */
+bool music_drifted(double expected, double actual, double loop_len);
 
 /* The slider's 0-100 as sfMusic's volume: perceived loudness (4.7). */
 float music_volume_curve(int volume);

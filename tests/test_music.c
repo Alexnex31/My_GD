@@ -155,6 +155,8 @@ static void test_choice(void)
     CHECK(c.source == SONG_LEVEL);
     c = music_choose(&lib, "mine.ogg", &hdr, SONG_LEVEL);     /* it failed */
     CHECK(c.source == SONG_LEVEL);
+    c = music_choose(&lib, "level.ogg", &hdr, SONG_OVERRIDE); /* its own */
+    CHECK(c.source == SONG_OVERRIDE && c.offset == 1.5);
     hdr.music_offset = 0.0;                   /* set: 0 is the level's own */
     CHECK(music_choose(&lib, NULL, &hdr, SONG_OVERRIDE).offset == 0.0);
     hdr.music_offset_set = false;
@@ -178,8 +180,16 @@ static void test_sync_and_volume(void)
 
     CHECK(music_expected(1.25, 0, 0.0) == 1.25);
     CHECK(fabs(music_expected(1.25, TICK_RATE * 3, 0.1) - 4.35) < 1e-9);
-    CHECK(!music_drifted(10.0, 10.04) && !music_drifted(10.0, 9.96));
-    CHECK(music_drifted(10.0, 10.06) && music_drifted(10.0, 9.9));
+    CHECK(!music_drifted(10.0, 10.04, 0.0) && !music_drifted(10.0, 9.96, 0.0));
+    CHECK(music_drifted(10.0, 10.06, 0.0) && music_drifted(10.0, 9.9, 0.0));
+    CHECK(music_seek_point(-0.3, 0.0) == 0.0);    /* never before the start */
+    CHECK(music_seek_point(-0.3, 2.0) == 0.0);
+    CHECK(music_seek_point(5.5, 0.0) == 5.5);
+    CHECK(fabs(music_seek_point(5.5, 2.0) - 1.5) < 1e-9);  /* loops (4.9) */
+    CHECK(!music_drifted(5.5, 1.5, 2.0));        /* looped: where it should be */
+    CHECK(music_drifted(5.5, 1.5, 0.0));
+    CHECK(!music_drifted(4.01, 1.99, 2.0));      /* the seam: 0.02 s apart */
+    CHECK(music_drifted(4.5, 1.5, 2.0));
     CHECK(music_volume_curve(100) == 100.0f);
     CHECK(music_volume_curve(50) == 25.0f);       /* sounds like half (4.7) */
     CHECK(music_volume_curve(0) == 0.0f && music_volume_curve(150) == 100.0f);

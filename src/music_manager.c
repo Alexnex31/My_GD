@@ -42,6 +42,7 @@ int music_load(music_manager_t *m, const char *file)
     char path[256];
     sfMusic *next = NULL;
 
+    m->start_at_ms = 0;
     if (m->current != NULL && strcmp(m->current_file, file) == 0) {
         remember_menu(m);                    /* the same file, a new owner */
         m->preview_until_ms = 0;
@@ -61,25 +62,72 @@ int music_load(music_manager_t *m, const char *file)
     return 0;
 }
 
+/* The song's length when it loops, 0 when it doesn't (music_seek_point). */
+static double loop_len(const music_manager_t *m)
+{
+    if (!sfMusic_getLoop(m->current))
+        return 0.0;
+    return sfTime_asSeconds(sfMusic_getDuration(m->current));
+}
+
+/*
+** SFML only seeks a stream that plays or is paused: a stopped one starts
+** from 0 whatever it was told, so it is started first. A position before
+** the song's start is a song due later: it starts from 0 when it's time.
+*/
 void music_play_from(music_manager_t *m, double seconds)
 {
     if (m->current == NULL)
         return;
-    sfMusic_stop(m->current);
-    sfMusic_setPlayingOffset(m->current, sfSeconds((float)seconds));
-    sfMusic_play(m->current);
     m->last_check_ms = ui_now_ms();
+    m->start_at_ms = 0;
+    if (seconds < 0.0) {
+        sfMusic_stop(m->current);
+        m->start_at_ms = m->last_check_ms + (int64_t)(-seconds * 1000.0) + 1;
+        return;
+    }
+    if (sfMusic_getStatus(m->current) == sfStopped)
+        sfMusic_play(m->current);
+    sfMusic_setPlayingOffset(m->current,
+        sfSeconds((float)music_seek_point(seconds, loop_len(m))));
+    sfMusic_play(m->current);
+}
+
+/* Where the level's song is at that tick, `ahead` seconds past it (4.8). */
+void music_play_at_tick(music_manager_t *m, long tick, double ahead)
+{
+    music_play_from(m, music_expected(m->level_offset, tick, m->audio_offset)
+        + ahead);
+}
+
+/* A song due later starts now that it's time. */
+static void start_when_due(music_manager_t *m, int64_t now)
+{
+    if (m->start_at_ms == 0 || now < m->start_at_ms || m->current == NULL)
+        return;
+    m->start_at_ms = 0;
+    m->last_check_ms = now;
+    sfMusic_play(m->current);                /* stopped: from its start */
 }
 
 void music_stop(music_manager_t *m)
 {
+    m->start_at_ms = 0;
     if (m->current != NULL)
         sfMusic_stop(m->current);
+}
+
+/* A level with no song: the menu song stops, and is resumed after (4.10). */
+void music_silence(music_manager_t *m)
+{
+    remember_menu(m);
+    music_stop(m);
 }
 
 /* The pause menu's (PLAN 10.4): resuming plays from the tick's place again. */
 void music_pause(music_manager_t *m)
 {
+    m->start_at_ms = 0;
     if (m->current != NULL && sfMusic_getStatus(m->current) == sfPlaying)
         sfMusic_pause(m->current);
 }
@@ -113,14 +161,16 @@ void music_check_sync(music_manager_t *m, long tick)
     int64_t now = ui_now_ms();
     double expected = 0.0;
 
+    start_when_due(m, now);
     if (m->current == NULL || now - m->last_check_ms < 1000
         || sfMusic_getStatus(m->current) != sfPlaying)
         return;
     m->last_check_ms = now;
     expected = music_expected(m->level_offset, tick, m->audio_offset);
-    if (music_drifted(expected, sfTime_asSeconds(
-        sfMusic_getPlayingOffset(m->current))))
-        sfMusic_setPlayingOffset(m->current, sfSeconds((float)expected));
+    if (expected > 0.0 && music_drifted(expected, sfTime_asSeconds(
+        sfMusic_getPlayingOffset(m->current)), loop_len(m)))
+        sfMusic_setPlayingOffset(m->current,
+            sfSeconds((float)music_seek_point(expected, loop_len(m))));
 }
 
 /*
@@ -150,9 +200,11 @@ double music_position(const music_manager_t *m)
     return (double)sfTime_asSeconds(sfMusic_getPlayingOffset(m->current));
 }
 
+/* A song due later counts: it is on, only not heard yet. */
 bool music_is_playing(const music_manager_t *m)
 {
-    return m->current != NULL && sfMusic_getStatus(m->current) == sfPlaying;
+    return m->current != NULL && (m->start_at_ms != 0
+        || sfMusic_getStatus(m->current) == sfPlaying);
 }
 
 void music_preview(gd_t *gd, const song_t *s)
@@ -166,11 +218,12 @@ void music_preview(gd_t *gd, const song_t *s)
     m->preview_until_ms = ui_now_ms() + PREVIEW_MS;
 }
 
-/* Per frame in the menus: a preview stops after its 10 s. */
+/* Per frame in the menus and the editor: a preview stops after its 10 s. */
 void music_update(gd_t *gd)
 {
     music_manager_t *m = &gd->music;
 
+    start_when_due(m, ui_now_ms());
     if (m->preview_until_ms != 0 && ui_now_ms() >= m->preview_until_ms) {
         music_stop(m);
         m->preview_until_ms = -1;            /* over, until the next one */

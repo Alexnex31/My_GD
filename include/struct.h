@@ -137,6 +137,7 @@ typedef struct music_manager {
     double level_offset;          /* where the level's song starts            */
     double audio_offset;          /* seconds, the setting's (4.8)             */
     int64_t last_check_ms;        /* drift checks once a second               */
+    int64_t start_at_ms;          /* a song due later (a negative position), 0 */
     char menu_file[SONG_FILE_MAX]; /* "" when the library is empty            */
     float menu_position;          /* where the menu song was left (4.10)      */
     bool menu_playing;            /* the playback is the menu's, whatever file */
