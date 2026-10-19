@@ -1159,7 +1159,7 @@ Set `lv->last_frame_us = input_now_us(gd)` at the very end of `level_start` (aft
 
 **A full queue holds the clock back.** The polling thread publishes `now` only once every change it saw is in the queue; while the queue is full, `input_now_us` waits, and so do the ticks, so a press is never counted in a later tick than its own. The pause menu's frames read the queue (`input_drain`), so its clicks never fill it.
 
-**The click that starts a level isn't a jump.** Play and Retry are left clicks, and the button is usually still down on the level's first tick; a hold carried into an attempt is fresh (3.4), so the cube would jump at tick 0. `level_start` calls `input_start`, which starts the polling thread with the mouse inputs latched: they count for nothing, neither held nor pressed, until they're seen up (the keyboard is never ignored).
+**The click that starts a level isn't a jump.** Play and Retry are left clicks, and the button is usually still down on the level's first tick; a hold carried into an attempt is fresh (3.4), so the cube would jump at tick 0. `level_start` calls `input_start`, which starts the polling thread with every jump input that is down latched: it counts for nothing, neither held nor pressed, until it's seen up. Space on a focused Play or Retry button is the same case as the click.
 
 `level_step` wraps the sim with the game rules:
 

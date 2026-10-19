@@ -171,7 +171,7 @@ input_t input_read_tick(input_reader_t *r, input_queue_t *q, int64_t start, int6
 
 - **Key repeat** doesn't exist for polling: a key held for 2 s is one change. `sfRenderWindow_setKeyRepeatEnabled(w, sfFalse)` is still set once after creating the window, for the UI (5).
 - **Another input** going down while one is held is a new press; a release never is.
-- **The click that starts a level** (`latched`): Play and Retry are left clicks, usually still down on tick 0. The mouse inputs start latched and count for nothing until they're seen up; the keyboard never is (PLAN 3.6).
+- **The click or key that starts a level** (`latched`): Play and Retry are toolkit buttons, chosen by a left click or by Enter or Space, and Space is a jump input too; whatever chose them is usually still down on tick 0. Every jump input down when the level starts is latched and counts for nothing until it's seen up (PLAN 3.6). It was the mouse alone while the keyboard couldn't choose a level.
 - **Threads and X.** SFML 2.6 polls through the X display its window uses and never makes Xlib thread safe, so `main` calls `XInitThreads()` before anything else (as SDL does). Measured: a poll of Space, Up and the left button takes about 0.28 ms, and the thread holds 1 kHz, so a stamp is at most about 1.3 ms off, against a 4.17 ms tick.
 - The thread runs while a level is open (`input_start` in `level_start`, `input_stop` in `level_free`); menus read events as before.
 
@@ -192,7 +192,7 @@ The same table of jump inputs is polled for every bit, so `held` and `pressed` c
 
 ### 1.5 Clicks that belong to the UI
 
-A left click on the pause button or the end screen must not also count as a jump. Polling can't tell a UI click from a jump, but it doesn't have to: the UI reads the frame's events **before** the ticks that cover the click run, and every UI click in a level stops those ticks. Pausing stops ticking, and resuming restarts the tick windows at the resume time, so a press stamped before it presses nothing (1.2). The end screen only exists once the sim has stopped. Retry and Play start a new level, whose mouse inputs start latched until released (1.3). A future widget that's clicked while ticks keep running would need the same treatment: drop the presses stamped before its click was handled. The UI is always clicked with the left mouse button, whatever the jump bindings are.
+A left click on the pause button or the end screen must not also count as a jump. Polling can't tell a UI click from a jump, but it doesn't have to: the UI reads the frame's events **before** the ticks that cover the click run, and every UI click in a level stops those ticks. Pausing stops ticking, and resuming restarts the tick windows at the resume time, so a press stamped before it presses nothing (1.2). The end screen only exists once the sim has stopped. Retry and Play start a new level, whose jump inputs that are down start latched until released (1.3). A future widget that's clicked while ticks keep running would need the same treatment: drop the presses stamped before its click was handled. The UI is always clicked with the left mouse button, whatever the jump bindings are.
 
 ### 1.6 Tests
 
@@ -439,7 +439,14 @@ ui_look_t ui_look(const ui_screen_t *ui, int i);                          /* 3.2
 
 `ui_look` gives the state of 3.2 with what to draw: scale 1.05 hovered (under the mouse with no button down), 0.92 pressed (the left press started here and the mouse is still on it, or it's the slider being dragged), 50% alpha disabled, an outline when focused.
 
-Widgets are laid out once when the screen is created; nothing is allocated per frame. No scene uses the toolkit yet: the options screen (5) is the first.
+Widgets are laid out once when the screen is created; nothing is allocated per frame.
+
+### 3.7 As built: every menu
+
+- **On the toolkit:** the options screen (5), the pause menu, the song picker, the editor's list and dialogs, and (since the slice 9 review, 2026-10-19) the main menu, the level list and the end screen. Their buttons act on release, with the left button only, and every one is reached by the keyboard: the main menu's Options, Play (focused at the start) and Editor; each level's Play and "Song:" line, the list scrolling to keep the focused level whole on screen; the end screen's Retry (focused) and Quit, Escape leaving as Quit does.
+- **Image buttons** (`button.c`): a button is a square of a given size (300 px for the main menu's Play, 200 for Options and Editor, 100 for a level's Play, 250 for Retry and Quit) and its image fills it, its shape kept, centered: what is drawn is what is clicked. Today's images are placeholders (the cursor's picture, 104×123), stretched to the square; an image made at that size is drawn as it is. `ui_draw_sprite` gives an image the looks of 3.2 (grown or shrunk around its center, faded, outlined when focused); `ui_draw_focus` outlines a widget its screen draws itself (a level's song line).
+- **The level list's widgets** are in the grid's own coordinates: a mouse position is moved by the scroll before the toolkit sees it.
+- **Starting a level** latches every jump input that is down (1.5), since Space chooses a focused button and jumps too.
 
 ---
 

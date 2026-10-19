@@ -75,6 +75,8 @@ Exit code `84` means a missing asset, an unreadable level or a bad argument, wit
 
 ## Controls
 
+The menus work with the mouse or the keyboard alike: the arrows move the focus (an outline), `Enter` or `Space` choose, `Escape` goes back (from the main menu, it quits). A button acts when the left button is released on it, so a click dragged away is cancelled. In the level list, each level has its Play button and its "Song:" line; the list scrolls to follow the focus, and with the wheel. The end screen's Retry has the focus: `Enter` plays again. Whatever started a level, a click or `Space`, is no jump until it is released.
+
 | Action | Key |
 |---|---|
 | Jump / hold | `Space`, `Up`, or left click (`jump_bindings`) |
