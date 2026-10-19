@@ -16,7 +16,6 @@
     #define VIEW_W 1920.0f
     #define VIEW_H 1080.0f
 
-    #define CHUNK_W 1024.0f       /* the slices the view is culled by (9.2) */
 
     #define LIST_COLUMNS 4        /* the level list's grid: three rows fit,   */
     #define LIST_TOP 200.0f       /* the rest is reached by scrolling         */

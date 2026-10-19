@@ -149,15 +149,16 @@ void input_drain(gd_t *gd)
 
 /*
 ** Out of the pause menu (PLAN 10.4): what happened while it was open pressed
-** nothing, and the mouse button that clicked Resume is no jump until it is
-** released, as at a level's start.
+** nothing, and whatever chose Resume is no jump until it is released: the
+** mouse button that clicked it, or Space, which is a jump input as well as
+** the key that activates a focused button.
 */
 void input_resume(gd_t *gd)
 {
     input_poll_t *ip = &gd->input;
 
     input_drain(gd);
-    ip->reader.latched |= ip->reader.down & mouse_inputs(&ip->jump);
+    ip->reader.latched |= ip->reader.down;
 }
 
 void input_stop(gd_t *gd)

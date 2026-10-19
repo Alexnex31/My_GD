@@ -15,35 +15,19 @@
     #include "sim/sim.h"
     #include "view.h"
     #include "music/library.h"
+    #include "fx/draw_order.h"
     #include "fx/trail.h"
     #include "ui/ui.h"
 
 typedef struct gd gd_t;
 
 /*
-** One slice of the level along x, for what is in view (9.2): the objects
-** whose drawn left edge is in it, by their place in the draw order.
-*/
-typedef struct render_chunk {
-    float left;                   /* the leftmost drawn x of its objects  */
-    float right;                  /* the rightmost: a sprite can stick out */
-    size_t *ranks;
-    size_t count;
-} render_chunk_t;
-
-/*
-** The draw order (FEATURES 11.15): by Z layer, then Z order, then the order
-** objects were placed in, the later on top. Built once per level; each frame
-** draws the objects in view in that order, those behind the player first.
+** What draws the objects (9.2): their order and chunks (draw_index_t), their
+** vertices computed once at load, and the frame's, in that order.
 */
 typedef struct draw_order {
-    size_t *by_rank;              /* the object drawn k-th, of all of them */
+    draw_index_t index;
     sfVertex *verts;              /* six per object, in the world, at load */
-    render_chunk_t *chunks;
-    size_t nb_chunks;
-    size_t *visible;              /* this frame's: ranks, sorted           */
-    size_t nb_visible;
-    size_t nb_behind;             /* the first ones: B5 to B1              */
     sfVertex *frame;              /* what is drawn, rebuilt each frame     */
     size_t frame_cap;
 } draw_order_t;
@@ -93,7 +77,6 @@ typedef struct level {
     char shown_percent[16];       /* the string on screen: only set when it changes */
     float end_time;               /* seconds since the level was completed (9.8) */
     uint64_t *seen_spent;         /* the spent bits the last frame drew (9.2)  */
-    sfSprite *flash_sprite;       /* an object that just fired, fading out     */
     size_t flash_index[MAX_FLASHES];
     float flash_left[MAX_FLASHES];
     struct end_level_screen *end_screen;
@@ -114,8 +97,7 @@ typedef struct level {
     sim_snapshot_t *checkpoints;  /* its checkpoints, the last one respawns    */
     size_t nb_checkpoints;
     size_t cap_checkpoints;
-    sfRectangleShape *diamond;    /* a checkpoint in the level                 */
-    sfRectangleShape *bar_tick;   /* and on the progress bar                   */
+    sfVertexArray *marks;         /* the checkpoints, in the level and the bar */
     bool paused;                  /* the pause menu is open: no tick (PLAN 10.4) */
     ui_screen_t pause_ui;
     widget_t pause_widgets[PAUSE_ITEMS];
@@ -183,7 +165,7 @@ void practice_place(level_t *lv);
 void practice_remove(level_t *lv);
 void practice_clear(level_t *lv);
 bool practice_restore(level_t *lv);          /* false: no checkpoint */
-void practice_draw_world(gd_t *gd, level_t *lv);
+void practice_draw_world(gd_t *gd, level_t *lv, float cam_x);
 void practice_draw_bar(gd_t *gd, level_t *lv, sfVector2f bar, sfVector2f size);
 
 /*
@@ -195,6 +177,8 @@ void level_build_chunks(level_t *lv, gd_t *gd);
 void level_free_chunks(level_t *lv);
 void render_objects(gd_t *gd, level_t *lv, float cam_x, bool front);
 void object_vertices(gd_t *gd, const object_t *o, sfVertex *v);   /* 6 of them */
+void object_flash_vertices(gd_t *gd, const object_t *o, sfVertex *v,
+    sfUint8 alpha);
 
 /* The camera the renderer uses: the player's x, the sim's y, pixel snapped. */
 vec2_t level_camera(gd_t *gd, const level_t *lv);

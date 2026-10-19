@@ -129,124 +129,46 @@ void object_vertices(gd_t *gd, const object_t *o, sfVertex *v)
     append_object(v, o, gd->atlas_rect[o->type], object_color(o));
 }
 
-static const object_t *g_sorting;
-
-static int by_draw_order(const void *a, const void *b)
+/* The same shape in white, from the atlas's white row: the spent flash. */
+void object_flash_vertices(gd_t *gd, const object_t *o, sfVertex *v,
+    sfUint8 alpha)
 {
-    const object_t *oa = &g_sorting[*(const size_t *)a];
-    const object_t *ob = &g_sorting[*(const size_t *)b];
+    sfFloatRect tex = gd->atlas_rect[o->type];
 
-    return object_draw_cmp(oa, oa->line, ob, ob->line);
-}
-
-static int by_rank(const void *a, const void *b)
-{
-    size_t ra = *(const size_t *)a;
-    size_t rb = *(const size_t *)b;
-
-    return (ra > rb) - (ra < rb);
-}
-
-static size_t chunk_index(const object_t *o)
-{
-    rect_t d = object_drawn_bounds(o);
-    double x = d.x < 0.0 ? 0.0 : d.x;
-
-    return (size_t)(x / CHUNK_W);
-}
-
-/* Each chunk sized first, so its list is allocated once; filled by rank,
-** so it is already in the draw order. */
-static void build_chunks(draw_order_t *d, const level_data_t *lvl)
-{
-    size_t *filled = sim_xcalloc(d->nb_chunks, sizeof(size_t));
-
-    for (size_t i = 0; i < lvl->nb_objects; i++)
-        d->chunks[chunk_index(&lvl->objects[i])].count += 1;
-    for (size_t c = 0; c < d->nb_chunks; c++)
-        d->chunks[c].ranks = sim_xcalloc(d->chunks[c].count + 1,
-            sizeof(size_t));
-    for (size_t k = 0; k < lvl->nb_objects; k++) {
-        const object_t *o = &lvl->objects[d->by_rank[k]];
-        render_chunk_t *ch = &d->chunks[chunk_index(o)];
-        rect_t b = object_drawn_bounds(o);
-
-        ch->ranks[filled[ch - d->chunks]++] = k;
-        ch->left = fminf(ch->left, (float)b.x);
-        ch->right = fmaxf(ch->right, (float)(b.x + b.w));
-    }
-    free(filled);
+    tex.top += gd->atlas_white_dy;
+    append_object(v, o, tex, (sfColor){255, 255, 255, alpha});
 }
 
 /*
 ** Objects never move (Principle 1): their vertices are computed once per
-** level, and their place in the draw order too. A frame only copies those
-** of the objects in view, in that order.
+** level, and their place in the draw order too (draw_index_build). A frame
+** only copies those of the objects in view, in that order.
 */
 void level_build_chunks(level_t *lv, gd_t *gd)
 {
     const level_data_t *lvl = &lv->sim.lvl;
     draw_order_t *d = &lv->draw;
-    double right = 0.0;
 
     *d = (draw_order_t){0};
-    d->by_rank = sim_xcalloc(lvl->nb_objects + 1, sizeof(size_t));
     d->verts = sim_xcalloc(lvl->nb_objects * VERTS_PER_OBJECT + 1,
         sizeof(sfVertex));
-    d->visible = sim_xcalloc(lvl->nb_objects + 1, sizeof(size_t));
     for (size_t i = 0; i < lvl->nb_objects; i++) {
         const object_t *o = &lvl->objects[i];
-        rect_t b = object_drawn_bounds(o);
 
-        d->by_rank[i] = i;
         append_object(d->verts + i * VERTS_PER_OBJECT, o,
             gd->atlas_rect[o->type], object_color(o));
-        right = fmax(right, b.x + b.w);
     }
-    g_sorting = lvl->objects;
-    qsort(d->by_rank, lvl->nb_objects, sizeof(size_t), by_draw_order);
-    d->nb_chunks = (size_t)(right / CHUNK_W) + 1;
-    d->chunks = sim_xcalloc(d->nb_chunks, sizeof(render_chunk_t));
-    for (size_t c = 0; c < d->nb_chunks; c++)
-        d->chunks[c] = (render_chunk_t){INFINITY, -INFINITY, NULL, 0};
-    build_chunks(d, lvl);
+    draw_index_build(&d->index, lvl->objects, lvl->nb_objects);
 }
 
 void level_free_chunks(level_t *lv)
 {
     draw_order_t *d = &lv->draw;
 
-    for (size_t c = 0; c < d->nb_chunks; c++)
-        free(d->chunks[c].ranks);
-    free(d->chunks);
-    free(d->by_rank);
+    draw_index_free(&d->index);
     free(d->verts);
-    free(d->visible);
     free(d->frame);
     *d = (draw_order_t){0};
-}
-
-/* The objects of the chunks in view, in the draw order. */
-static void gather(level_t *lv, float cam_x)
-{
-    draw_order_t *d = &lv->draw;
-    const object_t *objs = lv->sim.lvl.objects;
-
-    d->nb_visible = 0;
-    for (size_t c = 0; c < d->nb_chunks; c++) {
-        const render_chunk_t *ch = &d->chunks[c];
-
-        if (ch->right < cam_x || ch->left > cam_x + VIEW_W)
-            continue;
-        memcpy(d->visible + d->nb_visible, ch->ranks,
-            ch->count * sizeof(size_t));
-        d->nb_visible += ch->count;
-    }
-    qsort(d->visible, d->nb_visible, sizeof(size_t), by_rank);
-    d->nb_behind = 0;
-    while (d->nb_behind < d->nb_visible
-        && objs[d->by_rank[d->visible[d->nb_behind]]].z_layer < Z_T1)
-        d->nb_behind += 1;
 }
 
 /*
@@ -274,12 +196,13 @@ void render_objects(gd_t *gd, level_t *lv, float cam_x, bool front)
 {
     sfRenderStates rs = {sfBlendAlpha, sfTransform_Identity, gd->atlas, NULL};
     draw_order_t *d = &lv->draw;
-    size_t from = front ? d->nb_behind : 0;
+    draw_index_t *x = &d->index;
+    size_t from = front ? x->nb_behind : 0;
     size_t to;
 
     if (!front)
-        gather(lv, cam_x);
-    to = front ? d->nb_visible : d->nb_behind;
+        draw_index_gather(x, lv->sim.lvl.objects, cam_x, cam_x + VIEW_W);
+    to = front ? x->nb_visible : x->nb_behind;
     if (to == from)
         return;
     if ((to - from) * VERTS_PER_OBJECT > d->frame_cap) {
@@ -288,7 +211,7 @@ void render_objects(gd_t *gd, level_t *lv, float cam_x, bool front)
         d->frame = sim_xcalloc(d->frame_cap, sizeof(sfVertex));
     }
     for (size_t k = from; k < to; k++)
-        put_one(lv, gd, d->by_rank[d->visible[k]],
+        put_one(lv, gd, x->by_rank[x->visible[k]],
             d->frame + (k - from) * VERTS_PER_OBJECT);
     draw_triangles(gd, d->frame, (to - from) * VERTS_PER_OBJECT, &rs);
 }

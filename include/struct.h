@@ -171,6 +171,7 @@ typedef struct gd {
     int draw_calls;               /* this frame's, counted in draw.c (9.0)    */
     sfTexture *atlas;             /* every object image in one texture (9.2)  */
     sfFloatRect atlas_rect[OBJ_TYPE_COUNT];
+    float atlas_white_dy;         /* the same images, white, this much lower  */
     progress_t progress;          /* attempts and best, loaded once (6.4)     */
     settings_t settings;          /* save/settings.txt (FEATURES 2)           */
     sfRectangleShape *ui_shape;   /* the widgets', reused (FEATURES 3)        */

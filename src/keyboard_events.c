@@ -239,10 +239,18 @@ void handle_end_screen_click(level_t **level, gd_t *gd, int mx, int my)
 
 /*
 ** The level scene's keys. The jump has its own thread (FEATURES 1). Escape
-** pauses (PLAN 10.4); once the level is complete it leaves, as Quit does.
+** pauses (PLAN 10.4); once the level is complete it skips the end sequence
+** to the end screen (9.8), and there it leaves, as Quit does.
 */
 static void playing_key(level_t **level, gd_t *gd, sfKeyCode key)
 {
+    float shown = level_end_flight(*level) + END_FLASH;
+
+    if (key == sfKeyEscape && (*level)->state == LEVEL_COMPLETE
+        && (*level)->end_time < shown) {
+        (*level)->end_time = shown;
+        return;
+    }
     if (key == sfKeyEscape && (*level)->state == LEVEL_COMPLETE)
         return go_back_playing_level_list(gd, level);
     if (key == sfKeyEscape)

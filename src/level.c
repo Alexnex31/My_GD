@@ -37,8 +37,6 @@ void level_count_attempt(level_t *lv)
 
     lv->stats.attempts += 1;
     lv->stats.dirty = lv->stats.dirty || !lv->playtest;
-    if (lv->attempt_text == NULL)
-        return;                              /* the first one, before the text */
     snprintf(text, sizeof(text), "Attempt %d", lv->stats.attempts);
     sfText_setString(lv->attempt_text, text);
 }
@@ -162,8 +160,7 @@ static level_t *level_setup(level_t *lv, gd_t *gd, const char *id)
     lv->state = LEVEL_PLAYING;
     level_build_chunks(lv, gd);
     lv->seen_spent = sim_xcalloc(lv->sim.st.spent_words + 1, sizeof(uint64_t));
-    lv->flash_sprite = sfSprite_create();
-    sfSprite_setTexture(lv->flash_sprite, gd->atlas, sfTrue);
+    flash_forget(lv->seen_spent, &lv->sim.st);   /* spent behind a start */
     lv->player_sprite = sfSprite_create();
     lv->trail_va = sfVertexArray_create();
     sfVertexArray_setPrimitiveType(lv->trail_va, sfTriangleStrip);
@@ -229,7 +226,6 @@ void level_free(level_t *lv, gd_t *gd)
         free_end_level_screen(lv->end_screen);
     practice_free(lv);
     level_free_chunks(lv);
-    sfSprite_destroy(lv->flash_sprite);
     free(lv->seen_spent);
     free(lv->path);
     sfSprite_destroy(lv->player_sprite);
@@ -275,7 +271,7 @@ static void respawn_run(level_t *lv)
 {
     if (!practice_restore(lv)) {
         sim_reset_at(&lv->sim, level_current_start(lv));
-        memset(lv->seen_spent, 0, lv->sim.st.spent_words * sizeof(uint64_t));
+        flash_forget(lv->seen_spent, &lv->sim.st);  /* behind a start */
     }
     lv->path_len = 0;                        /* a playtest's line: one attempt */
     trail_reset(&lv->trail, &lv->sim.st.player);

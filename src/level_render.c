@@ -8,7 +8,6 @@
 #include "mygd.h"
 #include "sim/modes.h"
 
-#define DRAW_MARGIN 200.0f        /* a sprite can reach past its hitbox (9.2) */
 #define STRIP_H     100.0f        /* the corridor's floor and ceiling (5.3)   */
 #define FADE_TIME   0.25f         /* how long a removed corridor lingers      */
 #define EXPLOSION_FRAMES 3
@@ -96,26 +95,6 @@ static void render_ship_bounds(gd_t *gd, level_t *lv, float cam_x)
         draw_bounds(gd, lv, now, cam_x, 255);
 }
 
-/* One object drawn on its own, from the atlas: the spent flash (9.2). */
-static void draw_one_object(gd_t *gd, level_t *lv, const object_t *o,
-    sfColor col)
-{
-    sfFloatRect a = gd->atlas_rect[o->type];
-
-    sfSprite_setTextureRect(lv->flash_sprite, (sfIntRect){(int)a.left,
-        (int)a.top, (int)a.width, (int)a.height});
-    sfSprite_setOrigin(lv->flash_sprite, (sfVector2f){a.width / 2.0f,
-        a.height / 2.0f});
-    sfSprite_setScale(lv->flash_sprite, (sfVector2f){(float)o->rect.w / a.width,
-        (float)o->rect.h / a.height});
-    sfSprite_setRotation(lv->flash_sprite, (float)o->rotation);
-    sfSprite_setPosition(lv->flash_sprite,
-        (sfVector2f){(float)(o->rect.x + o->rect.w / 2.0),
-            (float)(o->rect.y + o->rect.h / 2.0)});
-    sfSprite_setColor(lv->flash_sprite, col);
-    draw_sprite(gd, lv->flash_sprite, NULL);
-}
-
 static void start_flash(level_t *lv, size_t index)
 {
     for (int i = 0; i < MAX_FLASHES; i++)
@@ -128,32 +107,30 @@ static void start_flash(level_t *lv, size_t index)
 
 /*
 ** An interactive object keeps its sprite when it fires (5.1); the feedback is
-** one white frame fading out over it. The spent bitset is compared word by
-** word with the one the last frame drew, so this costs nothing per object.
+** its white silhouette fading out over it, all of them in one draw call.
 */
 static void render_spent_flashes(gd_t *gd, level_t *lv)
 {
     const run_state_t *st = &lv->sim.st;
     float dt = (float)lv->frame_us / 1000000.0f;
+    sfRenderStates rs = {sfBlendAlpha, sfTransform_Identity, gd->atlas, NULL};
+    sfVertex v[MAX_FLASHES * 6];
+    size_t fresh[MAX_FLASHES];
+    size_t n = flash_fresh(lv->seen_spent, st, fresh, MAX_FLASHES);
 
-    for (size_t w = 0; w < st->spent_words; w++) {
-        uint64_t fresh = st->spent[w] & ~lv->seen_spent[w];
-
-        for (int b = 0; fresh != 0 && b < 64; b++)
-            if (fresh & ((uint64_t)1 << b)) {
-                start_flash(lv, w * 64 + b);
-                fresh &= ~((uint64_t)1 << b);
-            }
-        lv->seen_spent[w] = st->spent[w];
-    }
+    for (size_t i = 0; i < n; i++)
+        start_flash(lv, fresh[i]);
+    n = 0;
     for (int i = 0; i < MAX_FLASHES; i++) {
         if (lv->flash_left[i] <= 0.0f)
             continue;
-        draw_one_object(gd, lv, &lv->sim.lvl.objects[lv->flash_index[i]],
-            (sfColor){255, 255, 255,
-                (sfUint8)(255.0f * lv->flash_left[i] / FLASH_TIME)});
+        object_flash_vertices(gd, &lv->sim.lvl.objects[lv->flash_index[i]],
+            v + n, (sfUint8)(255.0f * lv->flash_left[i] / FLASH_TIME));
+        n += 6;
         lv->flash_left[i] -= dt;
     }
+    if (n > 0)
+        draw_triangles(gd, v, n, &rs);
 }
 
 /* Three 110 x 110 frames of res/explos.png, over the death delay (6.1). */
@@ -193,15 +170,12 @@ static void render_ground(gd_t *gd, level_t *lv, float cam_x)
 */
 static void render_background(gd_t *gd, level_t *lv, vec2_t cam)
 {
-    sfVector2u ts = sfTexture_getSize(gd->res->level_background);
-
     sfSprite_setTextureRect(lv->background_sprite,
         (sfIntRect){(int)(cam.x * 0.1), (int)(cam.y * 0.1),
             (int)VIEW_W, (int)VIEW_H});
     sfSprite_setPosition(lv->background_sprite, (sfVector2f){0.0f, 0.0f});
     sfSprite_setScale(lv->background_sprite, (sfVector2f){1.0f, 1.0f});
     draw_sprite(gd, lv->background_sprite, NULL);
-    (void)ts;
 }
 
 /*
@@ -340,6 +314,7 @@ static void render_end_sequence(gd_t *gd, level_t *lv, vec2_t cam)
     render_background(gd, lv, cam);
     sfRenderWindow_setView(gd->w, gd->level_view);
     render_ground(gd, lv, (float)cam.x);
+    render_ship_bounds(gd, lv, (float)cam.x);  /* a level may end in one */
     render_objects(gd, lv, (float)cam.x, false);
     draw_end_wall(gd, lv, cam);
     render_trail(gd, lv, (vec2_t){x, p->pos.y}, (float)cam.x);
@@ -386,7 +361,7 @@ void level_render(gd_t *gd, level_t *lv)
     render_objects(gd, lv, (float)cam.x, true);    /* T1 to T4 */
     if (lv->state == LEVEL_DYING)
         render_explosion(gd, lv);            /* over everything it hit */
-    practice_draw_world(gd, lv);             /* its checkpoints (13.1) */
+    practice_draw_world(gd, lv, (float)cam.x);   /* its checkpoints (13.1) */
     render_spent_flashes(gd, lv);
     render_attempt(gd, lv);
     if (gd->debug_overlay)

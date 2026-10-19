@@ -30,25 +30,33 @@ static const char *const ATLAS_FILES[OBJ_TYPE_COUNT] = {
     [OBJ_MINI] = "res/cube_portal.png",
 };
 
-/*
-** Repeat the image's own edge rows and columns into the padding, so a texture
-** coordinate rounded outward still lands on the right colour.
-*/
-static void copy_with_padding(sfImage *dst, const sfImage *src, unsigned int x,
-    unsigned int y)
+/* The pixel at (x, y) of the padded image: the nearest of the image's own. */
+static sfColor padded_pixel(const sfImage *src, sfVector2u s, int x, int y)
 {
-    sfVector2u s = sfImage_getSize((sfImage *)src);
+    x = x < 0 ? 0 : (x >= (int)s.x ? (int)s.x - 1 : x);
+    y = y < 0 ? 0 : (y >= (int)s.y ? (int)s.y - 1 : y);
+    return sfImage_getPixel(src, (unsigned int)x, (unsigned int)y);
+}
 
-    sfImage_copyImage(dst, (sfImage *)src, x + PAD, y + PAD,
-        (sfIntRect){0, 0, (int)s.x, (int)s.y}, sfFalse);
-    sfImage_copyImage(dst, (sfImage *)src, x, y + PAD,
-        (sfIntRect){0, 0, PAD, (int)s.y}, sfFalse);
-    sfImage_copyImage(dst, (sfImage *)src, x + PAD + s.x, y + PAD,
-        (sfIntRect){(int)s.x - PAD, 0, PAD, (int)s.y}, sfFalse);
-    sfImage_copyImage(dst, (sfImage *)src, x + PAD, y,
-        (sfIntRect){0, 0, (int)s.x, PAD}, sfFalse);
-    sfImage_copyImage(dst, (sfImage *)src, x + PAD, y + PAD + s.y,
-        (sfIntRect){0, (int)s.y - PAD, (int)s.x, PAD}, sfFalse);
+/*
+** The image with its own edge pixels repeated into the padding, corners
+** included, so a texture coordinate rounded outward still lands on the
+** right colour. White: the same shape, every pixel white, for the flash.
+*/
+static void copy_with_padding(sfImage *dst, const sfImage *src, sfVector2u at,
+    bool white)
+{
+    sfVector2u s = sfImage_getSize(src);
+
+    for (int y = 0; y < (int)s.y + 2 * PAD; y++)
+        for (int x = 0; x < (int)s.x + 2 * PAD; x++) {
+            sfColor c = padded_pixel(src, s, x - PAD, y - PAD);
+
+            if (white)
+                c = (sfColor){255, 255, 255, c.a};
+            sfImage_setPixel(dst, at.x + (unsigned int)x,
+                at.y + (unsigned int)y, c);
+        }
 }
 
 /*
@@ -139,10 +147,12 @@ static sfImage *load_image(const char *path)
     return im;
 }
 
+/* Side by side on the first row; the second row is the same, white. */
 static void atlas_place(gd_t *gd, sfImage *atlas, sfImage **parts,
     unsigned int *widths)
 {
     unsigned int x = 0;
+    unsigned int row = sfImage_getSize(atlas).y / 2;
 
     for (int t = 0; t < OBJ_TYPE_COUNT; t++) {
         sfVector2u s;
@@ -150,11 +160,13 @@ static void atlas_place(gd_t *gd, sfImage *atlas, sfImage **parts,
         if (parts[t] == NULL)
             continue;
         s = sfImage_getSize(parts[t]);
-        copy_with_padding(atlas, parts[t], x, 0);
+        copy_with_padding(atlas, parts[t], (sfVector2u){x, 0}, false);
+        copy_with_padding(atlas, parts[t], (sfVector2u){x, row}, true);
         gd->atlas_rect[t] = (sfFloatRect){(float)(x + PAD), (float)PAD,
             (float)s.x, (float)s.y};
         x += widths[t];
     }
+    gd->atlas_white_dy = (float)row;
 }
 
 /* The earlier type drawn from the same file, or -1: it is loaded once. */
@@ -170,6 +182,7 @@ static int same_image_as(int t)
 /*
 ** One texture for every object type, built once at startup. Types that share
 ** an image (a slope is drawn with the block texture) share its rectangle.
+** Under them, their white silhouettes: what flashes when one fires (9.2).
 */
 void atlas_build(gd_t *gd)
 {
@@ -190,7 +203,7 @@ void atlas_build(gd_t *gd)
         total += widths[t];
         height = s.y + 2 * PAD > height ? s.y + 2 * PAD : height;
     }
-    atlas = sfImage_createFromColor(total, height, sfTransparent);
+    atlas = sfImage_createFromColor(total, 2 * height, sfTransparent);
     atlas_place(gd, atlas, parts, widths);
     for (int t = 0; t < OBJ_TYPE_COUNT; t++)
         if (ATLAS_FILES[t] != NULL && same_image_as(t) >= 0)

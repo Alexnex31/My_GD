@@ -8,6 +8,7 @@
 #include "mygd.h"
 
 #define DIAMOND 36.0f                 /* the marker's side, world pixels */
+#define EDGE 4.2f                     /* its white edge, 3 px across a side */
 
 static const sfColor CHECKPOINT = {60, 220, 90, 230};
 
@@ -19,19 +20,11 @@ void practice_clear(level_t *lv)
     lv->nb_checkpoints = 0;
 }
 
-/* The two shapes it draws with, made once with the level (3.6). */
+/* The vertices it draws with, made once with the level (3.6). */
 void practice_create(level_t *lv)
 {
-    lv->diamond = sfRectangleShape_create();
-    sfRectangleShape_setSize(lv->diamond, (sfVector2f){DIAMOND, DIAMOND});
-    sfRectangleShape_setOrigin(lv->diamond,
-        (sfVector2f){DIAMOND / 2.0f, DIAMOND / 2.0f});
-    sfRectangleShape_setRotation(lv->diamond, 45.0f);
-    sfRectangleShape_setFillColor(lv->diamond, CHECKPOINT);
-    sfRectangleShape_setOutlineThickness(lv->diamond, 3.0f);
-    sfRectangleShape_setOutlineColor(lv->diamond, sfWhite);
-    lv->bar_tick = sfRectangleShape_create();
-    sfRectangleShape_setFillColor(lv->bar_tick, CHECKPOINT);
+    lv->marks = sfVertexArray_create();
+    sfVertexArray_setPrimitiveType(lv->marks, sfTriangles);
 }
 
 void practice_free(level_t *lv)
@@ -40,8 +33,7 @@ void practice_free(level_t *lv)
     free(lv->checkpoints);
     lv->checkpoints = NULL;
     lv->cap_checkpoints = 0;
-    sfRectangleShape_destroy(lv->diamond);
-    sfRectangleShape_destroy(lv->bar_tick);
+    sfVertexArray_destroy(lv->marks);
 }
 
 /*
@@ -88,8 +80,7 @@ bool practice_restore(level_t *lv)
     if (!lv->practice || lv->nb_checkpoints == 0)
         return false;
     sim_snapshot_restore(&lv->sim, &lv->checkpoints[lv->nb_checkpoints - 1]);
-    memcpy(lv->seen_spent, lv->sim.st.spent,
-        lv->sim.st.spent_words * sizeof(uint64_t));
+    flash_forget(lv->seen_spent, &lv->sim.st);
     return true;
 }
 
@@ -113,31 +104,62 @@ void practice_set(level_t *lv, gd_t *gd, bool on)
     level_respawn(lv, gd);
 }
 
-/* Green diamonds where the player was when each one was placed. */
-void practice_draw_world(gd_t *gd, level_t *lv)
+/* Two triangles: corners c[0..3] around, in one colour. */
+static void add_quad(sfVertexArray *va, const sfVector2f *c, sfColor col)
 {
-    if (!lv->practice || lv->nb_checkpoints == 0)
-        return;
-    for (size_t i = 0; i < lv->nb_checkpoints; i++) {
-        vec2_t at = lv->checkpoints[i].st.player.pos;
+    static const int ORDER[6] = {0, 1, 2, 0, 2, 3};
 
-        sfRectangleShape_setPosition(lv->diamond,
-            (sfVector2f){(float)at.x, (float)at.y});
-        draw_rect(gd, lv->diamond);
-    }
+    for (int k = 0; k < 6; k++)
+        sfVertexArray_append(va, (sfVertex){c[ORDER[k]], col, {0, 0}});
 }
 
-/* A tick on the progress bar at each checkpoint's percentage. */
+/* A square turned 45 degrees, `r` from its middle to each corner. */
+static void add_diamond(sfVertexArray *va, sfVector2f at, float r,
+    sfColor col)
+{
+    sfVector2f c[4] = {{at.x, at.y - r}, {at.x + r, at.y},
+        {at.x, at.y + r}, {at.x - r, at.y}};
+
+    add_quad(va, c, col);
+}
+
+/*
+** Green diamonds with a white edge where the player was when each one was
+** placed: those in view, all in one draw call.
+*/
+void practice_draw_world(gd_t *gd, level_t *lv, float cam_x)
+{
+    float r = DIAMOND / sqrtf(2.0f);
+
+    if (!lv->practice || lv->nb_checkpoints == 0)
+        return;
+    sfVertexArray_clear(lv->marks);
+    for (size_t i = 0; i < lv->nb_checkpoints; i++) {
+        vec2_t at = lv->checkpoints[i].st.player.pos;
+        sfVector2f p = {(float)at.x, (float)at.y};
+
+        if (p.x + r + EDGE < cam_x || p.x - r - EDGE > cam_x + VIEW_W)
+            continue;
+        add_diamond(lv->marks, p, r + EDGE, sfWhite);
+        add_diamond(lv->marks, p, r, CHECKPOINT);
+    }
+    if (sfVertexArray_getVertexCount(lv->marks) > 0)
+        draw_vertex_array(gd, lv->marks, NULL);
+}
+
+/* A tick on the progress bar at each checkpoint's percentage, one call. */
 void practice_draw_bar(gd_t *gd, level_t *lv, sfVector2f bar, sfVector2f size)
 {
     if (!lv->practice || lv->nb_checkpoints == 0)
         return;
-    sfRectangleShape_setSize(lv->bar_tick, (sfVector2f){4.0f, size.y + 10.0f});
+    sfVertexArray_clear(lv->marks);
     for (size_t i = 0; i < lv->nb_checkpoints; i++) {
         double pct = lv->checkpoints[i].st.distance / lv->sim.lvl.end_shift;
+        float x = bar.x + size.x * (float)fmin(pct, 1.0) - 2.0f;
+        sfVector2f c[4] = {{x, bar.y - 5.0f}, {x + 4.0f, bar.y - 5.0f},
+            {x + 4.0f, bar.y + size.y + 5.0f}, {x, bar.y + size.y + 5.0f}};
 
-        sfRectangleShape_setPosition(lv->bar_tick, (sfVector2f){bar.x
-            + size.x * (float)fmin(pct, 1.0) - 2.0f, bar.y - 5.0f});
-        draw_rect(gd, lv->bar_tick);
+        add_quad(lv->marks, c, CHECKPOINT);
     }
+    draw_vertex_array(gd, lv->marks, NULL);
 }

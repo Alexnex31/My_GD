@@ -24,6 +24,7 @@ int main(void)
     test_ufo();
     test_wave();
     test_trail();
+    test_draw_order();
     test_ball();
     test_mirror();
     test_pads();
