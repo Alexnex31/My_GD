@@ -80,7 +80,7 @@ Exit code `84` means a missing asset, an unreadable level or a bad argument, wit
 | Jump / hold | `Space`, `Up`, or left click (`jump_bindings`) |
 | Pause: Resume, Restart, Practice on/off, Quit (`Escape` again resumes; the window losing focus pauses too) | `Escape` |
 | Practice: place / remove a checkpoint (a death goes back to the last one; only the practice best counts) | `Z` / `X` (`checkpoint_key`, `remove_checkpoint_key`) |
-| Back to the level list, once the level is complete | `Escape` |
+| Skip to the end screen while the player flies to the wall, then back to the level list | `Escape` |
 | Restart the attempt | `R` (`restart_key`) |
 | Previous / next start position (no best and no completion from one) | `A` / `E` |
 | Debug overlay (hitboxes, contacts, tick, speeds) | `F3` |
@@ -110,8 +110,8 @@ restart_key=R
 The full list is in `FEATURES.md` 2.2. The **options screen** (the main menu's options button) edits them, with the keyboard or the mouse:
 
 - **Sections:** Audio, Gameplay, Controls, Display and Data, switched with `Tab` / `Shift+Tab` or a click. `Up`/`Down` move through the rows, `Left`/`Right` change a value, `Enter` activates, `Escape` goes back and saves what changed.
-- **Controls:** activate a row, then press any key, mouse button or gamepad button. `Escape` cancels, `Backspace` clears. An input another row has swaps the two rows, and the last jump input can't be removed.
-- **Display:** a new fullscreen setting or window size asks to be kept, and reverts by itself after 10 s, so an unsupported mode fixes itself.
+- **Controls:** activate a row, then press any key, mouse button or gamepad button. `Escape` or the Cancel button cancels, `Backspace` or the Clear button clears, a click outside the prompt cancels. An input another row has swaps the two rows, and the last key or mouse button that jumps can't be removed (gamepads aren't read for jumps yet).
+- **Display:** a new fullscreen setting or window size asks to be kept, and reverts by itself after 10 s, so an unsupported mode fixes itself. It is saved only once kept: closing the game during the countdown keeps the old one.
 - **Data:** Reset progress asks first, and keeps the old file as `save/progress.txt.bak` (a reset of an empty store leaves the last `.bak` alone). Open save folder opens `save/` and prints its path.
 
 ## Level editor

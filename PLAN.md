@@ -2524,7 +2524,7 @@ static vec2_t snap_camera(gd_t *gd, float x, float y)
 
 ### 9.2 Objects: atlas, chunks, the draw order
 
-**Atlas.** At startup, load every object image (`block.png`, `spike.png`, `cube_portal.png`, later pads and orbs) as an `sfImage`, copy them side by side into one atlas image with `sfImage_copyImage`, and create one `sfTexture` from it. Keep each image's rectangle in the atlas (`gd->atlas_rect[type]`).
+**Atlas.** At startup, load every object image (`block.png`, `spike.png`, `cube_portal.png`, later pads and orbs) as an `sfImage`, copy them side by side into one atlas image, each with 2 px of its own edge pixels repeated around it (corners included), and create one `sfTexture` from it. Keep each image's rectangle in the atlas (`gd->atlas_rect[type]`). Under that row, the same images again as white silhouettes (each pixel white, its alpha kept), `gd->atlas_white_dy` lower: what the spent flash draws.
 
 **Vertices.** Each object is two triangles (6 vertices, `sfTriangles`): the rect's four corners, rotated around its center by `rotation` (the same function as the hitbox, 4.4), with texture coordinates from the atlas and a vertex color (white, or the portal tint: cyan for cube, pink for ship). **A slope is drawn as its hitbox's triangle** (bottom left, top right, bottom right, 4.2), with the texture cut along the same diagonal, so what you see is what the circle walks on; its second triangle collapses to a point and draws nothing, which keeps every object at 6 vertices. Types drawn from the same image file (the slope uses `block.png`) load it once and share its atlas rectangle.
 
@@ -2547,7 +2547,7 @@ static void append_object(sfVertex *v, const object_t *o, sfFloatRect tex, sfCol
 
 **Chunks and the draw order.** GD draws by Z layer, then Z order, then the order objects were placed in (7.2, FEATURES 11.15), and the player between B1 and T1. That order is global: two overlapping objects in different slices of x must still be drawn in it, so it can't be cut into per-chunk buffers. At load, each object's six vertices are computed once (objects never move, Principle 1) and the objects are sorted once into the draw order; each one knows its rank. The level is still split into chunks of 1024 px along x, by the left edge of each object's drawn (rotated) bounds, for culling only: a chunk lists its objects' ranks, and remembers the leftmost and rightmost drawn x of its objects, since an object can stick out of its chunk.
 
-Each frame, the ranks of the chunks in view are gathered and sorted, and their vertices copied into one array, in that order, a saw turned by the attempt's time on the way. The ones behind the player (B5 to B1) are drawn, then the player, then the rest (T1 to T4): two draw calls. The death explosion, the spent flashes and the practice checkpoints come after.
+Each frame, the ranks of the chunks in view are gathered and sorted (the order and the gathering are pure, `src/fx/draw_order.c`, and tested), and their vertices copied into one array, in that order, a saw turned by the attempt's time on the way. The ones behind the player (B5 to B1) are drawn, then the player, then the rest (T1 to T4): two draw calls. The death explosion, the spent flashes and the practice checkpoints come after.
 
 ```c
 void render_objects(gd_t *gd, level_t *lv, float cam_x, bool front);
@@ -2556,7 +2556,7 @@ void render_objects(gd_t *gd, level_t *lv, float cam_x, bool front);
 
 Static GPU buffers per chunk were the first version: they kept the vertices on the GPU, but drew blocks, hazards and interactive objects as three fixed layers, which is not GD's order. A frame's copy is a few thousand objects at most, well under a millisecond.
 
-**Spent objects** are drawn like live ones: they lose their hitbox, not their sprite. The feedback flash when an interactive object becomes spent is the only per-frame object drawing: the game layer compares the `spent` bitset with the previous frame's and, for a few frames, draws that one object again with a single sprite (white, fading out). Pulsing orbs later work the same way: a small dynamic vertex array for animated objects, the static buffers for everything else.
+**Spent objects** are drawn like live ones: they lose their hitbox, not their sprite. The feedback flash when an interactive object becomes spent is the only per-frame object drawing: the game layer compares the `spent` bitset with the previous frame's (`flash_fresh`) and, for a few frames, draws that object's own six vertices again from the atlas's white row, fading out: a pad flashes as its plate and an orb as its ring, all of them in one draw call. A reset or a checkpoint copies the bitset first (`flash_forget`): what a start position marks spent behind it was never fired. Pulsing orbs later work the same way: a small dynamic vertex array for animated objects, the static buffers for everything else.
 
 This also fixes two mismatches you have today: `block.png` and `spike.png` are 100×100 and never scaled, so `size 1` objects are drawn twice as big as their hitbox (levels 1 and 2 have some); and portals are drawn with the player/ship icons at 100×100 over a 100×200 hitbox. Vertices use each object's real rect, and portals use `cube_portal.png` (100×200, currently unused), tinted by mode.
 
