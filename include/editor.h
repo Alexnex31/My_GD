@@ -100,6 +100,7 @@ typedef struct editor {
     bool repeating;
     int64_t repeat_at_ms;         /* when it acts again                      */
     char path[64];                /* levels/<id>.gd                          */
+    bool is_new;                  /* never saved: its file must not exist    */
     vec2_t cam;                   /* the canvas's center, world coordinates  */
     float zoom;                   /* world px per UI px: 2 is zoomed out     */
     int zoom_step;                /* zoom is ED_ZOOM_STEP to this: 100% is   */

@@ -47,7 +47,7 @@ static void build_rows(editor_m_t *m)
 
     free_rows(m);
     m->ids = fill_names_list();
-    while (m->ids != NULL && m->ids[m->nb] != NULL && m->nb < ED_PICKER_MAX)
+    while (m->ids != NULL && m->ids[m->nb] != NULL)
         m->nb += 1;
     m->rows = sim_xcalloc((size_t)m->nb + 1, sizeof(char *));
     for (int i = 0; i < m->nb; i++) {
@@ -103,21 +103,49 @@ void free_editor_menu(editor_m_t *om)
 
 void print_editor_menu(editor_m_t *om, gd_t *gd)
 {
-    if (om->ed != NULL)
-        return editor_draw(om->ed, gd);
+    if (om->ed != NULL) {
+        editor_draw(om->ed, gd);
+        if (om->ed->play == NULL)            /* a playtest hides it, as a level */
+            print_cursor(gd->cursor, gd->w);
+        return;
+    }
     sfRenderWindow_drawSprite(gd->w, om->background, NULL);
     ui_update(&om->ui, ui_now_ms());
     ui_draw(gd, &om->ui);
+    if (ui_now_ms() < om->notice_until_ms)
+        ui_caption(gd, om->notice, VIEW_W / 2.0f, 140.0f);
+    print_cursor(gd->cursor, gd->w);
 }
 
-/* A new level takes the id after the highest there is (7.2). */
+/*
+** A new level takes the id after the highest there is (7.2). Every file of
+** levels/ was listed; one made since by hand is stepped over too.
+*/
 static void open_new(editor_m_t *m, gd_t *gd)
 {
     char id[LEVEL_ID_MAX + 1];
+    char path[64];
 
     ed_next_id((const char *const *)m->ids, (size_t)m->nb, id, sizeof(id));
+    snprintf(path, sizeof(path), "levels/%s.gd", id);
+    if (access(path, F_OK) == 0) {
+        build_rows(m);                       /* listed again: it is in now */
+        layout(m);
+        ed_next_id((const char *const *)m->ids, (size_t)m->nb, id,
+            sizeof(id));
+    }
     m->ed = editor_open(gd, id, m->name);
     m->name[0] = '\0';
+}
+
+/* Unreadable, or gone since the list was made: said, and listed again. */
+static void cant_open(editor_m_t *m)
+{
+    snprintf(m->notice, sizeof(m->notice), "Could not open levels/%s.gd",
+        m->ids[m->row]);
+    m->notice_until_ms = ui_now_ms() + 3000;
+    build_rows(m);
+    layout(m);
 }
 
 /* What the callbacks asked for, once the events are done (PLAN 10.1). */
@@ -131,9 +159,11 @@ static void act(editor_m_t **menu, gd_t *gd)
         gd->menu = 'm';
         return;
     }
-    if (m->want_open && m->nb > 0)
+    if (m->want_open && m->nb > 0) {
         m->ed = editor_open(gd, m->ids[m->row], NULL);
-    else if (m->want_new)
+        if (m->ed == NULL)
+            cant_open(m);
+    } else if (m->want_new)
         open_new(m, gd);
     m->want_open = false;
     m->want_new = false;

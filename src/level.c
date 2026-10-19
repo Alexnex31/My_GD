@@ -97,14 +97,15 @@ static void show_song_notice(level_t *lv, const char *override)
 
 /*
 ** The override, the level's song, the default (FEATURES 4.4): a file that
-** won't open falls to the next rule. Started at tick 0's position, right
+** won't open falls to the next rule. A playtest has no override: it plays
+** what the editor's P plays, the level's own (11.11). Started at tick 0's position, right
 ** before the level clock starts (4.8).
 */
 static void level_music_start(level_t *lv, gd_t *gd)
 {
     const progress_entry_t *pe = progress_find(&gd->progress, lv->id);
-    const char *override = pe == NULL ? NULL : pe->song;
-    song_source_t from = SONG_OVERRIDE;
+    const char *override = pe == NULL || lv->playtest ? NULL : pe->song;
+    song_source_t from = lv->playtest ? SONG_LEVEL : SONG_OVERRIDE;
 
     for (;;) {
         lv->song = music_choose(&gd->library, override, &lv->sim.lvl.hdr,

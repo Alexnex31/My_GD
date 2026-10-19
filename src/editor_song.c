@@ -35,11 +35,13 @@ void editor_song_toggle(editor_t *ed, gd_t *gd)
 
     if (ed->song_on)
         return editor_song_stop(ed, gd);
-    if (c.song == NULL || music_load(&gd->music, c.song->file) != 0)
+    if (c.song == NULL)
         return editor_notice(ed, "No song to play: L chooses the level's");
     from = (from < c.offset ? c.offset : from) + gd->music.audio_offset;
-    if (from >= c.song->duration)
+    if (from >= c.song->duration)             /* before the menu song goes */
         return editor_notice(ed, "The song is over before this point");
+    if (music_load(&gd->music, c.song->file) != 0)
+        return editor_notice(ed, "No song to play: L chooses the level's");
     music_set_loop(&gd->music, false);
     music_play_from(&gd->music, from);
     ed->song_on = true;

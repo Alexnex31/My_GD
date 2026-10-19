@@ -34,8 +34,11 @@ static int wanted_start(const editor_t *ed)
     return before != 0 ? before : (rank > 0 ? 1 : 0);
 }
 
+/* Not over a notice of the level's own: "Song missing" says more (4.4). */
 static void banner(level_t *lv)
 {
+    if (lv->notice_left > 0.0f)
+        return;
     sfText_setUnicodeString(lv->notice_text, utf8_to_utf32(
         "Playtest - Escape: back to the editor - A / E: start positions"));
     lv->notice_left = 4.0f;
@@ -106,8 +109,11 @@ void editor_play_events(editor_t *ed, gd_t *gd)
             editor_play_stop(ed, gd);
             return editor_close(ed, gd);
         }
-        if (ev->type == sfEvtGainedFocus)
-            ed->play->last_frame_us = input_now_us(gd);
+        if (ev->type == sfEvtLostFocus) {    /* the keys are someone else's */
+            editor_play_stop(ed, gd);
+            return editor_notice(ed, "Playtest stopped: the window lost the "
+                "focus");
+        }
         if (ev->type == sfEvtKeyPressed)
             play_key(ed, gd, ev->key.code);
         if (ed->play != NULL && input_event_is(ev, gd->settings.restart_key))

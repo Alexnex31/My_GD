@@ -76,7 +76,6 @@ typedef struct level_list {
     sfText *picker_title;
 } level_list_t;
 
-    #define ED_PICKER_MAX 256     /* levels the editor's list shows          */
 
 struct editor;
 
@@ -95,6 +94,8 @@ typedef struct editor_menu {
     int nb;
     int row;
     char name[64];                /* the new level's                         */
+    char notice[96];              /* a level that couldn't be opened         */
+    int64_t notice_until_ms;
     bool want_open;               /* set by the callbacks, done after events */
     bool want_new;
     bool want_back;

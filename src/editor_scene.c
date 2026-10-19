@@ -5,6 +5,10 @@
 ** the editor: opening it, its keys, saving (FEATURES 11.6)
 */
 
+#include <errno.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "editor.h"
 
 void editor_notice(editor_t *ed, const char *what)
@@ -26,6 +30,7 @@ editor_t *editor_open(gd_t *gd, const char *id, const char *new_name)
         if (ed->lv.hdr.name[0] == '\0')
             snprintf(ed->lv.hdr.name, sizeof(ed->lv.hdr.name), "LEVEL %s", id);
         ed->lv.dirty = true;                 /* it exists nowhere yet */
+        ed->is_new = true;
     } else if (ed_level_open(&ed->lv, ed->path) != 0) {
         free(ed);
         return NULL;
@@ -71,13 +76,26 @@ void editor_free(editor_t *ed)
     free(ed);
 }
 
-/* A saved level needs no autosave: it would only be offered back (11.12). */
+/*
+** A saved level needs no autosave: it would only be offered back (11.12).
+** A new level's first save never replaces a file that appeared since its
+** id was chosen. levels/ is made if it isn't there: a fresh install.
+*/
 bool editor_save(editor_t *ed)
 {
+    if (ed->is_new && access(ed->path, F_OK) == 0) {
+        editor_notice(ed, "Not saved: a level with this number appeared");
+        return false;
+    }
+    if (mkdir("levels", 0755) != 0 && errno != EEXIST) {
+        editor_notice(ed, "Could not make the levels folder");
+        return false;
+    }
     if (ed_level_save(&ed->lv, ed->path) != 0) {
         editor_notice(ed, "Could not save the level");
         return false;
     }
+    ed->is_new = false;
     ed_autosave_remove(ED_AUTOSAVE_DIR, ed->lv.id);
     editor_notice(ed, "Saved");
     return true;

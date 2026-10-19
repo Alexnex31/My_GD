@@ -113,15 +113,24 @@ char **fill_names_list(void)
     DIR *d = opendir("levels");
     struct dirent *dir = NULL;
     char **ids = NULL;
+    char **bigger = NULL;
     char id[24];
     int n = 0;
+    int cap = 64;
 
     if (d == NULL)
         return NULL;
-    ids = sim_xcalloc(257, sizeof(char *));
-    for (dir = readdir(d); dir != NULL && n < 256; dir = readdir(d)) {
+    ids = sim_xcalloc((size_t)cap + 1, sizeof(char *));
+    for (dir = readdir(d); dir != NULL; dir = readdir(d)) {
         if (level_id_from_path(dir->d_name, id, sizeof(id))) {  /* 7.2, 7.5 */
-            ids[n] = strdup(id);
+            if (n == cap) {                  /* every one: a new id is free */
+                cap *= 2;
+                bigger = sim_xcalloc((size_t)cap + 1, sizeof(char *));
+                memcpy(bigger, ids, (size_t)n * sizeof(char *));
+                free(ids);
+                ids = bigger;
+            }
+            ids[n] = sim_xstrdup(id);
             n += 1;
         } else if (dir->d_name[0] != '.')
             dprintf(2, "my_gd: levels/%s is not <digits>.gd (at most %d"
