@@ -19,16 +19,18 @@ A Geometry Dash–like rhythm platformer in C with CSFML. Fan project, not affil
 
 | | |
 |---|---|
-| ![The main menu](docs/screenshots/menu.png) | ![The ship between two rows of spikes](docs/screenshots/ship.png) |
-| The main menu | The ship, in its corridor |
-| ![The UFO](docs/screenshots/ufo.png) | ![The cube over spikes, a yellow orb behind it and a pink one ahead](docs/screenshots/orbs.png) |
-| The UFO: one press, one hop | Jump orbs: a click while touching one throws the player |
-| ![A mini cube jumping a spike under a low roof](docs/screenshots/mini.png) | ![The F3 overlay on the ball: hitboxes and the tick's numbers](docs/screenshots/debug_overlay.png) |
-| Mini: half the size, smaller jumps, through a gap a full cube can't take | The F3 overlay: the player's shapes, every hitbox, the tick's numbers |
-| ![The editor with 25 spikes selected and the properties panel](docs/screenshots/editor.png) | ![The editor zoomed out, the bot's path drawn through the level](docs/screenshots/editor_verify.png) |
-| The level editor: a box selection and its properties | Verify: the bot found a path, drawn as a line |
+| ![The main menu](docs/screenshots/menu.png) | ![The Icons screen: a tab per gamemode, the cube's icons below](docs/screenshots/icons.png) |
+| The main menu: your cube in the corner opens the Icons screen | The Icons screen: an icon per gamemode, the chosen one framed |
+| ![The ship between two rows of spikes](docs/screenshots/ship.png) | ![The UFO](docs/screenshots/ufo.png) |
+| The ship, in its corridor | The UFO: one press, one hop |
+| ![The cube over spikes, a yellow orb behind it and a pink one ahead](docs/screenshots/orbs.png) | ![A mini cube jumping a spike under a low roof](docs/screenshots/mini.png) |
+| Jump orbs: a click while touching one throws the player | Mini: half the size, smaller jumps, through a gap a full cube can't take |
+| ![The F3 overlay on the ball: hitboxes and the tick's numbers](docs/screenshots/debug_overlay.png) | ![The editor with 25 spikes selected and the properties panel](docs/screenshots/editor.png) |
+| The F3 overlay: the player's shapes, every hitbox, the tick's numbers | The level editor: a box selection and its properties |
+| ![The editor zoomed out, the bot's path drawn through the level](docs/screenshots/editor_verify.png) | |
+| Verify: the bot found a path, drawn as a line | |
 
-The sprites are placeholders for now: only the cube and the ship have icons of their own, and the other modes borrow one of those two.
+The sprites are placeholders for now: only the cube and the ship have icons of their own, and each other mode has a copy of one of those two in its folder, waiting for its art.
 
 ## What it is
 
@@ -75,7 +77,7 @@ Exit code `84` means a missing asset, an unreadable level or a bad argument, wit
 
 ## Controls
 
-The main menu has Options, Play and Editor, and Credits in its corner: every song with its author and license, then `res/CREDITS.md`. The menus work with the mouse or the keyboard alike: the arrows move the focus (an outline), `Enter` or `Space` choose, `Escape` goes back (from the main menu, it quits). A button acts when the left button is released on it, so a click dragged away is cancelled. In the level list, each level has its Play button and its "Song:" line; the list scrolls to follow the focus, and with the wheel. The end screen's Retry has the focus: `Enter` plays again. Whatever started a level, a click or `Space`, is no jump until it is released.
+The main menu has Options, Play and Editor, Credits in one corner (every song with its author and license, then `res/CREDITS.md`) and your cube in the other: the **Icons** screen. There you choose an icon for each gamemode, a tab per mode (cube, ship, ball, UFO, wave, robot, spider, swing), its icons 30 to a page; the chosen one is framed in green, and Back saves it. Icons have no colours to choose: each is drawn as its image is. The menus work with the mouse or the keyboard alike: the arrows move the focus (an outline), `Enter` or `Space` choose, `Escape` goes back (from the main menu, it quits). A button acts when the left button is released on it, so a click dragged away is cancelled. In the level list, each level has its Play button and its "Song:" line; the list scrolls to follow the focus, and with the wheel. The end screen's Retry has the focus: `Enter` plays again. Whatever started a level, a click or `Space`, is no jump until it is released.
 
 | Action | Key |
 |---|---|
@@ -110,6 +112,7 @@ editor_redo=Ctrl+Shift+Z   # the editor's: a key with Ctrl, Shift or Alt
 - An invalid value keeps its default, with a warning naming the line. Unknown keys are kept and written back; comments aren't.
 - If the file exists but can't be read, the game uses the defaults and never overwrites it. The same goes for `save/progress.txt`: an unreadable one is left alone, and that session's progress isn't saved.
 - `sfx_volume` is the click's volume (the only sound so far). Gamepad buttons are read but not polled yet.
+- `icon_cube=`, `icon_ship=`, … are the chosen icons' file names, one per mode. A file that has gone shows the mode's first icon.
 
 The full list is in `FEATURES.md` 2.2. The **options screen** (the main menu's options button) edits them, with the keyboard or the mouse:
 
@@ -247,12 +250,29 @@ src/fx/         effects that only read the simulation (the wave's trail): no SFM
 src/editor/     the level the editor edits (ids, open, save, hit test, undo, selection): no SFML, tested
 levels/         level files
 music/          songs and songs.txt
-res/            textures, fonts, sounds
+res/            images, fonts, sounds (see Assets)
 tests/          unit tests, engine tests, the bot
 docs/           the screenshots in this README
 PLAN.md         the rewrite: architecture, engine, phases
 FEATURES.md     gamemodes, objects, editor, music, options, tests
 ```
+
+## Assets
+
+```text
+res/
+  fonts/                 GDfont.ttf
+  menus/
+    backgrounds/         a screen's background each
+    buttons/             the image buttons (Play, Options, Editor, Retry, Quit)
+    cursor.png
+  level/                 the level's background and ground, the objects, the explosion
+  icons/<mode>/          the player's icons, any .png name, one folder per gamemode
+  sounds/                not played yet
+  CREDITS.md             each asset's author and license (not written yet)
+```
+
+Every path the game loads is in `include/assets.h`. Many images are placeholders: copies of another image under the name the real art will have. The buttons are the cursor's picture; each mode without art has a copy of the cube's or the ship's icon; and some files nothing loads yet hold their place (`editor_background.png`, `b.png` and `menu.png` copy other backgrounds, `opt_background.png` and `param_buton.png` are the cursor's picture, `monster.png` and `monster2.png` are other explosion strips). A placeholder keeps its name: replacing the file is all it takes. To add an icon, put a `.png` in its mode's folder: the Icons screen lists it at the next start, in natural order (`cube_2.png` before `cube_10.png`).
 
 ## Tests
 

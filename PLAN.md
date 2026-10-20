@@ -1224,7 +1224,7 @@ At load, `hitbox.c` builds each object's shape from its type, **then** rotates i
 |---|---|---|
 | `block` | neutral | the full rect |
 | `slope` | neutral | right triangle `(x, y+h)`, `(x+w, y)`, `(x+w, y+h)`: rises from left to right, 45° for a square |
-| `spike` | harm | `{x + 0.37w, y + 0.25h, 0.26w, 0.43h}`: measured off `res/spike_hitbox.png` (a 26 x 43 px box at (37, 25) in the 100 x 100 sprite). Narrow, and it stops well above the base, so brushing a spike's foot or its sloped sides is not a death. Proportional to the spike's size |
+| `spike` | harm | `{x + 0.37w, y + 0.25h, 0.26w, 0.43h}`: measured off `res/level/spike_hitbox.png` (a 26 x 43 px box at (37, 25) in the 100 x 100 sprite). Narrow, and it stops well above the base, so brushing a spike's foot or its sloped sides is not a death. Proportional to the spike's size |
 | `portal` | interactive | **1.2 blocks wide and 2.8 tall**, measured in GD, around the center of the cell the line writes (7.2). A derived axis is centered on that cell, so the corridor a mode portal opens (5.2) doesn't move; an explicit `w=` or `h=` anchors at the cell's corner like any other object |
 | `portal` | interactive | the full rect |
 
@@ -1926,7 +1926,7 @@ void level_respawn(level_t *lv, gd_t *gd)
 
 Compare with today's `player_dead`: it frees `portal_blocks`, undoes the accumulated shift of every object, resets the player, and relies on `reset_attempt_display` to reset the gamemode. Four places that must agree. Now the whole reset is `sim_reset`, which touches no object positions because none ever moved.
 
-The half-second delay is where the unused assets go: `res/explos.png` is a 330×110 strip of three 110×110 frames. Draw frame `(DEATH_DELAY_TICKS - death_ticks) * 3 / DEATH_DELAY_TICKS` at `death_pos` and hide the player; play `explode_11.ogg` (subject to Phase 12).
+The half-second delay is where the unused assets go: `res/level/explos.png` is a 330×110 strip of three 110×110 frames. Draw frame `(DEATH_DELAY_TICKS - death_ticks) * 3 / DEATH_DELAY_TICKS` at `death_pos` and hide the player; play `explode_11.ogg` (subject to Phase 12).
 
 The death delay (and the explosion) is a deliberate change from the legacy game, which respawns instantly. It lives entirely in the game layer, so it doesn't affect the sim, the replays or the bot.
 
@@ -2794,9 +2794,9 @@ Render the player at `prev_pos + (pos - prev_pos) * alpha`, with `alpha = lv->ac
 
 ### 12.1 Photos of people
 
-`res/cecilya.png` (editor background) and `res/noe_background.jpeg` (options background) are photos of real people, published in a public repository. If they're friends and it's a joke, make sure they're fine with it being public and permanent. Either way, replace them with real menu art before sharing the project widely.
+`res/menus/backgrounds/cecilya.png` (editor background) and `res/menus/backgrounds/noe_background.jpeg` (options background) are photos of real people, published in a public repository. If they're friends and it's a joke, make sure they're fine with it being public and permanent. Either way, replace them with real menu art before sharing the project widely.
 
-Deleting a file doesn't remove it from git history: anyone can still check out an old commit. If they need to disappear, rewrite history with `git filter-repo --path res/cecilya.png --invert-paths` (and the same for the other), then force-push. Everyone with a clone must re-clone.
+Deleting a file doesn't remove it from git history: anyone can still check out an old commit. If they need to disappear, rewrite history with `git filter-repo --path res/cecilya.png --path res/menus/backgrounds/cecilya.png --invert-paths` (both places it has been, and the same for the other), then force-push. Everyone with a clone must re-clone.
 
 ### 12.2 Assets from Geometry Dash
 

@@ -247,6 +247,7 @@ value   = any chars up to end of line
 | `remove_checkpoint_key` | binding name, or empty | not a jump binding, not Escape, not an earlier action key | `X` | practice |
 | `audio_offset_ms` | int | −300–300 | 0 | music sync (4.8) |
 | `editor_<action>` (45 of them: `editor_save`, `editor_undo`, … `editor_entry_9`) | a combination: a key name with `Ctrl+`, `Shift+`, `Alt+` before it in any order (written in that order), or empty | a key, never a mouse or gamepad button, never `Escape` or a modifier alone; no two actions alike | 11.6's table (`include/sim/editor_keys.h`) | editor (11.6) |
+| `icon_<mode>` (8 of them: `icon_cube`, `icon_ship`, `icon_ball`, `icon_ufo`, `icon_wave`, `icon_robot`, `icon_spider`, `icon_swing`) | file name in `res/icons/<mode>/` | a plain name, as `menu_song`; whether it exists is checked when it's drawn (3.8) | `player_icon.png`, `ship_icon.png`, then `<mode>_icon.png` | the player's icon (3.8) |
 
 ### 2.3 Loading rules
 
@@ -283,7 +284,7 @@ static const setting_def_t DEFS[] = {
 
 `offsetof` gives the field's position inside the struct, so one generic function reads and writes every setting. A value is only stored once it's valid: a rejected one never touches the field.
 
-What uses them today: the window (size, fullscreen, vsync, frame limit) at startup, the music volume, the three HUD toggles, the jump bindings (read by the input thread when a level starts), the restart key and the checkpoint keys (practice, PLAN 13.1). The effects volume sets the click's (the only sound so far, 5.9), `menu_song` the menus' song (4) and `audio_offset_ms` the sync (4.8).
+What uses them today: the window (size, fullscreen, vsync, frame limit) at startup, the music volume, the three HUD toggles, the jump bindings (read by the input thread when a level starts), the restart key and the checkpoint keys (practice, PLAN 13.1). The effects volume sets the click's (the only sound so far, 5.9), `menu_song` the menus' song (4), `audio_offset_ms` the sync (4.8) and the `icon_<mode>` keys the player's icons (3.8).
 
 ### 2.4 Saving rules
 
@@ -337,7 +338,7 @@ For each event, in order:
 
 1. If a modal dialog is open (confirmation, key capture), it gets the event; stop.
 2. If a widget has **mouse capture** (a slider being dragged), it gets mouse moves and the release, even outside its bounds; stop.
-3. Keyboard navigation: Up/Down move focus (skipping disabled widgets, wrapping around); Left/Right go to the focused widget (sliders and cyclers change value; on a button they move the focus like Up/Down, so a dialog's side-by-side buttons are reachable); Enter/Space activate; Escape goes to the screen's "back" action.
+3. Keyboard navigation: Up/Down move focus (skipping disabled widgets, wrapping around); Left/Right go to the focused widget (sliders and cyclers change value; on a button they move the focus like Up/Down, so a dialog's side-by-side buttons are reachable); Enter/Space activate; Escape goes to the screen's "back" action. A screen laid out as a grid (`ui.grid`, the Icons screen of 3.8) moves by position instead: each arrow goes to the nearest enabled widget that way (the distance along the arrow, plus twice the distance aside, so the next in a row beats a nearer one in the row below), without wrapping; a list keeps its Up and Down, a slider and a cycler their Left and Right.
 4. Mouse: find the widget under the mouse; hover moves focus to it; press starts capture or pressed state.
 5. The jump never goes through events: its own thread polls it (1.3). A UI click in a level stops the ticks that would cover it (1.5).
 
@@ -447,6 +448,19 @@ Widgets are laid out once when the screen is created; nothing is allocated per f
 - **Image buttons** (`button.c`): a button is a square of a given size (300 px for the main menu's Play, 200 for Options and Editor, 100 for a level's Play, 250 for Retry and Quit) and its image fills it, its shape kept, centered: what is drawn is what is clicked. Today's images are placeholders (the cursor's picture, 104×123), stretched to the square; an image made at that size is drawn as it is. `ui_draw_sprite` gives an image the looks of 3.2 (grown or shrunk around its center, faded, outlined when focused); `ui_draw_focus` outlines a widget its screen draws itself (a level's song line).
 - **The level list's widgets** are in the grid's own coordinates: a mouse position is moved by the scroll before the toolkit sees it.
 - **Starting a level** latches every jump input that is down (1.5), since Space chooses a focused button and jumps too.
+- **The Icons button** (3.8) is the main menu's fifth widget: a 150 px image button in the bottom-left corner, across from Credits, showing the cube's chosen icon. In the keyboard's order it comes after Credits.
+
+### 3.8 The Icons screen
+
+The player chooses one icon per gamemode, as in GD's icon kit, without its colours: an icon is drawn as its image is (GD paints the player's two colours on marked zones of each icon; this version has no colours, for icons or objects).
+
+- **The files:** every `.png` in `res/icons/<mode>/` (`cube`, `ship`, `ball`, `ufo`, `wave`, `robot`, `spider`, `swing`, the modes' names in level files), any name, in natural order: a run of digits by its value, so `cube_2.png` comes before `cube_10.png`; names alike that way (`a01`, `a1`) by their bytes. Not counted: a hidden file, a name too long for the settings (127 bytes), anything not ending in `.png` (any case). A file that isn't an image is left out with a warning; a mode with no icon at all is a missing asset (exit 84), as a missing background is.
+- **The choice** is the file's name, per mode, in `icon_<mode>` (2.2): adding or removing other files never changes it. A name that isn't in the folder (the file was removed or renamed) shows the folder's first, without changing the setting. The defaults are the files shipped today: `player_icon.png` and `ship_icon.png`, and for the six modes without their own art a copy of one of them under the mode's name (`ufo_icon.png` and `swing_icon.png` are the ship's; `wave_icon.png`, `ball_icon.png`, `robot_icon.png` and `spider_icon.png` the cube's), placeholders for the art to come. So each mode looks as it did before.
+- **Where it shows:** the player in a level, in practice and in a playtest; the start positions on the editor's canvas (11.8); the main menu's Icons button (the cube's).
+- **The screen** (scene `i`): eight tabs at the top, GD's order (cube, ship, ball, UFO, wave, robot, spider, swing), each showing its mode's chosen icon; the open tab is filled green. Under them, the mode's name and the page (`Cube   1 / 2` when there are more than 30). Then the open mode's icons, 10 by 3 a page, the chosen one framed in green; `<` and `>` turn the pages (wrapping), shown only when there are several. Back, or Escape, saves the settings if the choice changed (2.4) and returns to the main menu. It opens on the cube's tab, on the page of its chosen icon; a tab opens on its chosen icon's page.
+- **The keyboard:** the screen is a grid (3.4): the arrows go between the tabs, the icons, the arrows and Back by position; Enter or Space chooses.
+- **Code:** `include/ui/icon_kit.h` and `src/ui/icon_kit.c` are pure (the names, their order, the choice, the pages; `tests/test_icons.c`); `src/icons.c` lists the folders and loads every image once at start; `icon_texture(gd, mode)` is what every drawing asks; `src/icon_menu.c` is the screen.
+- **Not done:** colours (on purpose); the icons are loaded all at start, with no limit: fine for tens, to revisit for GD's hundreds.
 
 ---
 
@@ -465,7 +479,7 @@ Folder `music/`, scanned once at startup.
 
 Scan algorithm:
 
-**Moving today's files.** `res/back_mus.ogg` moves to `music/back_mus.ogg` and becomes the default level song. `res/menuLoop.mp3` is Geometry Dash's own menu track (PLAN 12.2), so it doesn't move: replace it with a track you're allowed to ship, saved as `music/menu_loop.ogg` (the `menu_song` default). Until that file exists, a missing `menu_song` falls back to the first song of the library with one warning, and to silence if the library is empty.
+**Moving today's files.** `res/back_mus.ogg` moves to `music/back_mus.ogg` and becomes the default level song. `res/menuLoop.mp3` (now `res/sounds/menuLoop.mp3`) is Geometry Dash's own menu track (PLAN 12.2), so it doesn't move to `music/`: replace it with a track you're allowed to ship, saved as `music/menu_loop.ogg` (the `menu_song` default). Until that file exists, a missing `menu_song` falls back to the first song of the library with one warning, and to silence if the library is empty.
 
 1. List `music/` (skip names starting with `.`).
 2. Keep files ending in `.ogg`, `.wav`, `.flac`, and `.mp3` (see below).
@@ -687,7 +701,7 @@ The end-of-level screen shows `♪ Title — Artist (License)`. A Credits screen
 - **Where:** the pure part is `src/music/library.c` (`include/music/library.h`): the scan, `songs.txt`, the choice of song and offset, the sync rule, the volume curve, the level's duration. The scan takes the decoder as a function, so `tests/test_music.c` feeds it a fake one; the game passes `music_probe` (`sfMusic`). The one `sfMusic` lives in `src/music_manager.c`, the level list's song line and picker in `src/song_picker.c`.
 - **File names:** a song's name can't have spaces or any of `#|=`, and needs one of the four extensions: the level header, `songs.txt` and the space-separated progress file all have to hold it. Others are skipped with a log line. At most 63 characters (the header's `music` field).
 - **Offsets:** a level with no `music_offset` line plays its song from the song's `default_offset`. A `music_offset` line, 0 included, is the level's own: the parser marks it set (`music_offset_set`) and the writer writes it back, so a level can start a song with a default offset at 0. A negative one counts as unset.
-- **What plays today:** `res/back_mus.ogg` moved to `music/back_mus.ogg` (`music/songs.txt` describes it, license still `?`). There's no `music/menu_loop.ogg`, so the menus play the library's first song with one warning; `res/menuLoop.mp3` isn't played any more (PLAN 12.2).
+- **What plays today:** `res/back_mus.ogg` moved to `music/back_mus.ogg` (`music/songs.txt` describes it, license still `?`). There's no `music/menu_loop.ogg`, so the menus play the library's first song with one warning; `res/sounds/menuLoop.mp3` isn't played any more (PLAN 12.2).
 - **Sync (4.8):** level start, death, respawn and completion follow the table; the drift check runs once a second while playing. Pause, focus loss and checkpoint respawns wait for pause (PLAN 10.4) and practice mode.
 - **Playing from a position:** `music_play_at_tick` is the one place the rule is applied (start, respawn, checkpoint, resume). A stopped song is started before it is moved (SFML ignores a move while stopped). A position past a looping song's end wraps (`music_seek_point`), and the drift check measures across the loop's seam, so a level longer than its song (4.9) never fights the loop. A position before the song's start (a negative audio offset at tick 0) is a song due later: it starts from 0 that many milliseconds on.
 - **The audio offset** also applies to the editor's "play from here" and to where its playhead is drawn.
