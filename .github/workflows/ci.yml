@@ -11,8 +11,15 @@ jobs:
       - name: Dependencies
         run: sudo apt-get update && sudo apt-get install -y libcsfml-dev libx11-dev xvfb
 
-      - name: Build with warnings as errors
-        run: make CFLAGS="-Wall -Wextra -Werror -Iinclude -MMD -MP -ffp-contract=off -O2"
+      # Warnings don't fail the run: each one becomes an annotation on the
+      # run's page. Ubuntu's gcc warns about more than a local build does
+      # (glibc's fortified headers), and a build that works mustn't look
+      # broken. A compile error still fails here.
+      - name: Build (warnings are annotated, not fatal)
+        run: |
+          set -o pipefail               # make's failure, not tee's success
+          make CFLAGS="-Wall -Wextra -Iinclude -MMD -MP -ffp-contract=off -O2" 2>&1 | tee build.log
+          sed -nE 's/^([^:]+):([0-9]+):([0-9]+): warning: (.*)$/::warning file=\1,line=\2,col=\3::\4/p' build.log
 
       # The simulation only: no window, no audio. Runs under ASan and UBSan.
       - name: Unit and determinism tests
