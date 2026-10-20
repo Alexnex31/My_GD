@@ -286,9 +286,7 @@ static void chdir_to_executable(void)
 
 static void print_usage(int fd)
 {
-    const char *msg = "usage: ./my_gd [-h | --check <level.gd>]\n";
-
-    write(fd, msg, strlen(msg));
+    dprintf(fd, "usage: ./my_gd [-h | --check <level.gd>]\n");
 }
 
 int main(int argc, char **argv)

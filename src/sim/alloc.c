@@ -13,9 +13,11 @@
 void *sim_xcalloc(size_t n, size_t size)
 {
     void *p = calloc(n, size);
+    ssize_t said = 0;
 
     if (p == NULL) {
-        write(2, "my_gd: out of memory\n", 21);
+        said = write(2, "my_gd: out of memory\n", 21);
+        (void)said;                     /* a lost message changes nothing */
         exit(84);
     }
     return p;
