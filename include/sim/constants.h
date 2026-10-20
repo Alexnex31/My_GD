@@ -18,7 +18,7 @@
     #define LEVEL_END_PADDING   500.0   /* level ends 500 px after the last object */
     #define KILL_CEILING_MARGIN 600.0    /* flipped gravity only: kill line above the highest object (4.7) */
 
-    /* Object shapes (4.2). The spike's box is res/spike_hitbox.png, measured:
+    /* Object shapes (4.2). The spike's box is res/level/spike_hitbox.png, measured:
        26 x 43 px at (37, 25) in a 100 x 100 sprite, well clear of the base. */
     #define SPIKE_BOX_X         0.37
     #define SPIKE_BOX_Y         0.25

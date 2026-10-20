@@ -133,7 +133,7 @@ static void render_spent_flashes(gd_t *gd, level_t *lv)
         draw_triangles(gd, v, n, &rs);
 }
 
-/* Three 110 x 110 frames of res/explos.png, over the death delay (6.1). */
+/* Three 110 x 110 frames of res/level/explos.png, over the death delay (6.1). */
 static void render_explosion(gd_t *gd, level_t *lv)
 {
     int done = DEATH_DELAY_TICKS - lv->death_ticks;

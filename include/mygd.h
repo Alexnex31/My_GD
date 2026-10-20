@@ -17,6 +17,7 @@
     #include <unistd.h>
     #include <math.h>
     #include <dirent.h>
+    #include "assets.h"
     #include "sim/alloc.h"
     #include "struct.h"
     #include "level.h"

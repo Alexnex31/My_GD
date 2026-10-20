@@ -31,7 +31,7 @@ cursor_t *create_cursor(void)
     sfVector2f v = {0.55f, 0.55f};
 
     cursor->cursor_s = sfSprite_create();
-    cursor->cursor_t = sfTexture_createFromFile("res/cursor.png", NULL);
+    cursor->cursor_t = sfTexture_createFromFile(ASSET_CURSOR, NULL);
     sfSprite_setTexture(cursor->cursor_s, cursor->cursor_t, sfTrue);
     sfSprite_setScale(cursor->cursor_s, v);
     return cursor;

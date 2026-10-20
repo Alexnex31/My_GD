@@ -18,16 +18,16 @@
 #define DRAWN_SIZE 64
 
 static const char *const ATLAS_FILES[OBJ_TYPE_COUNT] = {
-    [OBJ_BLOCK] = "res/block.png",
-    [OBJ_SLOPE] = "res/block.png",
-    [OBJ_SPIKE] = "res/spike.png",
-    [OBJ_PORTAL] = "res/cube_portal.png",
-    [OBJ_GRAVITY] = "res/cube_portal.png",
+    [OBJ_BLOCK] = ASSET_BLOCK,
+    [OBJ_SLOPE] = ASSET_BLOCK,
+    [OBJ_SPIKE] = ASSET_SPIKE,
+    [OBJ_PORTAL] = ASSET_PORTAL,
+    [OBJ_GRAVITY] = ASSET_PORTAL,
     [OBJ_PAD] = DRAWN_PLATE,                 /* no image yet: drawn here in */
     [OBJ_ORB] = DRAWN_ORB,                   /* white, tinted by its colour */
     [OBJ_SAW] = DRAWN_SAW,
     [OBJ_SPEED] = DRAWN_SPEED,               /* white, tinted by its speed */
-    [OBJ_MINI] = "res/cube_portal.png",
+    [OBJ_MINI] = ASSET_PORTAL,
 };
 
 /* The pixel at (x, y) of the padded image: the nearest of the image's own. */

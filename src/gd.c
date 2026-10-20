@@ -63,24 +63,24 @@ textures_t *load_textures(void)
 {
     textures_t *res = sim_xcalloc(1, sizeof(textures_t));
 
-    res->main_background = load_texture("res/main_background.png");
-    res->edi_background = load_texture("res/cecilya.png");
-    res->list_background = load_texture("res/level_list_background.png");
-    res->opt_background = load_texture("res/noe_background.jpeg");
-    res->level_background = load_texture("res/level_background.png");
-    res->play_button = load_texture("res/play_button.png");
-    res->opt_button = load_texture("res/param_button.png");
-    res->onli_button = load_texture("res/online_button.png");
-    res->ground = load_texture("res/ground.png");
-    res->explosion = load_texture("res/explos.png");
-    res->spike = load_texture("res/spike.png");
-    res->block = load_texture("res/block.png");
-    res->cube_portal = load_texture("res/cube_portal.png");
-    res->player_icon = load_texture("res/player_icon.png");
-    res->ship_icon = load_texture("res/ship_icon.png");
-    res->end_level_background = load_texture("res/end_level_background.png");
-    res->retry_button = load_texture("res/retry_button.png");
-    res->quit_button = load_texture("res/quit_button.png");
+    res->main_background = load_texture(ASSET_BG_MAIN);
+    res->edi_background = load_texture(ASSET_BG_EDITOR);
+    res->list_background = load_texture(ASSET_BG_LEVEL_LIST);
+    res->opt_background = load_texture(ASSET_BG_OPTIONS);
+    res->level_background = load_texture(ASSET_LEVEL_BG);
+    res->play_button = load_texture(ASSET_BUTTON_PLAY);
+    res->opt_button = load_texture(ASSET_BUTTON_OPTIONS);
+    res->onli_button = load_texture(ASSET_BUTTON_EDITOR);
+    res->ground = load_texture(ASSET_GROUND);
+    res->explosion = load_texture(ASSET_EXPLOSION);
+    res->spike = load_texture(ASSET_SPIKE);
+    res->block = load_texture(ASSET_BLOCK);
+    res->cube_portal = load_texture(ASSET_PORTAL);
+    res->player_icon = load_texture(ASSET_ICON_CUBE);
+    res->ship_icon = load_texture(ASSET_ICON_SHIP);
+    res->end_level_background = load_texture(ASSET_BG_END_LEVEL);
+    res->retry_button = load_texture(ASSET_BUTTON_RETRY);
+    res->quit_button = load_texture(ASSET_BUTTON_QUIT);
     return res;
 }
 
@@ -136,9 +136,9 @@ gd_t *create_gd(void)
     settings_load(&gd->settings, SETTINGS_PATH, log_warning);  /* before the window */
     gd->res = load_textures();
     music_init(gd);
-    gd->main_font = sfFont_createFromFile("res/GDfont.ttf");
+    gd->main_font = sfFont_createFromFile(ASSET_FONT);
     if (gd->main_font == NULL) {
-        dprintf(2, "my_gd: missing asset res/GDfont.ttf\n");
+        dprintf(2, "my_gd: missing asset %s\n", ASSET_FONT);
         exit(84);
     }
     gd->w = create_window(&gd->settings);
