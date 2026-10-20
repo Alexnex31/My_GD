@@ -48,6 +48,11 @@ void print_main_menu(main_m_t *m, gd_t *gd);
 main_m_t *create_main_menu(gd_t *gd);
 
 
+credits_t *create_credits(gd_t *gd);
+void free_credits(credits_t *c);
+void print_credits(credits_t *c, gd_t *gd);
+void keyboard_events_credits(credits_t **c, gd_t *gd);
+
 void free_editor_menu(editor_m_t *om);
 void print_editor_menu(editor_m_t *om, gd_t *gd);
 editor_m_t *create_editor_menu(gd_t *gd);
@@ -111,6 +116,12 @@ void music_menu(gd_t *gd);
 void music_preview(gd_t *gd, const song_t *s);
 void music_update(gd_t *gd);
 
+/* The sound effects (sound.c): the click, at the effects volume (5.2). */
+void sound_create(gd_t *gd);
+void sound_free(gd_t *gd);
+void sound_set_volume(gd_t *gd, int volume);
+void sound_click(gd_t *gd);
+
 /* The level list's song line and its picker (FEATURES 4.6). */
 void song_line_refresh(gd_t *gd, level_button_t *lb);
 void song_picker_open(level_list_t *list, gd_t *gd, int index);
@@ -130,6 +141,8 @@ bool ui_from_sf(gd_t *gd, const sfEvent *ev, ui_event_t *out);
 void ui_draw(gd_t *gd, const ui_screen_t *ui);
 /* Widget i drawn as an image (the menus' buttons), in the current view. */
 void ui_draw_sprite(gd_t *gd, const ui_screen_t *ui, int i, sfSprite *s);
+/* One widget as ui_draw draws it, beside others drawn otherwise. */
+void ui_draw_widget(gd_t *gd, const ui_screen_t *ui, int i);
 /* Only widget i's focus outline: a widget drawn by its screen (a text). */
 void ui_draw_focus(gd_t *gd, const ui_screen_t *ui, int i);
 void ui_dim(gd_t *gd);

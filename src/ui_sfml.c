@@ -230,7 +230,7 @@ static void draw_content(gd_t *gd, const widget_t *w, ui_rect_t r, float a)
         text(gd, w->text, (sfVector2f){r.x + 20.0f, center(r).y}, 0, a);
 }
 
-static void draw_widget(gd_t *gd, const ui_screen_t *ui, int i)
+void ui_draw_widget(gd_t *gd, const ui_screen_t *ui, int i)
 {
     const widget_t *w = &ui->widgets[i];
     ui_look_t look = ui_look(ui, i);
@@ -337,7 +337,7 @@ void ui_draw(gd_t *gd, const ui_screen_t *ui)
     if (ui->panel.w > 0.0f)
         rect(gd, ui->panel, TRACK, OUTLINE_W);   /* darker: its buttons show */
     for (int i = 0; i < ui->count; i++)
-        draw_widget(gd, ui, i);
+        ui_draw_widget(gd, ui, i);
     if (ui->capturing >= 0)
         draw_capture(gd, ui, &ui->widgets[ui->capturing]);
     if (ui->modal != NULL) {

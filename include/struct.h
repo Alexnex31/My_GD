@@ -16,6 +16,7 @@
     #include "sim/progress.h"
     #include "sim/settings.h"
     #include "music/library.h"
+    #include "music/sfx.h"
     #include "editor/ed_select.h"
     #include "ui/ui.h"
     #include "level.h"
@@ -110,12 +111,23 @@ typedef struct editor_menu {
     bool want_back;
 } editor_m_t;
 
-/* Options, Play, Editor: toolkit buttons over the images (FEATURES 3). */
+/* Options, Play, Editor over the images, and Credits (FEATURES 3, 4.11). */
+/* The Credits screen (FEATURES 4.11): every song, then res/CREDITS.md. */
+typedef struct credits {
+    sfSprite *background;
+    ui_screen_t ui;
+    widget_t widgets[2];          /* the lines, Back                        */
+    char **rows;
+    int nb_rows;
+    int row;
+    bool back;
+} credits_t;
+
 typedef struct main_menu {
     sfSprite *background;
     button_t *buttons[3];
     ui_screen_t ui;
-    widget_t widgets[3];
+    widget_t widgets[4];
     char next;                    /* the scene a callback asked for, or 0   */
     bool quit;                    /* Escape                                 */
     sfText *title;
@@ -189,6 +201,8 @@ typedef struct gd {
     settings_t settings;          /* save/settings.txt (FEATURES 2)           */
     sfRectangleShape *ui_shape;   /* the widgets', reused (FEATURES 3)        */
     sfText *ui_text;
+    sfSoundBuffer *click_buffer;  /* the click, made, not loaded (5.2)       */
+    sfSound *click;
     ed_clip_t clip;               /* the editor's copies: pasted into any level,
                                      until the game closes (11.6)           */
 } gd_t;

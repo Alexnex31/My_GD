@@ -28,7 +28,8 @@ typedef enum options_section {
 typedef enum options_dialog {
     DIALOG_NONE,
     DIALOG_REVERT,                /* "Keep these display settings?" (5.4)   */
-    DIALOG_RESET                  /* "Delete all attempts...?" (5.6)        */
+    DIALOG_RESET,                 /* "Delete all attempts...?" (5.6)        */
+    DIALOG_CALIBRATE              /* the click and the square (5.2)         */
 } options_dialog_t;
 
     #define OPT_ROWS_MAX 10
@@ -73,6 +74,7 @@ typedef struct option_menu {
     ui_screen_t dialog_ui;
     widget_t dialog_widgets[2];
     display_trial_t trial;        /* a new display mode, until kept (5.4)   */
+    calib_t calib;                /* its beats, while it's open             */
     char notice[200];
     int64_t notice_until_ms;
     bool pending_leave;
@@ -91,6 +93,9 @@ void keyboard_events_option_menu(option_m_t **om, gd_t *gd);
 /* The rows of each section, built when it's shown (options_rows.c). */
 void options_build_rows(option_m_t *om);
 void options_notice(option_m_t *om, const char *text);
+
+/* Shared with the calibration's own slider (5.2). */
+void options_audio_offset_changed(void *ctx, widget_t *w);
 
 /* The dialogs and what they do (options_dialogs.c). */
 void options_open_dialog(option_m_t *om, options_dialog_t which);

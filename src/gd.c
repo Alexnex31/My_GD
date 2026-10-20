@@ -88,6 +88,7 @@ void free_gd(gd_t *gd)
 {
     settings_free(&gd->settings);
     ed_clip_free(&gd->clip);
+    sound_free(gd);
     ui_gfx_free(gd);
     progress_free(&gd->progress);
     sfTexture_destroy(gd->atlas);
@@ -146,6 +147,7 @@ gd_t *create_gd(void)
         exit(84);
     }
     ui_gfx_create(gd);
+    sound_create(gd);
     gd->ui_view = sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H});
     gd->level_view = sfView_createFromRect((sfFloatRect){0, 0, VIEW_W, VIEW_H});
     apply_letterbox(gd, sfRenderWindow_getSize(gd->w).x,
@@ -188,6 +190,15 @@ void handle_option_menu(gd_t *gd, option_m_t **option_menu)
     keyboard_events_option_menu(option_menu, gd);
 }
 
+void handle_credits(gd_t *gd, credits_t **credits)
+{
+    if (*credits == NULL)
+        *credits = create_credits(gd);
+    print_credits(*credits, gd);
+    print_cursor(gd->cursor, gd->w);
+    keyboard_events_credits(credits, gd);
+}
+
 void handle_main_menu(gd_t *gd, main_m_t **menu)
 {
     if (*menu == NULL)
@@ -203,6 +214,7 @@ int main_loop(gd_t *gd)
     option_m_t *option_menu = NULL;
     editor_m_t *editor_menu = NULL;
     level_list_t *level_list = NULL;
+    credits_t *credits = NULL;
     level_t *level = NULL;
 
     while (sfRenderWindow_isOpen(gd->w)) {
@@ -218,6 +230,8 @@ int main_loop(gd_t *gd)
             handle_level_list(gd, &level_list);
         if (gd->menu == 'P')
             handle_playing(gd, &level);
+        if (gd->menu == 'c')
+            handle_credits(gd, &credits);
         sfRenderWindow_display(gd->w);
     }
     if (main_menu != NULL)
@@ -228,6 +242,7 @@ int main_loop(gd_t *gd)
         free_editor_menu(editor_menu);
     if (level_list != NULL)
         free_level_list_menu(level_list);
+    free_credits(credits);
     if (level != NULL)
         level_free(level, gd);
     if ((gd->settings.dirty || access(gd->settings.path, F_OK) != 0)

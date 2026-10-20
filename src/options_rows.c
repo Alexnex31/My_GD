@@ -30,9 +30,14 @@ static void music_volume_changed(void *ctx, widget_t *w)
     music_set_volume(&om->gd->music, *w->value);
 }
 
+/* The click, at the new volume: what it changes is heard (5.2). */
 static void sfx_volume_changed(void *ctx, widget_t *w)
 {
-    menu_of(ctx)->gd->settings.sfx_volume = *w->value;   /* no sounds yet */
+    option_m_t *om = menu_of(ctx);
+
+    om->gd->settings.sfx_volume = *w->value;
+    sound_set_volume(om->gd, *w->value);
+    sound_click(om->gd);
 }
 
 /* The new menu song plays at once, from its start (5.2). */
@@ -50,7 +55,13 @@ static void menu_song_changed(void *ctx, widget_t *w)
     music_menu(om->gd);
 }
 
-static void audio_offset_changed(void *ctx, widget_t *w)
+static void calibrate_pressed(void *ctx, widget_t *w)
+{
+    (void)w;
+    ((option_m_t *)ctx)->pending_dialog = DIALOG_CALIBRATE;
+}
+
+void options_audio_offset_changed(void *ctx, widget_t *w)
 {
     option_m_t *om = menu_of(ctx);
 
@@ -195,10 +206,12 @@ static int audio_rows(option_m_t *om, widget_t *r)
     r[2].enabled = lib->count > 0;
     r[2].on_change = menu_song_changed;
     r[3] = slider(3, "Audio offset (ms)", &om->audio_offset,
-        audio_offset_changed);
+        options_audio_offset_changed);
     r[3].min = -300;
     r[3].max = 300;
-    return 4;
+    r[4] = row(4, W_BUTTON, "Calibrate", NULL);
+    r[4].on_activate = calibrate_pressed;
+    return 5;
 }
 
 static int gameplay_rows(option_m_t *om, widget_t *r)

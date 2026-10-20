@@ -12,6 +12,8 @@
 #include <unistd.h>
 
 #include "music/library.h"
+#include "music/credits.h"
+#include "music/sfx.h"
 #include "sim/constants.h"
 #include "test.h"
 
@@ -215,6 +217,78 @@ static void clean(void)
     rmdir(tmp_dir);
 }
 
+/* A sharp start, loud, then nothing: a tick the ear can place (5.2). */
+static void test_click(void)
+{
+    int16_t s[SFX_CLICK_SAMPLES + 10];
+    int peak = 0;
+    size_t n = sfx_click(s, sizeof(s) / sizeof(s[0]));
+
+    CHECK(n == SFX_CLICK_SAMPLES && sfx_click(s, 5) == 5);
+    n = sfx_click(s, sizeof(s) / sizeof(s[0]));
+    for (size_t i = 0; i < SFX_RATE / 1000; i++)
+        peak = abs(s[i]) > peak ? abs(s[i]) : peak;
+    CHECK(peak > 20000);                     /* loud within a millisecond */
+    CHECK(abs(s[n - 1]) < 50);               /* and gone at its end       */
+}
+
+/*
+** Each beat's click comes `offset` ms before the flash, once per beat, never
+** twice nor in a burst; the flash is lit on the beat and fades.
+*/
+static void test_calibration(void)
+{
+    calib_t c;
+    int clicks = 0;
+    int64_t first = -1;
+
+    calib_begin(&c, 1000);
+    for (int64_t t = 1000; t < 1000 + CALIB_LEAD_MS + 4 * CALIB_PERIOD_MS;
+        t++)
+        if (calib_click_due(&c, t, 120)) {
+            first = first < 0 ? t : first;
+            clicks += 1;
+        }
+    CHECK(clicks == 5 && first == 1000 + CALIB_LEAD_MS - 120);
+    CHECK(calib_flash(&c, 1000 + CALIB_LEAD_MS - 1) == 0.0f);
+    CHECK(calib_flash(&c, 1000 + CALIB_LEAD_MS) == 1.0f);
+    CHECK(calib_flash(&c, 1000 + CALIB_LEAD_MS + CALIB_FLASH_MS) == 0.0f);
+    CHECK(calib_flash(&c, 1000 + CALIB_LEAD_MS + CALIB_PERIOD_MS + 75)
+        == 0.5f);
+    calib_begin(&c, 0);
+    CHECK(calib_click_due(&c, 5000, 0) && c.next == 9);    /* a hitch: one */
+    CHECK(!calib_click_due(&c, 5000, 0));
+    CHECK(calib_click_due(&c, 5000, 300));   /* the offset moved: the next */
+    CHECK(!calib_click_due(&c, 5000, -300) && c.next == 10);
+}
+
+/* The songs, then the file: headings bare, blank lines gone, long ones wrapped. */
+static void test_credits(void)
+{
+    song_t songs[2] = {{.title = "Base", .artist = "Me", .license = "CC0"},
+        {.title = "Café", .artist = "You"}};
+    library_t lib = {songs, 2};
+    int n = 0;
+    char **rows = credits_rows(&lib, "# Assets\n\n- block.png: me, CC0  \n"
+        "A very long line about a font that goes on and on, past the end of "
+        "the screen\n", &n);
+
+    CHECK(n == 9 && rows[9] == NULL);
+    CHECK(strcmp(rows[1], "Base \xe2\x80\x94 Me (CC0)") == 0);
+    CHECK(strcmp(rows[2], "Café \xe2\x80\x94 You (license unknown)") == 0);
+    CHECK(rows[3][0] == '\0' && strcmp(rows[5], "Assets") == 0);
+    CHECK(strcmp(rows[6], "- block.png: me, CC0") == 0);
+    CHECK(strlen(rows[7]) <= CREDITS_WRAP && rows[7][strlen(rows[7]) - 1]
+        != ' ' && strcmp(rows[8], "end of the screen") == 0);
+    credits_free(rows);
+    rows = credits_rows(&(library_t){NULL, 0}, NULL, &n);
+    CHECK(strcmp(rows[1], "No song in music/") == 0);
+    CHECK(strstr(rows[4], "CREDITS.md") != NULL);
+    for (int i = 0; i < n; i++)
+        CHECK(strlen(rows[i]) <= CREDITS_WRAP);
+    credits_free(rows);
+}
+
 void test_music(void)
 {
     if (mkdtemp(tmp_dir) == NULL) {
@@ -227,5 +301,8 @@ void test_music(void)
     test_file_names();
     test_choice();
     test_sync_and_volume();
+    test_click();
+    test_calibration();
+    test_credits();
     clean();
 }

@@ -34,8 +34,34 @@ static void dialog_back(void *ctx)
 ** unsupported mode gets the old one back by waiting or pressing Enter; and
 ** Cancel, so Enter never deletes anything (5.4, 5.6).
 */
+/*
+** The calibration (5.2): the menu song stops (its place kept), a click
+** every half second against a flashing square. The slider, focused, moves
+** the offset while it runs; Done or Escape ends it.
+*/
+static void open_calibration(option_m_t *om)
+{
+    om->dialog = DIALOG_CALIBRATE;
+    om->dialog_widgets[0] = (widget_t){.kind = W_SLIDER, .enabled = true,
+        .label = "Audio offset (ms)", .value = &om->audio_offset,
+        .min = -300, .max = 300, .step = 5,
+        .bounds = {900.0f, 640.0f, 380.0f, 70.0f},
+        .on_change = options_audio_offset_changed};
+    om->dialog_widgets[1] = (widget_t){.kind = W_BUTTON, .enabled = true,
+        .label = "Done", .bounds = {810.0f, 760.0f, 300.0f, 90.0f},
+        .on_activate = first_button};
+    ui_init(&om->dialog_ui, om->dialog_widgets, 2, om);
+    om->dialog_ui.on_back = dialog_back;
+    om->dialog_ui.panel = (ui_rect_t){260.0f, 170.0f, 1400.0f, 720.0f};
+    om->rows.modal = &om->dialog_ui;
+    music_silence(&om->gd->music);
+    calib_begin(&om->calib, ui_now_ms());
+}
+
 void options_open_dialog(option_m_t *om, options_dialog_t which)
 {
+    if (which == DIALOG_CALIBRATE)
+        return open_calibration(om);
     om->dialog = which;
     om->dialog_widgets[0] = (widget_t){.kind = W_BUTTON, .enabled = true,
         .label = which == DIALOG_REVERT ? "Revert" : "Cancel",
@@ -115,11 +141,18 @@ void options_answer(option_m_t *om, int answer)
         display_trial_end(&om->trial, &om->gd->settings, true);   /* 5.7 */
     if (which == DIALOG_RESET && answer == 2)
         reset_progress(om);
+    if (which == DIALOG_CALIBRATE) {
+        options_build_rows(om);              /* the row shows the new offset */
+        music_menu(om->gd);                  /* where it was (4.10) */
+    }
 }
 
-/* Unanswered for 10 s: Revert (5.4). */
+/* Unanswered for 10 s: Revert (5.4). The calibration's clicks, on time. */
 void options_dialogs_update(option_m_t *om)
 {
+    if (om->dialog == DIALOG_CALIBRATE && calib_click_due(&om->calib,
+        ui_now_ms(), om->gd->settings.audio_offset_ms))
+        sound_click(om->gd);
     if (om->dialog == DIALOG_REVERT && display_trial_due(&om->trial,
         ui_now_ms()))
         options_answer(om, 1);
@@ -137,6 +170,25 @@ static void centered(option_m_t *om, const char *s, float y)
     sfText_setOrigin(om->text, (sfVector2f){0.0f, 0.0f});
 }
 
+/* The square lit on each beat; the click is heard `offset` ms before it. */
+static void draw_calibration(option_m_t *om)
+{
+    float lit = calib_flash(&om->calib, ui_now_ms());
+    sfRectangleShape *sq = om->gd->ui_shape;
+
+    centered(om, "Calibrate the audio offset", 210.0f);
+    centered(om, "A click and a white square, twice a second. Move the", 290.0f);
+    centered(om, "offset until you hear the click as the square lights:", 340.0f);
+    centered(om, "more if you hear it late, less if it comes first.", 390.0f);
+    sfRectangleShape_setPosition(sq, (sfVector2f){885.0f, 460.0f});
+    sfRectangleShape_setSize(sq, (sfVector2f){150.0f, 150.0f});
+    sfRectangleShape_setFillColor(sq, (sfColor){255, 255, 255,
+        (sfUint8)(40.0f + 215.0f * lit)});
+    sfRectangleShape_setOutlineThickness(sq, 4.0f);
+    sfRectangleShape_setOutlineColor(sq, sfWhite);
+    draw_rect(om->gd, sq);
+}
+
 void options_draw_dialog(option_m_t *om)
 {
     char line[120];
@@ -147,6 +199,8 @@ void options_draw_dialog(option_m_t *om)
             " in %d", (int)((left + 999) / 1000));
         centered(om, line, 450.0f);
     }
+    if (om->dialog == DIALOG_CALIBRATE)
+        draw_calibration(om);
     if (om->dialog == DIALOG_RESET) {
         centered(om, "Delete all attempts, best percentages and per-level"
             " song choices?", 420.0f);

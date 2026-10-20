@@ -2,7 +2,7 @@
 ** ALEXNEX PROJECT, 2026
 ** main_menu
 ** File description:
-** the main menu: Options, Play, Editor, on the toolkit (FEATURES 3)
+** the main menu: Options, Play, Editor and Credits, on the toolkit (FEATURES 3)
 */
 
 #include "mygd.h"
@@ -10,6 +10,7 @@
     #define MAIN_OPTIONS 0
     #define MAIN_PLAY 1
     #define MAIN_EDITOR 2
+    #define MAIN_CREDITS 3
 
 void free_main_menu(main_m_t *m)
 {
@@ -28,13 +29,14 @@ void print_main_menu(main_m_t *m, gd_t *gd)
     ui_update(&m->ui, ui_now_ms());
     for (int i = 0; i < 3; i++)
         ui_draw_sprite(gd, &m->ui, i, m->buttons[i]->sprite);
+    ui_draw_widget(gd, &m->ui, MAIN_CREDITS);
     sfRenderWindow_drawText(gd->w, m->title, NULL);
 }
 
 /* The callbacks only say where to go: the scene changes after the events. */
 static void go(void *ctx, widget_t *w)
 {
-    static const char SCENES[3] = {'o', 'l', 'e'};
+    static const char SCENES[4] = {'o', 'l', 'e', 'c'};
     main_m_t *m = ctx;
 
     m->next = SCENES[w - m->widgets];
@@ -68,7 +70,10 @@ main_m_t *create_main_menu(gd_t *gd)
         gd->res->onli_button);
     for (int i = 0; i < 3; i++)
         menu->widgets[i] = button_widget(menu->buttons[i], LABELS[i], go);
-    ui_init(&menu->ui, menu->widgets, 3, menu);
+    menu->widgets[MAIN_CREDITS] = (widget_t){.kind = W_BUTTON,
+        .label = "Credits", .enabled = true,
+        .bounds = {1600.0f, 975.0f, 280.0f, 75.0f}, .on_activate = go};
+    ui_init(&menu->ui, menu->widgets, 4, menu);
     menu->ui.focused = MAIN_PLAY;
     menu->ui.on_back = quit;
     gd->menu = 'm';
