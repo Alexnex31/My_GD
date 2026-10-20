@@ -22,7 +22,8 @@
 typedef enum setting_type {
     ST_INT,
     ST_BOOL,
-    ST_FILE,                      /* a plain file name, no folder            */
+    ST_FILE,                      /* a plain file name, no folder: whether it
+                                     exists is the game's to check          */
     ST_BINDING,
     ST_BINDINGS,
     ST_COMBO                      /* an editor shortcut: a key and modifiers */
@@ -64,6 +65,14 @@ static const setting_def_t DEFS[] = {
         NULL},
     {"audio_offset_ms", ST_INT, FIELD(audio_offset_ms), -300, 300, NULL},
     ED_KEY_LIST(ED_KEY_SETTING)
+    {"icon_cube", ST_FILE, FIELD(icons[MODE_CUBE]), 0, 0, NULL},
+    {"icon_ship", ST_FILE, FIELD(icons[MODE_SHIP]), 0, 0, NULL},
+    {"icon_ball", ST_FILE, FIELD(icons[MODE_BALL]), 0, 0, NULL},
+    {"icon_ufo", ST_FILE, FIELD(icons[MODE_UFO]), 0, 0, NULL},
+    {"icon_wave", ST_FILE, FIELD(icons[MODE_WAVE]), 0, 0, NULL},
+    {"icon_robot", ST_FILE, FIELD(icons[MODE_ROBOT]), 0, 0, NULL},
+    {"icon_spider", ST_FILE, FIELD(icons[MODE_SPIDER]), 0, 0, NULL},
+    {"icon_swing", ST_FILE, FIELD(icons[MODE_SWING]), 0, 0, NULL},
 };
 
 #define NB_DEFS (sizeof(DEFS) / sizeof(DEFS[0]))
@@ -94,6 +103,11 @@ void settings_defaults(settings_t *s)
         .restart_key = {BIND_KEY, KEY_R, 0},
         .checkpoint_key = {BIND_KEY, KEY_Z, 0},
         .remove_checkpoint_key = {BIND_KEY, KEY_X, 0},
+        .icons = {[MODE_CUBE] = "player_icon.png",
+            [MODE_SHIP] = "ship_icon.png", [MODE_UFO] = "ufo_icon.png",
+            [MODE_WAVE] = "wave_icon.png", [MODE_BALL] = "ball_icon.png",
+            [MODE_ROBOT] = "robot_icon.png", [MODE_SWING] = "swing_icon.png",
+            [MODE_SPIDER] = "spider_icon.png"},
     };
     for (int k = 0; k < ED_KEY_COUNT; k++)
         s->editor_keys[k] = ed_key_default((ed_key_t)k);
@@ -138,12 +152,12 @@ static bool parse_int(const setting_def_t *d, const char *v, int *out)
     return true;
 }
 
-/* A name in music/: no folder, no hidden file, nothing to escape with. */
+/* A name in a folder: no folder of its own, no hidden file, nothing to escape. */
 static bool valid_file_name(const char *v)
 {
     size_t n = strlen(v);
 
-    if (n == 0 || n >= sizeof(((settings_t *)0)->menu_song) || v[0] == '.')
+    if (n == 0 || n >= SETTING_FILE_MAX || v[0] == '.')
         return false;
     for (size_t i = 0; i < n; i++)
         if (v[i] == '/' || v[i] == '\\' || !isprint((unsigned char)v[i]))
@@ -233,7 +247,7 @@ static bool parse_value(settings_t *s, const setting_def_t *d, const char *v)
     case ST_FILE:
         if (!valid_file_name(v))
             return false;
-        snprintf(field(s, d), sizeof(s->menu_song), "%s", v);
+        snprintf(field(s, d), SETTING_FILE_MAX, "%s", v);
         return true;
     case ST_BINDING:
         return parse_binding(v, field(s, d));

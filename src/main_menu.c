@@ -2,7 +2,7 @@
 ** ALEXNEX PROJECT, 2026
 ** main_menu
 ** File description:
-** the main menu: Options, Play, Editor and Credits, on the toolkit (FEATURES 3)
+** the main menu: Options, Play, Editor, Credits and Icons, on the toolkit (FEATURES 3)
 */
 
 #include "mygd.h"
@@ -11,13 +11,15 @@
     #define MAIN_PLAY 1
     #define MAIN_EDITOR 2
     #define MAIN_CREDITS 3
+    #define MAIN_ICONS 4
+    #define MAIN_IMAGES 4             /* the image buttons' slots in buttons[] */
 
 void free_main_menu(main_m_t *m)
 {
     if (m == NULL)
         return;
     sfSprite_destroy(m->background);
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < MAIN_IMAGES; i++)
         free_button(m->buttons[i]);
     sfText_destroy(m->title);
     free(m);
@@ -29,6 +31,7 @@ void print_main_menu(main_m_t *m, gd_t *gd)
     ui_update(&m->ui, ui_now_ms());
     for (int i = 0; i < 3; i++)
         ui_draw_sprite(gd, &m->ui, i, m->buttons[i]->sprite);
+    ui_draw_sprite(gd, &m->ui, MAIN_ICONS, m->buttons[3]->sprite);
     ui_draw_widget(gd, &m->ui, MAIN_CREDITS);
     sfRenderWindow_drawText(gd->w, m->title, NULL);
 }
@@ -36,7 +39,7 @@ void print_main_menu(main_m_t *m, gd_t *gd)
 /* The callbacks only say where to go: the scene changes after the events. */
 static void go(void *ctx, widget_t *w)
 {
-    static const char SCENES[4] = {'o', 'l', 'e', 'c'};
+    static const char SCENES[5] = {'o', 'l', 'e', 'c', 'i'};
     main_m_t *m = ctx;
 
     m->next = SCENES[w - m->widgets];
@@ -73,7 +76,10 @@ main_m_t *create_main_menu(gd_t *gd)
     menu->widgets[MAIN_CREDITS] = (widget_t){.kind = W_BUTTON,
         .label = "Credits", .enabled = true,
         .bounds = {1600.0f, 975.0f, 280.0f, 75.0f}, .on_activate = go};
-    ui_init(&menu->ui, menu->widgets, 4, menu);
+    menu->buttons[3] = create_button(40.0f, 900.0f, 150,   /* the cube worn */
+        icon_texture(gd, MODE_CUBE));
+    menu->widgets[MAIN_ICONS] = button_widget(menu->buttons[3], "Icons", go);
+    ui_init(&menu->ui, menu->widgets, 5, menu);
     menu->ui.focused = MAIN_PLAY;
     menu->ui.on_back = quit;
     gd->menu = 'm';

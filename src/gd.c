@@ -35,10 +35,6 @@ void free_textures(textures_t *res)
         sfTexture_destroy(res->block);
     if (res->cube_portal != NULL)
         sfTexture_destroy(res->cube_portal);
-    if (res->player_icon != NULL)
-        sfTexture_destroy(res->player_icon);
-    if (res->ship_icon != NULL)
-        sfTexture_destroy(res->ship_icon);
     if (res->end_level_background != NULL)
         sfTexture_destroy(res->end_level_background);
     if (res->retry_button != NULL)
@@ -76,8 +72,6 @@ textures_t *load_textures(void)
     res->spike = load_texture(ASSET_SPIKE);
     res->block = load_texture(ASSET_BLOCK);
     res->cube_portal = load_texture(ASSET_PORTAL);
-    res->player_icon = load_texture(ASSET_ICON_CUBE);
-    res->ship_icon = load_texture(ASSET_ICON_SHIP);
     res->end_level_background = load_texture(ASSET_BG_END_LEVEL);
     res->retry_button = load_texture(ASSET_BUTTON_RETRY);
     res->quit_button = load_texture(ASSET_BUTTON_QUIT);
@@ -95,6 +89,7 @@ void free_gd(gd_t *gd)
     sfView_destroy(gd->ui_view);
     sfView_destroy(gd->level_view);
     free_textures(gd->res);
+    icons_free(gd);
     music_free(&gd->music);
     library_free(&gd->library);
     sfFont_destroy(gd->main_font);
@@ -135,6 +130,7 @@ gd_t *create_gd(void)
 
     settings_load(&gd->settings, SETTINGS_PATH, log_warning);  /* before the window */
     gd->res = load_textures();
+    icons_load(gd);
     music_init(gd);
     gd->main_font = sfFont_createFromFile(ASSET_FONT);
     if (gd->main_font == NULL) {
@@ -199,6 +195,15 @@ void handle_credits(gd_t *gd, credits_t **credits)
     keyboard_events_credits(credits, gd);
 }
 
+void handle_icon_menu(gd_t *gd, icon_m_t **icon_menu)
+{
+    if (*icon_menu == NULL)
+        *icon_menu = create_icon_menu(gd);
+    print_icon_menu(*icon_menu, gd);
+    print_cursor(gd->cursor, gd->w);
+    keyboard_events_icon_menu(icon_menu, gd);
+}
+
 void handle_main_menu(gd_t *gd, main_m_t **menu)
 {
     if (*menu == NULL)
@@ -215,6 +220,7 @@ int main_loop(gd_t *gd)
     editor_m_t *editor_menu = NULL;
     level_list_t *level_list = NULL;
     credits_t *credits = NULL;
+    icon_m_t *icon_menu = NULL;
     level_t *level = NULL;
 
     while (sfRenderWindow_isOpen(gd->w)) {
@@ -232,6 +238,8 @@ int main_loop(gd_t *gd)
             handle_playing(gd, &level);
         if (gd->menu == 'c')
             handle_credits(gd, &credits);
+        if (gd->menu == 'i')
+            handle_icon_menu(gd, &icon_menu);
         sfRenderWindow_display(gd->w);
     }
     if (main_menu != NULL)
@@ -243,6 +251,7 @@ int main_loop(gd_t *gd)
     if (level_list != NULL)
         free_level_list_menu(level_list);
     free_credits(credits);
+    free_icon_menu(icon_menu);
     if (level != NULL)
         level_free(level, gd);
     if ((gd->settings.dirty || access(gd->settings.path, F_OK) != 0)

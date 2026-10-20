@@ -14,6 +14,7 @@
 
     #define SETTINGS_PATH "save/settings.txt"
     #define BINDINGS_MAX 6
+    #define SETTING_FILE_MAX 128      /* a file name setting, the NUL included */
 
 typedef struct bindings {
     binding_t items[BINDINGS_MAX];
@@ -27,7 +28,7 @@ typedef struct bindings {
 typedef struct settings {
     int music_volume;             /* 0-100                                   */
     int sfx_volume;               /* 0-100                                   */
-    char menu_song[128];          /* a file name in music/ (4.2)             */
+    char menu_song[SETTING_FILE_MAX];   /* a file name in music/ (4.2)       */
     bool fullscreen;
     int window_width;             /* window.c also caps it to the desktop    */
     int window_height;
@@ -42,6 +43,8 @@ typedef struct settings {
     binding_t remove_checkpoint_key;
     int audio_offset_ms;          /* -300-300 (4.8)                          */
     binding_t editor_keys[ED_KEY_COUNT];   /* combinations, BIND_NONE unbound */
+    char icons[MODE_COUNT][SETTING_FILE_MAX];   /* a file in res/icons/<mode>/:
+                                     the player's icon in each gamemode     */
     char **extra;                 /* unknown "key=value" lines, kept as is   */
     size_t nb_extra;
     bool dirty;                   /* changed since loaded or saved (5.7)     */

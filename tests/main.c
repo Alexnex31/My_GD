@@ -45,6 +45,7 @@ int main(void)
     test_input();
     test_settings();
     test_ui();
+    test_icons();
     test_music();
     test_options();
     test_bot();

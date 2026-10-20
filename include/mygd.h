@@ -49,6 +49,17 @@ void print_main_menu(main_m_t *m, gd_t *gd);
 main_m_t *create_main_menu(gd_t *gd);
 
 
+/* res/icons/: each mode's, loaded at start; the one the settings chose. */
+void icons_load(gd_t *gd);
+void icons_free(gd_t *gd);
+sfTexture *icon_texture(gd_t *gd, gamemode_t mode);
+
+icon_m_t *create_icon_menu(gd_t *gd);
+void free_icon_menu(icon_m_t *im);
+void print_icon_menu(icon_m_t *im, gd_t *gd);
+void keyboard_events_icon_menu(icon_m_t **im, gd_t *gd);
+void handle_icon_menu(gd_t *gd, icon_m_t **im);
+
 credits_t *create_credits(gd_t *gd);
 void free_credits(credits_t *c);
 void print_credits(credits_t *c, gd_t *gd);
@@ -148,6 +159,7 @@ void ui_draw_widget(gd_t *gd, const ui_screen_t *ui, int i);
 void ui_draw_focus(gd_t *gd, const ui_screen_t *ui, int i);
 void ui_dim(gd_t *gd);
 void ui_caption(gd_t *gd, const char *s, float x, float y);
+void ui_box(gd_t *gd, ui_rect_t r, sfColor fill, sfColor edge);
 int64_t ui_now_ms(void);
 const sfUint32 *utf8_to_utf32(const char *s);
 

@@ -42,7 +42,6 @@
     #define ASSET_PORTAL "res/level/cube_portal.png"
     #define ASSET_EXPLOSION "res/level/explos.png"
 
-    #define ASSET_ICON_CUBE "res/icons/cube/player_icon.png"
-    #define ASSET_ICON_SHIP "res/icons/ship/ship_icon.png"
+    #define ASSET_ICONS "res/icons"   /* then a folder per mode, MODES' names */
 
 #endif

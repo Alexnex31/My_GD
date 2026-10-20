@@ -188,17 +188,7 @@ static void render_background(gd_t *gd, level_t *lv, vec2_t cam)
 static void setup_player_sprite(gd_t *gd, level_t *lv)
 {
     const player_t *p = &lv->sim.st.player;
-    sfTexture *const icons[MODE_COUNT] = {   /* one per mode (FEATURES 6.1) */
-        [MODE_CUBE] = gd->res->player_icon,
-        [MODE_SHIP] = gd->res->ship_icon,
-        [MODE_UFO] = gd->res->ship_icon,     /* stands in until it has its own */
-        [MODE_WAVE] = gd->res->player_icon,  /* the same */
-        [MODE_BALL] = gd->res->player_icon,  /* the same, rolling */
-        [MODE_ROBOT] = gd->res->player_icon, /* the same, upright */
-        [MODE_SWING] = gd->res->ship_icon,   /* the ship's, for now */
-        [MODE_SPIDER] = gd->res->player_icon, /* the cube's, upright */
-    };
-    sfTexture *tex = icons[p->mode];
+    sfTexture *tex = icon_texture(gd, p->mode);   /* the player's (3.8) */
     sfVector2u size = sfTexture_getSize(tex);
     double side = fmax(2.0 * player_mode(p)->half,
         ICON_MIN_SIDE * (p->mini ? MINI_SCALE : 1.0));

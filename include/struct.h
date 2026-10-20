@@ -18,6 +18,7 @@
     #include "music/library.h"
     #include "music/sfx.h"
     #include "editor/ed_select.h"
+    #include "ui/icon_kit.h"
     #include "ui/ui.h"
     #include "level.h"
 
@@ -111,7 +112,6 @@ typedef struct editor_menu {
     bool want_back;
 } editor_m_t;
 
-/* Options, Play, Editor over the images, and Credits (FEATURES 3, 4.11). */
 /* The Credits screen (FEATURES 4.11): every song, then res/CREDITS.md. */
 typedef struct credits {
     sfSprite *background;
@@ -123,11 +123,34 @@ typedef struct credits {
     bool back;
 } credits_t;
 
+/*
+** The Icons screen (FEATURES 3.8): a tab per mode showing its chosen icon,
+** that mode's icons a page at a time, the page's arrows, Back.
+*/
+    #define ICON_W_TABS 0
+    #define ICON_W_GRID MODE_COUNT
+    #define ICON_W_PREV (ICON_W_GRID + ICONS_PER_PAGE)
+    #define ICON_W_NEXT (ICON_W_PREV + 1)
+    #define ICON_W_BACK (ICON_W_NEXT + 1)
+    #define ICON_W_COUNT (ICON_W_BACK + 1)
+
+typedef struct icon_menu {
+    gd_t *gd;
+    sfSprite *background;
+    sfSprite *icon;               /* every icon drawn, one after the other  */
+    ui_screen_t ui;
+    widget_t widgets[ICON_W_COUNT];
+    gamemode_t tab;
+    int page;
+    bool back;
+} icon_m_t;
+
+/* Options, Play, Editor and Icons over images, and Credits (3, 3.8, 4.11). */
 typedef struct main_menu {
     sfSprite *background;
-    button_t *buttons[3];
+    button_t *buttons[4];         /* Options, Play, Editor, then Icons      */
     ui_screen_t ui;
-    widget_t widgets[4];
+    widget_t widgets[5];
     char next;                    /* the scene a callback asked for, or 0   */
     bool quit;                    /* Escape                                 */
     sfText *title;
@@ -147,8 +170,6 @@ typedef struct textures {
     sfTexture *spike;
     sfTexture *block;
     sfTexture *cube_portal;
-    sfTexture *player_icon;
-    sfTexture *ship_icon;
     sfTexture *end_level_background;
     sfTexture *retry_button;
     sfTexture *quit_button;
@@ -205,6 +226,8 @@ typedef struct gd {
     sfSound *click;
     ed_clip_t clip;               /* the editor's copies: pasted into any level,
                                      until the game closes (11.6)           */
+    icon_kit_t icons;             /* res/icons/<mode>/'s files (3.8)        */
+    sfTexture **icon_tex[MODE_COUNT];   /* their images, in the kit's order  */
 } gd_t;
 
 #endif

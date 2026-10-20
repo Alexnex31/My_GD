@@ -181,9 +181,7 @@ static void draw_selection(editor_t *ed, gd_t *gd)
 static void draw_start(editor_t *ed, gd_t *gd, const level_start_t *st,
     sfColor tint)
 {
-    sfTexture *tex = st->mode == MODE_SHIP || st->mode == MODE_UFO
-        || st->mode == MODE_SWING
-        ? gd->res->ship_icon : gd->res->player_icon;
+    sfTexture *tex = icon_texture(gd, st->mode);
     sfVector2u size = sfTexture_getSize(tex);
     const mode_ops_t *m = st->mini ? &MINI_MODES[st->mode] : &MODES[st->mode];
     float side = (float)fmax(2.0 * m->half, st->mini ? 30.0 : 60.0);

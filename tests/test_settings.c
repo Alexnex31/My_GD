@@ -120,6 +120,7 @@ static void test_invalid_values(void)
         "jump_bindings=A,B,C,D,E,F,G", "jump_bindings=Joy16",
         "jump_bindings=Mouse", "restart_key=Escape", "restart_key=Nope",
         "audio_offset_ms=301", "music_volume=99999999999999999999",
+        "icon_cube=", "icon_ship=../ship.png", "icon_ufo=.hidden.png",
     };
     settings_t s;
     settings_t def;
@@ -136,6 +137,8 @@ static void test_invalid_values(void)
         CHECK(s.jump_bindings.count == 4 && s.window_width == 1280);
         CHECK(binding_equal(s.restart_key, def.restart_key));
         CHECK(strcmp(s.menu_song, def.menu_song) == 0);
+        for (int m = 0; m < MODE_COUNT; m++)
+            CHECK(strcmp(s.icons[m], def.icons[m]) == 0);
         settings_free(&s);
     }
     load(&s, "fps_limit=75\n");
@@ -187,7 +190,10 @@ static void test_round_trip(void)
     s.remove_checkpoint_key = (binding_t){BIND_NONE, 0, 0};
     s.audio_offset_ms = 120;
     snprintf(s.menu_song, sizeof(s.menu_song), "%s", "x.ogg");
+    snprintf(s.icons[MODE_SPIDER], SETTING_FILE_MAX, "%s", "legs 2.png");
     CHECK(settings_save(&s) == 0);
+    CHECK(strstr(read_file(), "icon_spider=legs 2.png\n") != NULL);
+    CHECK(strstr(read_file(), "icon_cube=player_icon.png\n") != NULL);
     CHECK(strstr(read_file(), "future_thing=3\n") != NULL);
     CHECK(strstr(read_file(), "remove_checkpoint_key=\n") != NULL);
     CHECK(strstr(read_file(), "jump_bindings=Numpad0,MouseMiddle\n") != NULL);
@@ -202,6 +208,8 @@ static void test_round_trip(void)
     CHECK(back.remove_checkpoint_key.kind == BIND_NONE);
     CHECK(back.audio_offset_ms == 120);
     CHECK(strcmp(back.menu_song, "x.ogg") == 0);
+    CHECK(strcmp(back.icons[MODE_SPIDER], "legs 2.png") == 0);
+    CHECK(strcmp(back.icons[MODE_SHIP], "ship_icon.png") == 0);
     CHECK(back.nb_extra == 1);
     settings_free(&s);
     settings_free(&back);

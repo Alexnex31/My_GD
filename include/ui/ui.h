@@ -121,6 +121,10 @@ struct ui_screen {
     float label_x;                /* where row labels start; 0: right-aligned
                                      against their widget                    */
     ui_rect_t panel;              /* drawn behind a dialog; no width: none   */
+    bool grid;                    /* the arrows go to the nearest widget that
+                                     way, no wrapping, but a list's Up and Down
+                                     and a slider's or cycler's Left and Right;
+                                     else Up and Down go in order (3.4)      */
     void (*on_back)(void *ctx);                        /* Escape            */
     void (*on_key)(void *ctx, binding_t key, bool shift);  /* the others: Tab */
 };

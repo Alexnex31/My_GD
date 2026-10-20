@@ -301,9 +301,63 @@ static void adjust(ui_screen_t *ui, int dir)
         cycler_step(ui, w, dir);
 }
 
+static float absf(float v)
+{
+    return v < 0.0f ? -v : v;
+}
+
+/*
+** The nearest enabled widget whose center is that way from the focused
+** one's: the distance along the arrow, and twice the distance aside, so the
+** next in a row beats a closer one in the row below.
+*/
+static void go_toward(ui_screen_t *ui, float dx, float dy)
+{
+    ui_rect_t f = ui->widgets[ui->focused].bounds;
+    float best_score = 0.0f;
+    int best = -1;
+
+    for (int i = 0; i < ui->count; i++) {
+        ui_rect_t b = ui->widgets[i].bounds;
+        float ox = b.x + b.w / 2.0f - (f.x + f.w / 2.0f);
+        float oy = b.y + b.h / 2.0f - (f.y + f.h / 2.0f);
+        float along = ox * dx + oy * dy;
+        float score = along + 2.0f * absf(dx != 0.0f ? oy : ox);
+
+        if (i == ui->focused || !usable(ui, i) || along < 1.0f)
+            continue;
+        if (best < 0 || score < best_score) {
+            best = i;
+            best_score = score;
+        }
+    }
+    if (best >= 0)
+        ui->focused = best;
+}
+
+/* A list's Up and Down, a slider's and a cycler's Left and Right are theirs. */
+static bool grid_arrow(ui_screen_t *ui, binding_t key)
+{
+    widget_kind_t kind = W_BUTTON;
+
+    if (!ui->grid || !usable(ui, ui->focused))
+        return false;
+    kind = ui->widgets[ui->focused].kind;
+    if ((is_key(key, KEY_Up) || is_key(key, KEY_Down)) && kind != W_LIST)
+        go_toward(ui, 0.0f, is_key(key, KEY_Up) ? -1.0f : 1.0f);
+    else if ((is_key(key, KEY_Left) || is_key(key, KEY_Right))
+        && kind != W_SLIDER && kind != W_CYCLER)
+        go_toward(ui, is_key(key, KEY_Left) ? -1.0f : 1.0f, 0.0f);
+    else
+        return false;
+    return true;
+}
+
 /* What an arrow does, on its press and on each repeat. */
 static bool arrow(ui_screen_t *ui, binding_t key)
 {
+    if (grid_arrow(ui, key))
+        return true;
     if (is_key(key, KEY_Up) || is_key(key, KEY_Down))
         navigate(ui, is_key(key, KEY_Up) ? -1 : 1);
     else if (is_key(key, KEY_Left) || is_key(key, KEY_Right))

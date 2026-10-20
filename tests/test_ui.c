@@ -256,6 +256,45 @@ static void test_left_right(void)
     CHECK(f.ui.focused == LIST);
 }
 
+/*
+** A grid of buttons: 3 x 2 at 100 px, a row of tabs above it, and a slider
+** below that keeps its Left and Right (3.4).
+*/
+static void test_grid(void)
+{
+    widget_t w[9];
+    ui_screen_t ui;
+    int value = 5;
+    int moved = 0;
+    static const key_id_t PATH[] = {KEY_Right, KEY_Right, KEY_Right,
+        KEY_Down, KEY_Left, KEY_Up, KEY_Up, KEY_Down, KEY_Down, KEY_Down};
+    static const int WHERE[] = {1, 2, 2, 5, 4, 1, 6, 1, 4, 8};
+
+    for (int i = 0; i < 6; i++)
+        w[i] = (widget_t){.kind = W_BUTTON, .enabled = true, .bounds = {100.0f
+            * (float)(i % 3), 200.0f + 100.0f * (float)(i / 3), 80.0f, 80.0f}};
+    w[6] = (widget_t){.kind = W_BUTTON, .enabled = true,   /* a tab above 1 */
+        .bounds = {90.0f, 50.0f, 100.0f, 80.0f}};
+    w[7] = (widget_t){.kind = W_BUTTON, .enabled = false,  /* skipped */
+        .bounds = {100.0f, 400.0f, 80.0f, 80.0f}};
+    w[8] = (widget_t){.kind = W_SLIDER, .enabled = true, .value = &value,
+        .max = 10, .step = 1, .bounds = {0.0f, 500.0f, 280.0f, 80.0f}};
+    ui_init(&ui, w, 9, NULL);
+    ui.grid = true;
+    for (int i = 0; i < 10; i++) {
+        ui_event(&ui, &(ui_event_t){.kind = UI_PRESS,
+            .input = {BIND_KEY, (int)PATH[i], 0}}, 0);
+        moved += ui.focused == WHERE[i];
+    }
+    CHECK(moved == 10);                  /* no wrap at the row's end */
+    ui_event(&ui, &(ui_event_t){.kind = UI_PRESS,
+        .input = {BIND_KEY, KEY_Right, 0}}, 0);
+    CHECK(ui.focused == 8 && value == 6); /* a slider's arrows are its own */
+    ui_event(&ui, &(ui_event_t){.kind = UI_PRESS,
+        .input = {BIND_KEY, KEY_Up, 0}}, 0);
+    CHECK(ui.focused == 4);              /* its Up: the nearest above */
+}
+
 /* A held arrow: first repeat after 300 ms, then every 80 ms (3.5). */
 static void test_key_repeat(void)
 {
@@ -568,6 +607,7 @@ void test_ui(void)
     test_slider_capture();
     test_keyboard_navigation();
     test_left_right();
+    test_grid();
     test_key_repeat();
     test_repeat_let_go();
     test_capture();

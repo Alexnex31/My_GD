@@ -324,6 +324,17 @@ void ui_dim(gd_t *gd)
     rect(gd, (ui_rect_t){0.0f, 0.0f, VIEW_W, VIEW_H}, DIM, 0.0f);
 }
 
+/* A box a screen draws itself: a fill and an edge of its own colour. */
+void ui_box(gd_t *gd, ui_rect_t r, sfColor fill, sfColor edge)
+{
+    sfRectangleShape_setPosition(gd->ui_shape, (sfVector2f){r.x, r.y});
+    sfRectangleShape_setSize(gd->ui_shape, (sfVector2f){r.w, r.h});
+    sfRectangleShape_setFillColor(gd->ui_shape, fill);
+    sfRectangleShape_setOutlineThickness(gd->ui_shape, OUTLINE_W);
+    sfRectangleShape_setOutlineColor(gd->ui_shape, edge);
+    draw_rect(gd, gd->ui_shape);
+}
+
 /* One line of text centered on x, in the toolkit's font and size. */
 void ui_caption(gd_t *gd, const char *s, float x, float y)
 {
