@@ -2,7 +2,7 @@
 ** ALEXNEX PROJECT, 2026
 ** tests/test_edmusic.c
 ** File description:
-** the song along the level, beat lines, the level's song settings (FEATURES 11.11)
+** the song along the level, beat lines, the level's settings (FEATURES 11.11, 11.16)
 */
 
 #include <math.h>
@@ -11,6 +11,8 @@
 #include <string.h>
 
 #include "editor/ed_music.h"
+#include "editor/ed_settings.h"
+#include "sim/modes.h"
 #include "sim/constants.h"
 #include "test.h"
 
@@ -185,6 +187,68 @@ static void test_song_settings(void)
     ed_level_free(&lv);
 }
 
+static bool setting_is(const ed_level_t *lv, ed_setting_t s, const char *want)
+{
+    char text[64];
+
+    ed_setting_text(lv, &LIB, s, text, sizeof(text));
+    return strcmp(text, want) == 0;
+}
+
+/*
+** The settings window's rows: the song's as the panel had them, then the
+** start's. Every change is a step back, one per gesture.
+*/
+static void test_level_settings(void)
+{
+    ed_level_t lv;
+    ed_history_t h = {0};
+    char *text;
+
+    CHECK((int)ED_SET_FIRST_BEAT == (int)ED_SONG_FIRST_BEAT);
+    CHECK((int)ED_SET_FIRST_START == (int)ED_SONG_PROP_COUNT);
+    CHECK(strcmp(ed_setting_name(ED_SET_SPEED), "Speed") == 0);
+    ed_level_new(&lv, "1");
+    CHECK(setting_is(&lv, ED_SET_MODE, "cube") && setting_is(&lv,
+        ED_SET_SPEED, "x1"));
+    CHECK(setting_is(&lv, ED_SET_SIZE, "normal") && setting_is(&lv,
+        ED_SET_GRAVITY, "normal"));
+    ed_gesture(&h);
+    CHECK(ed_setting_step(&lv, &h, &LIB, ED_SET_MODE, -1, false) && lv.dirty);
+    CHECK(lv.hdr.start.mode == MODE_COUNT - 1 && h.nb_undo == 1);
+    CHECK(ed_setting_step(&lv, &h, &LIB, ED_SET_MODE, 1, false));
+    CHECK(ed_setting_step(&lv, &h, &LIB, ED_SET_MODE, 1, false));
+    CHECK(setting_is(&lv, ED_SET_MODE, "ship") && h.nb_undo == 1);
+    ed_gesture(&h);
+    for (int i = 0; i < 3; i++)
+        CHECK(ed_setting_step(&lv, &h, &LIB, ED_SET_SPEED, 1, false));
+    CHECK(!ed_setting_step(&lv, &h, &LIB, ED_SET_SPEED, 1, false));
+    CHECK(setting_is(&lv, ED_SET_SPEED, "x4") && h.nb_undo == 2);
+    ed_gesture(&h);
+    CHECK(ed_setting_step(&lv, &h, &LIB, ED_SET_SIZE, 1, false));
+    ed_gesture(&h);
+    CHECK(ed_setting_step(&lv, &h, &LIB, ED_SET_GRAVITY, -1, false));
+    ed_gesture(&h);
+    CHECK(ed_setting_step(&lv, &h, &LIB, ED_SET_SONG, 1, false));
+    CHECK(setting_is(&lv, ED_SET_SONG, "Alpha") && h.nb_undo == 5);
+    text = ed_level_text(&lv);
+    CHECK(strstr(text, "start_gamemode ship\n") != NULL);
+    CHECK(strstr(text, "start_gravity flipped\n") != NULL);
+    CHECK(strstr(text, "start_speed 4\n") != NULL);
+    CHECK(strstr(text, "start_size mini\n") != NULL);
+    free(text);
+    CHECK(ed_undo(&lv, &h) && lv.hdr.music[0] == '\0');
+    CHECK(ed_undo(&lv, &h) && ed_undo(&lv, &h) && !lv.hdr.start.mini);
+    CHECK(lv.hdr.start.gravity_dir == 1 && lv.hdr.start.speed == 4.0);
+    CHECK(ed_undo(&lv, &h) && lv.hdr.start.speed == 1.0);
+    CHECK(ed_undo(&lv, &h) && lv.hdr.start.mode == MODE_CUBE);
+    CHECK(ed_redo(&lv, &h) && lv.hdr.start.mode == MODE_SHIP);
+    lv.dirty = false;
+    CHECK(ed_redo(&lv, &h) && lv.hdr.start.speed == 4.0 && lv.dirty);
+    ed_history_free(&h);
+    ed_level_free(&lv);
+}
+
 void test_edmusic(void)
 {
     test_time_and_x();
@@ -192,4 +256,5 @@ void test_edmusic(void)
     test_beat_xs();
     test_own_offset();
     test_song_settings();
+    test_level_settings();
 }

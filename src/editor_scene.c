@@ -209,6 +209,8 @@ void editor_events(editor_t *ed, gd_t *gd)
         return editor_verify_events(ed, gd);
     editor_autosave(ed, false);
     editor_song_follow(ed, gd);
+    if (ed->settings_open)
+        return editor_settings_events(ed, gd);
     editor_apply_camera(ed, gd);             /* the mouse is read through it */
     while (poll_event(gd)) {
         const sfEvent *ev = gd->event;

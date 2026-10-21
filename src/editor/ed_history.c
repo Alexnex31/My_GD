@@ -21,6 +21,7 @@ static void cmd_free(ed_cmd_t *c)
     free(c->ids);
     free(c->before);
     free(c->after);
+    free(c->hdr);
     *c = (ed_cmd_t){0};
 }
 
@@ -176,6 +177,20 @@ void ed_do_change(ed_level_t *lv, ed_history_t *h, const int *ids,
     lv->dirty = true;
 }
 
+/* The first `before` of the gesture stays: its last `after` is the step's. */
+void ed_do_header(ed_level_t *lv, ed_history_t *h,
+    const level_header_t *before)
+{
+    ed_cmd_t *c = record(h, ED_HEADER);
+
+    if (c->hdr == NULL) {
+        c->hdr = sim_xcalloc(2, sizeof(level_header_t));
+        c->hdr[0] = *before;
+    }
+    c->hdr[1] = lv->hdr;
+    lv->dirty = true;
+}
+
 /* Removed from the end first, each place is the one it had before any left. */
 static bool from_the_end(const ed_cmd_t *c)
 {
@@ -243,6 +258,10 @@ static void apply(ed_level_t *lv, const ed_cmd_t *c, bool forward)
         take_out(lv, c);
     if (c->kind == ED_REMOVE && !forward)
         put_back(lv, c);
+    if (c->kind == ED_HEADER) {
+        lv->hdr = c->hdr[forward ? 1 : 0];
+        lv->dirty = true;
+    }
     if (c->kind != ED_CHANGE)
         return;
     for (size_t i = 0; i < c->count; i++) {

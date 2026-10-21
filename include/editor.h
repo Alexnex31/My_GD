@@ -11,6 +11,7 @@
     #include "mygd.h"
     #include "editor/ed_props.h"
     #include "editor/ed_music.h"
+    #include "editor/ed_settings.h"
     #include "editor/ed_check.h"
     #include "editor/ed_verify.h"
     #include "editor/ed_autosave.h"
@@ -72,7 +73,12 @@ typedef struct editor {
     sfMouseButton press_button;   /* only its release ends what it began     */
     vec2_t stroke_at;             /* a stroke's last point: the next one     */
     bool stroke_on;               /* paints every cell on the way from it    */
-    bool level_panel;             /* L: the level's song and beat (11.11)    */
+    bool settings_open;           /* L: the level's settings window (11.16)  */
+    ui_screen_t settings_ui;
+    widget_t settings_widgets[ED_SET_COUNT + 1];   /* the rows, then Close  */
+    char settings_text[ED_SET_COUNT][48];          /* what each row shows   */
+    int settings_row;             /* a step asked for: the row, or -1        */
+    int settings_dir;
     bool song_on;                 /* P: its song plays from the canvas       */
     level_t *play;                /* the playtest, while it runs (11.9)      */
     vec2_t *trace;                /* where the last playtest went            */
@@ -182,6 +188,13 @@ void editor_verify_events(editor_t *ed, gd_t *gd);
 void editor_next_issue(editor_t *ed);
 bool editor_status_holds(sfVector2f at);
 void editor_status_draw(editor_t *ed, gd_t *gd);
+
+/* editor_settings.c: the level's settings window (11.16) */
+void editor_settings_open(editor_t *ed);
+void editor_settings_events(editor_t *ed, gd_t *gd);
+void editor_settings_draw(editor_t *ed, gd_t *gd);
+bool editor_settings_button_holds(sfVector2f at);   /* the toolbar's */
+void editor_settings_button_draw(editor_t *ed, gd_t *gd);
 
 /* editor_dialog.c: unsaved changes, and the autosave */
 void editor_dialog_open(editor_t *ed, ed_dialog_t which);

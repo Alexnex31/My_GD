@@ -58,7 +58,7 @@
     m(SONG, "song", "Hear the song from here", 3, KEY_P, 0, false) \
     m(VERIFY, "verify", "Verify", 3, KEY_V, 0, false) \
     m(NEXT_ISSUE, "next_issue", "Next warning", 3, KEY_N, 0, false) \
-    m(LEVEL_PANEL, "level_panel", "Level panel", 4, KEY_L, 0, false) \
+    m(LEVEL_PANEL, "level_panel", "Level settings", 4, KEY_L, 0, false) \
     m(GRID, "grid", "Grid size", 4, KEY_G, 0, false) \
     m(LAYER_DOWN, "layer_down", "Previous layer", 4, KEY_PageDown, 0, \
         false) \

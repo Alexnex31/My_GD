@@ -55,7 +55,7 @@ const char *ed_song_prop_name(ed_song_prop_t p);
 void ed_song_prop_text(const ed_level_t *lv, const library_t *lib,
     ed_song_prop_t p, char *out, size_t size);
 /* false when nothing changed (a value already at 0). Marks the level dirty;
-** the header isn't in the undo history. */
+** the window's ed_setting_step puts it in the undo history. */
 bool ed_song_prop_step(ed_level_t *lv, const library_t *lib, ed_song_prop_t p,
     int dir, bool big);
 

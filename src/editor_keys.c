@@ -102,7 +102,7 @@ void editor_key_action(editor_t *ed, gd_t *gd, ed_key_t k)
     if (k == ED_KEY_NEXT_ISSUE)
         editor_next_issue(ed);
     if (k == ED_KEY_LEVEL_PANEL)
-        ed->level_panel = !ed->level_panel;
+        editor_settings_open(ed);
     if (k == ED_KEY_GRID)
         ed->grid = ed->grid == 50.0 ? 25.0 : 50.0;
     if (k == ED_KEY_LAYER_DOWN || k == ED_KEY_LAYER_UP)   /* All, 0, 1 (11.15) */

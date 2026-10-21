@@ -160,7 +160,7 @@ The keys, as they are by default. Every one can be changed in the options' **Edi
 | G | Grid 50 / 25 |
 | Page Down / Page Up | Editor layer: All, 0, 1, 2… (the others fade and can't be picked) |
 | Home | Back to the level's start, at 100% |
-| L | The level's panel: its song, offset, BPM and first beat (Shift+click: bigger steps) |
+| L, or the toolbar's Level settings button | The level's settings: its song, offset, BPM and first beat (Shift: bigger steps), and how an attempt starts: gamemode, speed, size, gravity. Each change can be undone |
 | P | Hear the level's song from the middle of the canvas; again to stop |
 | Enter | Playtest from the level's start |
 | Shift+Enter | Playtest from a start position: the selected one, or the last one before the middle of the canvas |
@@ -174,9 +174,9 @@ Holding a move, a 15-degree turn, undo or redo repeats it.
 
 With something selected, a panel in the canvas's top right corner shows its properties, each with a minus and a plus: turn (15 degrees), width and height (grid units), kind (a portal's mode, a pad's or an orb's colour, a gravity portal's direction). Every object also has its Z layer (B5 to T4: behind or in front of the player), its Z order (higher is on top) and its editor layer. A saw stays round: its width and height change together. A speed portal has a speed row instead of a kind.
 
-**Start positions** are the palette's last entry. They are other places to begin an attempt from, for practice: the level's real start doesn't change, and they aren't obstacles. Selected, the panel sets their gamemode, gravity and speed. In the game and in a playtest, **A** and **E** go to the previous and the next one (the level's start is the first of the list) and begin an attempt there. An attempt from a start position still adds to the attempt counter, but records no best and no completion. A short `<1/2>` shows which one it is.
+**Start positions** are the palette's last entry. They are other places to begin an attempt from, for practice: the level's real start doesn't change (the level's settings set how it begins), and they aren't obstacles. Selected, the panel sets their gamemode, gravity and speed. In the game and in a playtest, **A** and **E** go to the previous and the next one (the level's start is the first of the list) and begin an attempt there. An attempt from a start position still adds to the attempt counter, but records no best and no completion. A short `<1/2>` shows which one it is.
 
-With a BPM set in the level's panel, the canvas shows a line at every beat of the song, every fourth one brighter. While the song plays (P), a pink line shows where it is in the level and the canvas follows it.
+With a BPM set in the level's settings, the canvas shows a line at every beat of the song, every fourth one brighter. While the song plays (P), a pink line shows where it is in the level and the canvas follows it.
 
 A **playtest** plays the level as it is, saved or not, with the level's own song (not a song you chose for it in the level list), and records nothing. Escape, a death, or the window losing the focus bring the editor back where the player was (the level's end doesn't stop it: the player runs on), with the path of that attempt drawn as a line until the next edit.
 

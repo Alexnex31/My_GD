@@ -375,11 +375,12 @@ static void draw_toolbar(editor_t *ed, gd_t *gd)
         "%zu selected   -   Grid %.0f   -   Zoom %.0f%%   -   Layer %s",
         ed->lv.hdr.name, ed->lv.dirty ? " *" : "", ed->lv.id, ed->lv.count,
         editor_props(ed)->selected, ed->grid, 100.0f / ed->zoom, layer);
-    editor_label_fit(ed, gd, text, (sfVector2f){20.0f, 8.0f}, VIEW_W - 40.0f,
+    editor_label_fit(ed, gd, text, (sfVector2f){20.0f, 8.0f}, VIEW_W - 340.0f,
         28, sfWhite);
     help_line(ed, gd, text, sizeof(text));
-    editor_label_fit(ed, gd, text, (sfVector2f){20.0f, 48.0f}, VIEW_W - 40.0f,
+    editor_label_fit(ed, gd, text, (sfVector2f){20.0f, 48.0f}, VIEW_W - 340.0f,
         18, (sfColor){180, 190, 210, 255});
+    editor_settings_button_draw(ed, gd);
     if (ui_now_ms() < ed->notice_until_ms)
         editor_label(ed, gd, ed->notice, ED_PALETTE_W + 30.0f,
             ED_STATUS_Y - 60.0f, 30,
@@ -402,5 +403,6 @@ void editor_draw(editor_t *ed, gd_t *gd)
     editor_status_draw(ed, gd);
     editor_panel_draw(ed, gd);
     editor_keys_draw(ed, gd);
+    editor_settings_draw(ed, gd);
     editor_dialog_draw(ed, gd);
 }

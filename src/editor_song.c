@@ -26,8 +26,8 @@ static void no_song(editor_t *ed, gd_t *gd)
     char key[BINDING_NAME_MAX];
     char text[96];
 
-    snprintf(text, sizeof(text), "No song to play: the level panel (%s) "
-        "chooses it", editor_key_name(gd, ED_KEY_LEVEL_PANEL, key,
+    snprintf(text, sizeof(text), "No song to play: the level settings (%s) "
+        "choose it", editor_key_name(gd, ED_KEY_LEVEL_PANEL, key,
         sizeof(key)));
     editor_notice(ed, text);
 }

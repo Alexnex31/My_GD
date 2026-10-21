@@ -15,7 +15,8 @@
 typedef enum ed_cmd_kind {
     ED_ADD,
     ED_REMOVE,
-    ED_CHANGE                 /* a move today; a turn or a resize the same way */
+    ED_CHANGE,                /* a move today; a turn or a resize the same way */
+    ED_HEADER                 /* the level's settings: its song, its start    */
 } ed_cmd_kind_t;
 
 /* One edit, with what it takes to do it again and to take it back (11.7). */
@@ -29,10 +30,12 @@ typedef struct ed_cmd {
     int *ids;                 /* CHANGE: whose object changed                 */
     ed_object_t *before;      /* CHANGE: each one whole, so an undo is exact  */
     ed_object_t *after;       /* (never the kept fields: nothing edits them)  */
+    level_header_t *hdr;      /* HEADER: [0] before, [1] after                */
 } ed_cmd_t;
 
 /*
-** Everything that edits the level's objects goes through here. One gesture
+** Everything that edits the level's objects, or its settings, goes through
+** here. One gesture
 ** (a painted stroke, a drag, a paste) is one step back: objects added or
 ** removed during the same gesture join the same command. Pure, tested alone.
 */
@@ -65,6 +68,13 @@ bool ed_do_place(ed_level_t *lv, ed_history_t *h, const ed_entry_t *e,
 */
 void ed_do_change(ed_level_t *lv, ed_history_t *h, const int *ids,
     const ed_object_t *before, size_t count);
+
+/*
+** The level's settings were `before` and are lv->hdr now: records it. The
+** changes of one gesture are one step.
+*/
+void ed_do_header(ed_level_t *lv, ed_history_t *h,
+    const level_header_t *before);
 
 bool ed_undo(ed_level_t *lv, ed_history_t *h);            /* false: nothing to */
 bool ed_redo(ed_level_t *lv, ed_history_t *h);

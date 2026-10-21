@@ -408,7 +408,7 @@ static void slider_follow(ui_screen_t *ui, widget_t *w, float x)
 
 Cycler: `< label >`. Left/Right move through `choices`, wrapping around; a click on its left third goes back, anywhere else forward, and Enter goes forward.
 
-Stepper (`W_STEPPER`, 2026-10-21): a cycler whose value the caller keeps. It shows `text`, the caller's buffer, and its keys and clicks call `on_step(ctx, widget, -1 or 1)`; what a step does, and whether Shift makes it bigger, is the caller's. For values a list of choices can't hold, such as decimals.
+Stepper (`W_STEPPER`, 2026-10-21): a cycler whose value the caller keeps. It shows `text`, the caller's buffer, and its keys and clicks call `on_step(ctx, widget, -1 or 1)`; what a step does, and whether Shift makes it bigger, is the caller's. For values a list of choices can't hold: the level settings' offset, BPM and first beat (11.16).
 
 Key capture: activating it starts the modal ("Press a key, mouse button or gamepad button for Jump 2", "Esc to cancel, Backspace to clear"), drawn over a dimmed screen. Only the next **press** counts, so the click or Enter that opened it doesn't. Escape cancels, Backspace gives `BIND_NONE` (clear), anything else is the result. With `on_capture` set, the screen decides (5.5: swaps, the last jump binding); without it, the binding is assigned.
 
@@ -1775,7 +1775,7 @@ Every action is bound to a **combination**: a key with its own Ctrl, Shift and A
 | P | Hear the song from here | |
 | V | Verify | |
 | N | Next warning, of the editor layer | |
-| L | The level's panel | |
+| L | The level's settings window (11.16): again, or Escape, closes it | |
 | G | Grid 50 / 25 | |
 | Page Down / Page Up | Editor layer: All, 0, 1… | |
 | Home | Back to the level's start, at 100% | |
@@ -1877,7 +1877,7 @@ Music: `music_play_from(offset + ed_time_at_x(x) + audio_offset)`.
 6. On completion or Escape: return to the editor.
 7. In the editor, draw the recorded path as a thin line until the next edit. It shows exactly where jumps happen and how close hazards are: most of level design is reading this line.
 
-As built: a playtest plays the level's own song, as P and the level panel do, never a song the player chose for the level in the level list (4.4). The window losing the focus ends it like Escape ("Playtest stopped: the window lost the focus"): the keys are someone else's, and a run left going would come back dead. The banner doesn't hide a "Song missing" notice, and the cursor isn't drawn over it, as in a level.
+As built: a playtest plays the level's own song, as P and the level's settings do, never a song the player chose for the level in the level list (4.4). The window losing the focus ends it like Escape ("Playtest stopped: the window lost the focus"): the keys are someone else's, and a run left going would come back dead. The banner doesn't hide a "Song missing" notice, and the cursor isn't drawn over it, as in a level.
 
 ### 11.10 Verify (bot)
 
@@ -1995,7 +1995,7 @@ Show counts in the toolbar; clicking cycles the camera through the flagged objec
 
 ### 11.13f As built: E6
 
-- **The level's panel** (key L, with nothing selected): the same panel as the selection's, with the level's song settings, a minus and a plus each. Song goes through the library and "none"; Offset by 0.05 s (Shift: 1 s), shown as "0.50 s (song)" while the level has none of its own, and stepped from that value, so the song never jumps (the first step gives the level its own offset, which can then be 0); BPM by 1 (Shift: 10); Beat 1, the song time of the first beat, by 0.01 s (Shift: 0.1 s). They are the header's `music`, `music_offset`, `bpm` and `first_beat`, saved with the level. No text field: the steps reach any value. These settings mark the level changed but are **not in the undo history**, which only holds objects.
+- **The level's panel** (key L, with nothing selected): the same panel as the selection's, with the level's song settings, a minus and a plus each. Song goes through the library and "none"; Offset by 0.05 s (Shift: 1 s), shown as "0.50 s (song)" while the level has none of its own, and stepped from that value, so the song never jumps (the first step gives the level its own offset, which can then be 0); BPM by 1 (Shift: 10); Beat 1, the song time of the first beat, by 0.01 s (Shift: 0.1 s). They are the header's `music`, `music_offset`, `bpm` and `first_beat`, saved with the level. No text field: the steps reach any value. These settings mark the level changed but are **not in the undo history**, which only holds objects. *(Since 2026-10-21 these rows are the Song group of the level's settings window, 11.16, and each step is an undo step.)*
 - **Where the song is along the level** (`src/editor/ed_music.c`, pure and tested): time and x are converted with the offset the game itself will use (the level's, or else the song's own) and the level's speed, from the level's start. 11.11 wrote it with `PLAYER_SPAWN_X` and the normal speed; this follows `start_x` and `start_speed` too. Speed portals are walked since 10.3b.
 - **Beat lines:** with a BPM set, a line at every beat in view, every fourth one brighter, beat 0 at `first_beat`. They move as the offset, the BPM or the first beat change.
 - **Hear it** (key P): the song the level will play, from the time the middle of the canvas is reached at; P again stops it and gives the menus their song back. A pink line shows where the song is in the level, and the canvas turns the page when the line reaches its right edge. It stops at the song's end, when the song is changed, and when a playtest starts.
@@ -2048,6 +2048,19 @@ As in GD, as the user described it:
 - The order is pure and tested: `src/fx/draw_order.c` builds it once per level (the draw order, the chunks) and gathers what is in view each frame; `tests/test_draw_order.c` checks, on random levels seen from random places, that nothing in view is missed, that the order is the draw order and never the array's (which is sorted by x), and that what is behind the player comes first. `src/level_chunks.c` only keeps the vertices.
 
 Not yet: GD's second editor layer (2.2), and the B1 default, which waits for decoration objects.
+
+### 11.16 Level settings
+
+GD's editor has a window for the level's own settings: its song, how an attempt starts, its colours, its background and ground, and more. This one has the settings this game has, and nothing else: **no colour channels, no backgrounds or grounds, no dual mode, no platformer mode, no font**. Built 2026-10-21, at the user's request.
+
+- **Opening it:** the **Level settings** button at the right end of the toolbar, or the Level settings key (L by default; the setting keeps its old name, `editor_level_panel`, so a rebound key isn't lost). It sits over the canvas, which waits under it: every event is the window's. Escape, its Close button or the same key close it. The window's cross still closes the game, with the autosave.
+- **Song** (the header's `music`, `music_offset`, `bpm`, `first_beat`): the rows the level's panel had (11.13f), the same steps. Shift makes the song rows' steps bigger: an offset by 1 s, a BPM by 10, a first beat by 0.1 s. A new song stops the one P plays.
+- **Start** (`start_gamemode`, `start_speed`, `start_size`, `start_gravity`, PLAN 7.2): the gamemode goes round the eight modes; the speed goes from x0.5 to x4 and stops at the ends, as a start position's does (11.8); the size is normal or mini; the gravity normal or flipped. They are how every attempt from the level's own start begins, in the game, in a playtest and for the bot. Where the start is (`start_x`, `start_y`) isn't here.
+- **Every row** is a stepper, the toolkit's `W_STEPPER` (3.5): `< value >`, Left and Right or a click on its left or right part, Enter steps up. Up and Down go from row to row; the arrows repeat while held.
+- **Undo:** each step is one step of the history (11.7), its own gesture: Ctrl+Z after closing the window takes back the last change. The history keeps the whole header before and after (`ED_HEADER` commands, `ed_do_header`). An edit like any other, so what was worked out from the level is worked out again: its length and its song's, the beat lines, the bot's verdict and the last path drawn.
+- **The properties panel** no longer has a level page: with nothing selected it isn't shown.
+- **Pure and tested:** `src/editor/ed_settings.c` (the rows' names, values and steps, each recorded in the history) and the header commands of `src/editor/ed_history.c`, in `tests/test_edmusic.c` (each start row, the speed's ends, the song through the window, what a save writes, undo and redo one step at a time, a gesture's steps as one); the stepper in `tests/test_ui.c`. The window is `src/editor_settings.c`.
+- **Checked in a window:** opened by the button and by L; Gamemode, Speed and a Shift-step of the BPM with the keyboard; Escape, then Ctrl+Z took back only the BPM; the status line's level length followed the new speed; a playtest started as a ship at x3.
 
 ## 12. Level format v2 grammar
 
