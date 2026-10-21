@@ -39,6 +39,19 @@ void robot_rotation(player_t *p);
 void swing_input(player_t *p, input_t in);
 void spider_input(player_t *p, input_t in);
 
+/*
+** The surfaces there are right now (G.5): the ground, then the corridor's
+** floor and ceiling while one is active. side is +1 when the solid part is
+** below y and -1 when it is above, as sweep_box_plane takes it.
+*/
+typedef struct surface {
+    double y;
+    double side;
+    long id;                  /* SURF_GROUND, SURF_FLOOR or SURF_CEIL */
+} surface_t;
+
+int current_surfaces(const sim_t *s, surface_t out[3]);
+
 void move_and_collide(sim_t *s);                   /* 4.4 */
 void collide_kill_ceiling(player_t *p, const level_data_t *lvl);   /* 4.7 */
 void update_can_jump(sim_t *s);                    /* the jump zone (4.3) */

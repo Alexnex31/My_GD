@@ -76,6 +76,7 @@ void test_constants(void)
     CHECK(PER_TICK(SPEED_VFAST) == 6.5);
     CHECK(PER_TICK(SPEED_XFAST) == 8.0);
     CHECK(modes_tallest_corridor() == 1000.0);           /* the ship's (5.2) */
+    CHECK(modes_widest_half() == PLAYER_HALF);   /* the broadphase's margin (4.1) */
     cube_half_turn();
     ship_held_speed(&lowest, &highest);
     CHECK(highest == PER_TICK(SHIP_MAX_VY));           /* never above the cap */

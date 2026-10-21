@@ -33,12 +33,14 @@ static rect_t tick_sweep_bounds(const player_t *p)
 ** The objects this tick can touch, using the level's x order (4.1). The
 ** cursor only moves forward, so it keeps everything the biggest player could
 ** reach from here: a size or mode portal can grow this one into objects
-** behind it, and the jump zone reaches a skin further than the square.
+** behind it, and the jump zone reaches a skin further than the square. That
+** biggest player is PLAYER_HALF, which test_constants checks against every
+** mode at both sizes.
 */
 static void broadphase(sim_t *s, rect_t sweep)
 {
     const level_data_t *lv = &s->lvl;
-    double behind = s->st.player.pos.x - modes_widest_half() - ZONE_SKIN;
+    double behind = s->st.player.pos.x - PLAYER_HALF - ZONE_SKIN;
 
     while (s->st.first_active < lv->nb_objects
         && lv->objects[s->st.first_active].hitbox.aabb.x + lv->reach <= behind)
@@ -132,25 +134,31 @@ static void try_square(sim_t *s, size_t i, vec2_t d, event_t *out)
     keep(out, &c);
 }
 
-/* The ground, and the corridor's boundaries while one is active (G.5). */
+/* The one list every surface rule reads: nothing else names them (G.5). */
+int current_surfaces(const sim_t *s, surface_t out[3])
+{
+    const ship_bounds_t *b = &s->st.bounds;
+
+    out[0] = (surface_t){GROUND_Y, 1.0, SURF_GROUND};
+    if (!b->active)
+        return 1;
+    out[1] = (surface_t){b->bottom, 1.0, SURF_FLOOR};
+    out[2] = (surface_t){b->top, -1.0, SURF_CEIL};
+    return 3;
+}
+
 static void try_surfaces(sim_t *s, vec2_t d, event_t *out)
 {
     const player_t *p = &s->st.player;
     double half = player_mode(p)->half;
+    surface_t surf[3];
+    int n = current_surfaces(s, surf);
     contact_t c;
 
-    if (sweep_box_plane(p->pos, half, d, GROUND_Y, 1.0, &c)) {
-        c.surface = SURF_GROUND;
-        keep(out, &c);
-    }
-    if (!s->st.bounds.active)
-        return;
-    if (sweep_box_plane(p->pos, half, d, s->st.bounds.bottom, 1.0, &c)) {
-        c.surface = SURF_FLOOR;
-        keep(out, &c);
-    }
-    if (sweep_box_plane(p->pos, half, d, s->st.bounds.top, -1.0, &c)) {
-        c.surface = SURF_CEIL;
+    for (int k = 0; k < n; k++) {
+        if (!sweep_box_plane(p->pos, half, d, surf[k].y, surf[k].side, &c))
+            continue;
+        c.surface = surf[k].id;
         keep(out, &c);
     }
 }
@@ -239,21 +247,22 @@ static void try_shapes(sim_t *s, size_t i, vec2_t d, event_t *out)
     try_circle(s, i, d, out);
 }
 
-/* The corridor's ceiling, or the ground once gravity is flipped (G.7). */
+/*
+** A surface solid on the side the lift goes to: the corridor's ceiling, or
+** the ground and the corridor's floor once gravity is flipped (G.7).
+*/
 static bool lift_hits_surface(const sim_t *s, double y, double lift)
 {
     const player_t *p = &s->st.player;
     double g = p->gravity_dir;
     double top = (y - lift * g) - player_mode(p)->half * g;
-    double ceiling;
+    surface_t surf[3];
+    int n = current_surfaces(s, surf);
 
-    if (s->st.bounds.active)
-        ceiling = g > 0.0 ? s->st.bounds.top : s->st.bounds.bottom;
-    else if (g < 0.0)
-        ceiling = GROUND_Y;
-    else
-        return false;                        /* nothing above an open level */
-    return (top - ceiling) * g < 0.0;
+    for (int k = 0; k < n; k++)
+        if (surf[k].side == -g && (top - surf[k].y) * g < 0.0)
+            return true;
+    return false;
 }
 
 /*
@@ -382,7 +391,7 @@ static void step_up(sim_t *s, const face_t *f, vec2_t *vel)
     vel->y = 0.0;
 }
 
-static bool first_event(sim_t *s, vec2_t d, vec2_t vel, bool steps,
+static void first_event(sim_t *s, vec2_t d, vec2_t vel, bool steps,
     event_t *out)
 {
     out->kind = EV_NONE;
@@ -397,7 +406,6 @@ static bool first_event(sim_t *s, vec2_t d, vec2_t vel, bool steps,
     try_surfaces(s, d, out);
     if (steps)
         try_steps(s, d, vel, out);           /* contacts first, then steps (G.9) */
-    return out->kind != EV_NONE;
 }
 
 static void settle(player_t *p, const contact_t *c, double half)
@@ -473,22 +481,35 @@ static void respond(sim_t *s, const contact_t *c, vec2_t *vel)
 /* A surface can't be crossed (4.3): only a bug could put the player past one. */
 static bool crossed_surface(const sim_t *s)
 {
-    const player_t *p = &s->st.player;
+    double y = s->st.player.pos.y;
+    surface_t surf[3];
+    int n = current_surfaces(s, surf);
 
-    if (p->pos.y > GROUND_Y)
-        return true;
-    return s->st.bounds.active
-        && (p->pos.y > s->st.bounds.bottom || p->pos.y < s->st.bounds.top);
+    for (int k = 0; k < n; k++)
+        if ((y - surf[k].y) * surf[k].side > 0.0)
+            return true;
+    return false;
 }
 
-/* Where a straight move along the gravity ends: its floor, or the kill line. */
+/*
+** Where a straight move along the gravity ends: the nearest surface solid on
+** that side, or the kill line when there is none (4.7).
+*/
 static double far_side(const sim_t *s)
 {
-    const ship_bounds_t *b = &s->st.bounds;
+    double g = s->st.player.gravity_dir;
+    double far = s->lvl.kill_y;
+    bool found = false;
+    surface_t surf[3];
+    int n = current_surfaces(s, surf);
 
-    if (s->st.player.gravity_dir > 0)
-        return b->active ? b->bottom : GROUND_Y;
-    return b->active ? b->top : s->lvl.kill_y;
+    for (int k = 0; k < n; k++) {
+        if (surf[k].side != g || (found && (surf[k].y - far) * g >= 0.0))
+            continue;
+        far = surf[k].y;
+        found = true;
+    }
+    return far;
 }
 
 /*

@@ -184,7 +184,10 @@ double modes_tallest_corridor(void)
     return tallest;
 }
 
-/* Over every mode and size: what the broadphase keeps behind the player (4.1). */
+/*
+** Over every mode and size: what the broadphase keeps behind the player
+** (4.1). It uses PLAYER_HALF, a constant; test_constants checks the two agree.
+*/
 double modes_widest_half(void)
 {
     double widest = 0.0;

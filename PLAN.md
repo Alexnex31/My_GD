@@ -3394,6 +3394,8 @@ s->legs += 1;                                  /* path position = leg index + fr
 
 `crossed_surface(s)`: `pos.y > GROUND_Y`, or `pos.y > bounds.bottom`, or `pos.y < bounds.top` while the corridor is active. It can't happen (G.5); it's the safety net of 4.3.
 
+*(As built: every rule that reads the surfaces, `try_surfaces`, `crossed_surface`, `far_side`, `lift_hits_surface`, `zone_surface` and `stay_off_the_surfaces`, reads them from one list, `current_surfaces(s, out)`: the ground, then the corridor's floor and ceiling while one is active, each as a line `y` and the side it is solid on. A new surface is added there once.)*
+
 ### G.9 `first_event`: which shape tests which face
 
 The shapes don't each test the whole hitbox: the square owns horizontal and vertical faces, the circle owns tilted ones and every head hit (4.3). Because `sweep_box_poly` and `sweep_circle_clear` report one contact per shape, the filtering happens on what they're allowed to return.
@@ -3699,7 +3701,8 @@ The first version moves a cube on the ground and on block tops. No circle, no sl
 | `static void keep(event_t *out, const contact_t *c)` | strictly-earlier wins | G.9 |
 | `static void try_square(sim_t *s, size_t i, vec2_t d, event_t *out)` | the square's filter | G.9 |
 | `static void try_surfaces(sim_t *s, vec2_t d, event_t *out)` | ground, corridor floor and ceiling | G.5, G.9 |
-| `static bool first_event(sim_t *s, vec2_t d, vec2_t vel, event_t *out)` | the earliest event | G.9 |
+| `static void first_event(sim_t *s, vec2_t d, vec2_t vel, bool steps, event_t *out)` | the earliest event | G.9 |
+| `int current_surfaces(const sim_t *s, surface_t out[3])` | the ground and the corridor's boundaries, one list | G.5 |
 | `static void settle(player_t *p, const contact_t *c, double half)` | exact placement | 4.4 |
 | `static void land(player_t *p, const contact_t *c, vec2_t *vel)` | support, `surface_rise` | 4.4 |
 | `static void head_hit(player_t *p, const contact_t *c, vec2_t *vel)` | die, bounce, or stop on a surface | 4.4 |

@@ -70,14 +70,13 @@ static bool zone_light(const hitbox_t *h, rect_t zone)
 /* The ground and the corridor's boundaries are flat faces too (4.3). */
 static bool zone_surface(const sim_t *s, rect_t zone)
 {
-    const ship_bounds_t *b = &s->st.bounds;
+    surface_t surf[3];
+    int n = current_surfaces(s, surf);
 
-    if (zone.y + zone.h >= GROUND_Y && zone.y <= GROUND_Y)
-        return true;
-    if (!b->active)
-        return false;
-    return (zone.y + zone.h >= b->bottom && zone.y <= b->bottom)
-        || (zone.y + zone.h >= b->top && zone.y <= b->top);
+    for (int k = 0; k < n; k++)
+        if (zone.y + zone.h >= surf[k].y && zone.y <= surf[k].y)
+            return true;
+    return false;
 }
 
 /* The same rectangle, for the overlay to draw (9.6). Nothing here reads it. */

@@ -99,15 +99,16 @@ void corridor_from_center(sim_t *s, double center)
 static void stay_off_the_surfaces(sim_t *s)
 {
     player_t *p = &s->st.player;
-    const ship_bounds_t *b = &s->st.bounds;
     double half = player_mode(p)->half;
+    surface_t surf[3];
+    int n = current_surfaces(s, surf);
 
-    if (b->active && p->pos.y - half < b->top)
-        p->pos.y = b->top + half;
-    if (b->active && p->pos.y + half > b->bottom)
-        p->pos.y = b->bottom - half;
-    if (p->pos.y > GROUND_Y - half)
-        p->pos.y = GROUND_Y - half;
+    for (int k = 0; k < n; k++) {
+        double rest = surf[k].y - surf[k].side * half;   /* exactly on it */
+
+        if ((p->pos.y - rest) * surf[k].side > 0.0)
+            p->pos.y = rest;
+    }
 }
 
 /*
