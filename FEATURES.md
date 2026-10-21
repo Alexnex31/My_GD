@@ -408,6 +408,8 @@ static void slider_follow(ui_screen_t *ui, widget_t *w, float x)
 
 Cycler: `< label >`. Left/Right move through `choices`, wrapping around; a click on its left third goes back, anywhere else forward, and Enter goes forward.
 
+Stepper (`W_STEPPER`, 2026-10-21): a cycler whose value the caller keeps. It shows `text`, the caller's buffer, and its keys and clicks call `on_step(ctx, widget, -1 or 1)`; what a step does, and whether Shift makes it bigger, is the caller's. For values a list of choices can't hold, such as decimals.
+
 Key capture: activating it starts the modal ("Press a key, mouse button or gamepad button for Jump 2", "Esc to cancel, Backspace to clear"), drawn over a dimmed screen. Only the next **press** counts, so the click or Enter that opened it doesn't. Escape cancels, Backspace gives `BIND_NONE` (clear), anything else is the result. With `on_capture` set, the screen decides (5.5: swaps, the last jump binding); without it, the binding is assigned.
 
 List: rows of `UI_ROW_H` (60 px), as many as fit in its bounds, from `scroll`. The mouse wheel scrolls 3 rows, clamped so the last row stays at the bottom. Up/Down move the selection and scroll to keep it visible; past either end, the focus moves on to the next widget. A click selects a row; a click on the selected row, or Enter, activates it (`on_activate`). Used by the song picker and, later, the level list and editor file dialog.

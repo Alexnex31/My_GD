@@ -99,6 +99,12 @@ static void slider_step(ui_screen_t *ui, widget_t *w, int dir)
     set_value(ui, w, v < w->min ? w->min : (v > w->max ? w->max : v));
 }
 
+static void stepper_step(ui_screen_t *ui, widget_t *w, int dir)
+{
+    if (w->on_step != NULL)
+        w->on_step(ui->ctx, w, dir);
+}
+
 static void cycler_step(ui_screen_t *ui, widget_t *w, int dir)
 {
     int span = w->max - w->min + 1;
@@ -152,6 +158,8 @@ static void activate(ui_screen_t *ui, int i)
         set_value(ui, w, *w->value ? 0 : 1);
     if (w->kind == W_CYCLER)
         cycler_step(ui, w, 1);
+    if (w->kind == W_STEPPER)
+        stepper_step(ui, w, 1);
     if (w->kind == W_KEYBIND) {
         ui->capturing = i;               /* the next press is the result (5.5) */
         let_go(ui);
@@ -208,14 +216,20 @@ static void text_key(ui_screen_t *ui, const ui_event_t *ev, int64_t now)
     }
 }
 
-/* A cycler's left third goes back; a list's row is chosen, then activated. */
+/*
+** A cycler's or a stepper's left third goes back; a list's row is chosen,
+** then activated.
+*/
 static void click(ui_screen_t *ui, int i, float x, float y)
 {
     widget_t *w = &ui->widgets[i];
     int row = 0;
+    bool back = x < w->bounds.x + w->bounds.w / 3.0f;
 
-    if (w->kind == W_CYCLER && x < w->bounds.x + w->bounds.w / 3.0f)
+    if (w->kind == W_CYCLER && back)
         return cycler_step(ui, w, -1);
+    if (w->kind == W_STEPPER && back)
+        return stepper_step(ui, w, -1);
     if (w->kind == W_TEXT)
         return;                              /* a click focuses it: Enter confirms */
     if (w->kind != W_LIST)
@@ -299,6 +313,8 @@ static void adjust(ui_screen_t *ui, int dir)
         slider_step(ui, w, dir);
     if (w->kind == W_CYCLER)
         cycler_step(ui, w, dir);
+    if (w->kind == W_STEPPER)
+        stepper_step(ui, w, dir);
 }
 
 static float absf(float v)
@@ -335,7 +351,10 @@ static void go_toward(ui_screen_t *ui, float dx, float dy)
         ui->focused = best;
 }
 
-/* A list's Up and Down, a slider's and a cycler's Left and Right are theirs. */
+/*
+** A list's Up and Down, a slider's, a cycler's and a stepper's Left and
+** Right are theirs.
+*/
 static bool grid_arrow(ui_screen_t *ui, binding_t key)
 {
     widget_kind_t kind = W_BUTTON;
@@ -346,7 +365,7 @@ static bool grid_arrow(ui_screen_t *ui, binding_t key)
     if ((is_key(key, KEY_Up) || is_key(key, KEY_Down)) && kind != W_LIST)
         go_toward(ui, 0.0f, is_key(key, KEY_Up) ? -1.0f : 1.0f);
     else if ((is_key(key, KEY_Left) || is_key(key, KEY_Right))
-        && kind != W_SLIDER && kind != W_CYCLER)
+        && kind != W_SLIDER && kind != W_CYCLER && kind != W_STEPPER)
         go_toward(ui, is_key(key, KEY_Left) ? -1.0f : 1.0f, 0.0f);
     else
         return false;

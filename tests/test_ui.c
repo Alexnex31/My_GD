@@ -560,6 +560,43 @@ static void type(fixture_t *f, const char *s)
 ** A text field: typed characters go in while it has the focus, Backspace
 ** erases, Enter confirms, and no key is a shortcut meanwhile (11.6).
 */
+static void on_step(void *ctx, widget_t *w, int dir)
+{
+    (void)w;
+    ((fixture_t *)ctx)->changes += dir;      /* the steps' sum */
+    ((fixture_t *)ctx)->activations += 1;    /* and how many there were */
+}
+
+/*
+** A stepper: the caller's value, a cycler's keys and clicks. Left and Right
+** step it even in a grid, Enter goes up, Up and Down leave it.
+*/
+static void test_stepper(void)
+{
+    fixture_t f;
+    char shown[8] = "7";
+
+    setup(&f);
+    f.w[CYCLER] = (widget_t){.kind = W_STEPPER, .label = "n",
+        .bounds = row_at(CYCLER), .enabled = true, .text = shown,
+        .on_step = on_step};
+    f.ui.focused = CYCLER;
+    key(&f, KEY_Right, 0);
+    key(&f, KEY_Right, 0);
+    key(&f, KEY_Left, 0);
+    CHECK(f.changes == 1 && f.activations == 3);
+    key(&f, KEY_Enter, 0);
+    CHECK(f.changes == 2 && f.activations == 4);
+    click_at(&f, 1410, row_at(CYCLER).y + 10);      /* the left third */
+    click_at(&f, 1700, row_at(CYCLER).y + 10);
+    CHECK(f.changes == 2 && f.activations == 6);
+    f.ui.grid = true;
+    key(&f, KEY_Left, 0);
+    CHECK(f.changes == 1 && f.ui.focused == CYCLER);
+    key(&f, KEY_Down, 0);
+    CHECK(f.ui.focused != CYCLER && f.activations == 7);
+}
+
 static void test_text_field(void)
 {
     fixture_t f;
@@ -617,4 +654,5 @@ void test_ui(void)
     test_looks();
     test_modal();
     test_text_field();
+    test_stepper();
 }

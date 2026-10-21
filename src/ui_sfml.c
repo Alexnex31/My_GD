@@ -215,9 +215,10 @@ static void draw_content(gd_t *gd, const widget_t *w, ui_rect_t r, float a)
     }
     if (w->kind == W_SLIDER)
         draw_slider(gd, w, r, a);
-    if (w->kind == W_CYCLER) {
+    if (w->kind == W_CYCLER || w->kind == W_STEPPER) {
         text(gd, "<", (sfVector2f){r.x + 20.0f, center(r).y}, 0, a);
-        text(gd, w->choices[*w->value - w->min], center(r), 1, a);
+        text(gd, w->kind == W_CYCLER ? w->choices[*w->value - w->min]
+            : w->text, center(r), 1, a);
         text(gd, ">", (sfVector2f){r.x + r.w - 20.0f, center(r).y}, 2, a);
     }
     if (w->kind == W_KEYBIND) {

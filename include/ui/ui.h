@@ -66,7 +66,10 @@ typedef enum widget_kind {
     W_CYCLER,                     /* *value min..max, choices[value], wraps  */
     W_KEYBIND,                    /* *binding, through a capture modal       */
     W_LIST,                       /* *value the selected row, choices[0..max] */
-    W_TEXT                        /* text[0..text_cap - 1], typed when focused */
+    W_TEXT,                       /* text[0..text_cap - 1], typed when focused */
+    W_STEPPER                     /* a value the caller keeps: text shows it,
+                                     on_step(-1 or 1) changes it, a cycler's
+                                     keys and clicks; Enter is +1           */
 } widget_kind_t;
 
 typedef struct widget widget_t;
@@ -78,6 +81,7 @@ typedef struct widget widget_t;
 */
 typedef void (*widget_fn)(void *ctx, widget_t *w);
 typedef void (*capture_fn)(void *ctx, widget_t *w, binding_t b);
+typedef void (*step_fn)(void *ctx, widget_t *w, int dir);
 
 struct widget {
     widget_kind_t kind;
@@ -94,7 +98,8 @@ struct widget {
     widget_fn on_change;          /* only when the value really changed     */
     widget_fn on_activate;        /* a button, or a list's chosen row       */
     capture_fn on_capture;        /* NULL: the binding is set as captured   */
-    char *text;                   /* text field: the caller's buffer        */
+    step_fn on_step;              /* a stepper's                            */
+    char *text;                   /* text field, stepper: the caller's buffer */
     int text_cap;                 /* its size, the NUL included             */
     bool combo;                   /* keybind: a key with the Ctrl, Shift and
                                      Alt held, the modifiers alone wait;
