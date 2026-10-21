@@ -35,16 +35,21 @@ static rect_t tick_sweep_bounds(const player_t *p)
 ** reach from here: a size or mode portal can grow this one into objects
 ** behind it, and the jump zone reaches a skin further than the square. That
 ** biggest player is PLAYER_HALF, which test_constants checks against every
-** mode at both sizes.
+** mode at both sizes. It stops at the first object still ahead of that: a
+** long one keeps the cursor only while it lasts.
 */
 static void broadphase(sim_t *s, rect_t sweep)
 {
     const level_data_t *lv = &s->lvl;
     double behind = s->st.player.pos.x - PLAYER_HALF - ZONE_SKIN;
+    const rect_t *box = NULL;
 
-    while (s->st.first_active < lv->nb_objects
-        && lv->objects[s->st.first_active].hitbox.aabb.x + lv->reach <= behind)
+    while (s->st.first_active < lv->nb_objects) {
+        box = &lv->objects[s->st.first_active].hitbox.aabb;
+        if (box->x + box->w > behind)
+            break;
         s->st.first_active += 1;
+    }
     s->nb_cand = 0;
     for (size_t i = s->st.first_active; i < lv->nb_objects; i++) {
         const hitbox_t *h = &lv->objects[i].hitbox;

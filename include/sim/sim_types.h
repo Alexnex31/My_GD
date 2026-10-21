@@ -166,7 +166,7 @@ typedef struct speed_map {
 typedef struct level_data {   /* immutable after sim_load */
     object_t *objects;        /* contiguous, sorted by hitbox.aabb.x (then line) */
     size_t nb_objects;
-    double reach;              /* max over objects of hitbox.aabb.w: broadphase (4.1) */
+    double reach;              /* max over objects of hitbox.aabb.w: --check (4.1) */
     double end_shift;          /* distance at which the level completes (3.4)     */
     double kill_y;             /* kill ceiling, world y (4.7)                     */
     level_start_t *starts;     /* the level's other start positions, in file order:

@@ -1194,12 +1194,16 @@ Objects are sorted by `hitbox.aabb.x`, the left edge of their hitbox (ties broke
 static void broadphase(sim_t *s, rect_t sweep)
 {
     const level_data_t *lv = &s->lvl;
-    double behind = s->st.player.pos.x - modes_widest_half() - ZONE_SKIN;
+    double behind = s->st.player.pos.x - PLAYER_HALF - ZONE_SKIN;
+    const rect_t *box;
     size_t i;
 
-    while (s->st.first_active < lv->nb_objects &&
-        lv->objects[s->st.first_active].hitbox.aabb.x + lv->reach <= behind)
+    while (s->st.first_active < lv->nb_objects) {
+        box = &lv->objects[s->st.first_active].hitbox.aabb;
+        if (box->x + box->w > behind)
+            break;                              /* the first one still in reach */
         s->st.first_active += 1;
+    }
     s->nb_cand = 0;
     for (i = s->st.first_active; i < lv->nb_objects; i++) {
         const hitbox_t *h = &lv->objects[i].hitbox;
@@ -1212,7 +1216,7 @@ static void broadphase(sim_t *s, rect_t sweep)
 }
 ```
 
-`sweep` is the bounding box of everything the player can cover this tick: its box at the start and at the end of the unobstructed move `(vx, -vy * gravity_dir)`, grown by the step-up height (4.4). `reach` is the widest hitbox in the level (`max(hitbox.aabb.w)`), computed at load. Every object before the cursor has `hitbox left + reach <= behind`, so its right edge is behind anything the player could become. `behind` is not the tick's `sweep` left: the cursor only moves forward, and a size or mode portal can grow the player (mini to full size, wave to cube) into objects the smaller square had already left, so it keeps what the **widest** mode at either size could reach, plus the jump zone's skin (`ZONE_SKIN`, G.6). Otherwise whether a grown player finds a block behind it would depend on `reach`, the widest object anywhere in the level. The cost per tick is the handful of objects near the player, not the level's length; this replaces today's screen-space window `100 < x < 600`, which causes F5.
+`sweep` is the bounding box of everything the player can cover this tick: its box at the start and at the end of the unobstructed move `(vx, -vy * gravity_dir)`, grown by the step-up height (4.4). The cursor stops at the first object whose right edge is still past `behind`, so every object before it is behind anything the player could become. `behind` is not the tick's `sweep` left: the cursor only moves forward, and a size or mode portal can grow the player (mini to full size, wave to cube) into objects the smaller square had already left, so it keeps what the **widest** mode at either size could reach, plus the jump zone's skin (`ZONE_SKIN`, G.6). That width is `PLAYER_HALF`, a constant: `test_constants` checks it against `modes_widest_half()`, which reads every mode at both sizes. A long object holds the cursor back only while it lasts. *(As built: the first version skipped an object when its left edge plus `reach`, the widest hitbox in the level, was behind; one 20 000 px block then kept the cursor 20 000 px back for the whole level. `reach` is now used by `--check` only.)* The cost per tick is the handful of objects near the player, not the level's length; this replaces today's screen-space window `100 < x < 600`, which causes F5.
 
 Culling uses **hitbox** bounds, not sprite bounds: a hitbox can stick out of its sprite (a rotated object's hitbox bounds differ from its rect), and a sprite-based bound would drop objects early. `cand` lives in `sim_t` next to the run state (it's scratch space, rebuilt every tick, not part of snapshots); `MAX_CANDIDATES` = 256 is far more than a tick can reach, and `--check` warns if a level exceeds it anywhere.
 

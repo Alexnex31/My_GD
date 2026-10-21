@@ -329,6 +329,25 @@ static void test_determinism_and_snapshots(void)
 }
 
 /* The camera decides nothing, so the bot's hash ignores it (3.3). */
+/*
+** The broadphase's cursor stops at the first object still in reach: a long
+** one holds it back while it lasts, and no longer (4.1).
+*/
+static void test_broadphase_cursor(void)
+{
+    sim_t s;
+
+    load(&s, "block 0 -500 1 w=40\nblock 2100 -500 1\nblock 2300 -500 1\n"
+        "block 2500 -500 1\nblock 60000 750 2\n");
+    while (s.st.player.pos.x < 2000.0)
+        sim_tick(&s, NONE);
+    CHECK(s.st.first_active == 0);
+    while (s.st.player.pos.x < 2800.0)
+        sim_tick(&s, NONE);
+    CHECK(s.st.player.alive && s.st.first_active == 4);
+    sim_free(&s);
+}
+
 static void test_physics_hash_ignores_camera(void)
 {
     sim_t a;
@@ -401,6 +420,7 @@ void test_tick(void)
     test_no_jump_buffer();
     test_kill_ceiling();
     test_determinism_and_snapshots();
+    test_broadphase_cursor();
     test_physics_hash_ignores_camera();
     test_hash_ignores_what_decides_nothing();
     test_percent_and_completion();

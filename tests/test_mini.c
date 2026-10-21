@@ -283,8 +283,8 @@ static void test_grow_in_a_corridor(void)
 
 /*
 ** Growing back next to a block the mini player had already left: the bigger
-** square still finds it and steps back up onto it. A wide block far away,
-** which widens the broadphase's reach, changes nothing (4.1).
+** square still finds it and steps back up onto it. A wide block far away
+** changes nothing (4.1).
 */
 static void test_grow_by_a_block(void)
 {
