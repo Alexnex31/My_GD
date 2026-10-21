@@ -609,6 +609,9 @@ static double far_side(const sim_t *s)
 ** A step is not on the way: nothing moves sideways.
 ** It arrives as a grounded player does: at its floor's slide, with one tick
 ** of gravity past it.
+** The contact budget doesn't apply: the press is one straight move, and only
+** steep faces let it go on, each one at most once since it is then passed.
+** The bound is for a full list of passed objects, which forgets the rest.
 */
 static void teleport(sim_t *s)
 {
@@ -623,8 +626,8 @@ static void teleport(sim_t *s)
 
     p->teleport = false;
     broadphase(s, r);
-    for (int n = 0; n < MAX_CONTACTS && !p->grounded; n++) {
-        event_t e = {.kind = EV_NONE, .t = 1.0};
+    for (int n = 0; n <= MAX_CANDIDATES && !p->grounded; n++) {
+        event_t e;
 
         first_event(s, d, vel, false, &e);
         if (!finish_leg(s, d, leg_death_time(s, d), e.t, advance_y))

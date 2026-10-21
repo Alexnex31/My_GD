@@ -173,6 +173,25 @@ static void test_steep_face(void)
     sim_free(&s);
 }
 
+/*
+** However many steep faces are on the way, the press still takes it to the
+** ceiling in one go: going through them uses up no contact budget.
+*/
+static void test_steep_faces_in_a_row(void)
+{
+    sim_t s;
+
+    load(&s, SPIDER "slope 270 650 2 w=1 h=1.5 rot=180\n"
+        "slope 270 470 2 w=1 h=1.5 rot=180\n"
+        "slope 270 290 2 w=1 h=1.5 rot=180\n"
+        "slope 270 110 2 w=1 h=1.5 rot=180\n" FAR);
+    sim_tick(&s, PRESS);
+    CHECK(s.nb_dbg > MAX_CONTACTS && s.dbg[MAX_CONTACTS - 1].kind == DBG_PASS);
+    CHECK(s.st.player.alive && s.st.player.grounded);
+    CHECK(s.st.player.pos.y == TOP);
+    sim_free(&s);
+}
+
 /* A spike on the way kills it there, and so does one where it would land. */
 static void test_spikes(void)
 {
@@ -276,6 +295,7 @@ void test_spider(void)
     test_from_the_air();
     test_what_is_above();
     test_steep_face();
+    test_steep_faces_in_a_row();
     test_spikes();
     test_portal_on_the_way();
     test_nothing_above();
