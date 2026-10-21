@@ -1984,7 +1984,7 @@ Show counts in the toolbar; clicking cycles the camera through the flagged objec
 - **Playtest** (`src/editor_play.c`): Enter plays the level as it is now, saved or not, from its start; Shift+Enter from a start position: the selected one, or else the last one at or before the middle of the canvas, or else the first. It is the game's own level scene (`level_start_doc`, `level_frame`), built from the editor's document, so it can't differ from the game. Nothing is recorded. A and E work in it too; the restart key restarts.
 - **Leaving it:** Escape or a death (after the usual explosion) go back to the editor, with the canvas centered where the player was and a notice ("died at 43%"). Reaching the level's end ends nothing, unlike 11.9's step 6: the player runs on past it, at 100%, until it dies or Escape is pressed.
 - **The path:** the player's position every fourth tick of the last attempt, drawn as a line on the canvas until the level is edited (the history counts its edits, undo and redo included).
-- **Checked in a window:** playtests from the start and from start positions, A/E in a playtest and in the game, and the progress file after attempts from start positions (one attempt and a best of 18% recorded, from the real start, while the others reached 49% to 90%).
+- **Checked in a window:** playtests from the start and from start positions, A/E in a playtest and in the game, and the progress file after attempts from start positions (one attempt and a best of 18% recorded, from the real start, while the others reached 49% to 90%). And, for E5's "done when" (2026-10-21), a start position inside a ship section: `start 3000 500 ship` in level 7, played with Shift+Enter, starts as a ship in its corridor and turns back into a cube at the portal at 4000.
 
 ### 11.13f As built: E6
 
@@ -2171,45 +2171,47 @@ All in `tests/`, linking only `src/sim/` (PLAN 8). "Measured" values come from t
 
 ## 14. Milestones and acceptance criteria
 
+Checked 2026-10-21, each box against its tests, its "as built" notes or a run in a window. 29 of 31 are met; the two left say what is missing.
+
 **M1 — Foundations**
-- [ ] Input edges pass the four input tests
-- [ ] Key repeat disabled; holding Space never produces a second press
-- [ ] Jump bindings (keys, mouse buttons, gamepad) rebindable, defaults Space, Up, left click, gamepad A
-- [ ] Settings store passes its tests; unknown keys preserved
-- [ ] Widgets: button (activate on release), toggle, slider (mouse capture), cycler, key capture, list; all keyboard-navigable
+- [x] Input edges pass the four input tests
+- [x] Key repeat disabled; holding Space never produces a second press
+- [x] Jump bindings (keys, mouse buttons) rebindable, defaults Space, Up, left click *(the gamepad was dropped from this milestone, 2026-10-21: its buttons are bound and saved, not polled for the jump, 1.3)*
+- [x] Settings store passes its tests; unknown keys preserved
+- [x] Widgets: button (activate on release), toggle, slider (mouse capture), cycler, key capture, list; all keyboard-navigable
 
 **M2 — Music**
-- [ ] Library scan with `songs.txt`; undecodable files skipped with a log line
-- [ ] Song resolution order (override → level → default) and offset order implemented
-- [ ] Sync table (4.8) implemented for every event
-- [ ] Drift check resyncs after a forced freeze
-- [ ] Per-level override from the level list, saved with the new progress format, old format still readable
-- [ ] Credits on the end screen and a Credits page; every song has a license entry
+- [x] Library scan with `songs.txt`; undecodable files skipped with a log line
+- [x] Song resolution order (override → level → default) and offset order implemented
+- [x] Sync table (4.8) implemented for every event
+- [x] Drift check resyncs after a forced freeze
+- [x] Per-level override from the level list, saved with the new progress format, old format still readable
+- [ ] Credits on the end screen and a Credits page; every song has a license entry. *Not met (2026-10-21): both screens exist, but `back_mus.ogg`'s license is `?` in `music/songs.txt`, and `res/CREDITS.md` isn't written (4.13).*
 
 **M3 — Options**
-- [ ] All rows of 5.2 working with keyboard only and mouse only
-- [ ] VSync and FPS limit never both active
-- [ ] Display changes revert after 10 s unless confirmed
-- [ ] Capture of keys, mouse and gamepad buttons, with swap and last-binding protection
-- [ ] Audio offset slider and calibration
-- [ ] Reset progress with backup
+- [x] All rows of 5.2 working with keyboard only and mouse only
+- [x] VSync and FPS limit never both active
+- [x] Display changes revert after 10 s unless confirmed
+- [x] Capture of keys, mouse and gamepad buttons, with swap and last-binding protection
+- [x] Audio offset slider and calibration
+- [x] Reset progress with backup
 
 **M4 — Modes**
-- [ ] Mode table used by loader, tick, contact responses, renderer, bot; modes never move the player
-- [ ] Contacts gravity-aware (floors, ceilings, slopes with flipped gravity); mirrored tests pass
-- [ ] Head hits: ship, UFO, ball bounce; cube and wave die
-- [ ] UFO, wave (with trail), ball (a cube that flips) match the measured values
-- [ ] Hold rule (PLAN 3.4): buffered clicks, used holds ignored by orbs, orb priority over surface jumps
-- [ ] Gravity portals; mode portals never change `gravity_dir`; kill ceiling for players falling upward in flipped gravity
-- [ ] Same-mode portals switch to the new corridor; corridors snapped to the grid; camera locked while inside
-- [ ] Mode test levels: the bot finds a path (reported, never blocking)
+- [x] Mode table used by loader, tick, contact responses, renderer, bot; modes never move the player
+- [x] Contacts gravity-aware (floors, ceilings, slopes with flipped gravity); mirrored tests pass
+- [x] Head hits: ship, UFO, ball bounce; cube and wave die
+- [x] UFO, wave (with trail), ball (a cube that flips) match the measured values *(the tables of 7.3, 8 and 9.3, tested; GD's own numbers come with the tuning pass)*
+- [x] Hold rule (PLAN 3.4): buffered clicks, used holds ignored by orbs, orb priority over surface jumps
+- [x] Gravity portals; mode portals never change `gravity_dir`; kill ceiling for players falling upward in flipped gravity
+- [x] Same-mode portals switch to the new corridor; corridors snapped to the grid; camera locked while inside
+- [x] Mode test levels: the bot finds a path (reported, never blocking)
 
 **M5 — Editor**
-- [ ] Stages E1–E7 each meet their "done when"
-- [ ] Format round trip and undo tests pass
+- [ ] Stages E1–E7 each meet their "done when". *Waiting (2026-10-21): E6's, beat lines on the beats heard on a song of known BPM, is checked by ear. E5's was checked in a window that day: a start position inside level 7's ship section, played with Shift+Enter, starts as a ship in its corridor.*
+- [x] Format round trip and undo tests pass
 
 **M6 — Extras**
-- [ ] Pads (thin hitbox, speed never capped), orbs (fresh hold, exact tick, priority over surface jumps)
-- [ ] Saws (circle harm hitbox, swept)
-- [ ] Speed portals with the double distance accumulator; wave slope follows speed; editor time mapping piecewise
-- [ ] Robot, swing, spider, mini as wanted
+- [x] Pads (thin hitbox, speed never capped), orbs (fresh hold, exact tick, priority over surface jumps)
+- [x] Saws (circle harm hitbox, swept)
+- [x] Speed portals with the double distance accumulator; wave slope follows speed; editor time mapping piecewise
+- [x] Robot, swing, spider, mini as wanted *(10.4b, 10.5b–d; their constants are provisional until the tuning pass)*
