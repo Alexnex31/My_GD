@@ -37,8 +37,8 @@ bool sweep_box_plane(vec2_t c, double h, vec2_t d, double sy, double side,
 /*
 ** The circle against a polygon: the polygon inflated by r (G.4). The caller
 ** has **already** checked the circle is clear of hb (4.4 does, before every
-** sweep, with overlap_circle_poly): a circle inside it is the inner box's
-** business, not a contact.
+** sweep, with overlap_circle_poly): a circle inside it is no sweep's
+** business. The move's own rule for it is try_circle_inside (G.9).
 */
 bool sweep_circle_clear(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out);

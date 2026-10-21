@@ -252,6 +252,7 @@ typedef struct contact {
     bool flat;           /* the square met the shape's top or bottom (y axis) */
     double offset;       /* the face's line: normal . point = offset          */
     long surface;        /* object index, or SURF_GROUND / SURF_CEIL / SURF_FLOOR */
+    bool inside;         /* the circle was already in the shape (4.4)          */
 } contact_t;
 
 typedef enum event_kind { EV_NONE, EV_CONTACT, EV_STEP } event_kind_t;

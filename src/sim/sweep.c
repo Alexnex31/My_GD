@@ -91,6 +91,7 @@ bool sweep_box_poly(vec2_t c, double h, vec2_t d, const hitbox_t *hb,
     out->flat = s.k_in == 0;
     out->offset = s.offset;
     out->surface = 0;
+    out->inside = false;
     return true;
 }
 
@@ -144,6 +145,7 @@ bool sweep_box_plane(vec2_t c, double h, vec2_t d, double sy, double side,
     out->flat = true;
     out->offset = -side * sy;
     out->surface = SURF_GROUND;              /* the caller names the surface */
+    out->inside = false;
     return true;
 }
 
@@ -271,7 +273,7 @@ static void circle_vertices(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
 bool sweep_circle_clear(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
     face_ok_fn fok, vertex_ok_fn vok, double g, contact_t *out)
 {
-    contact_t best = {INFINITY, {0.0, 0.0}, false, 0.0, 0};
+    contact_t best = {INFINITY, {0.0, 0.0}, false, 0.0, 0, false};
 
     circle_faces(c, r, d, hb, fok, g, &best);
     circle_vertices(c, r, d, hb, vok, g, &best);
@@ -284,7 +286,7 @@ bool sweep_circle_clear(vec2_t c, double r, vec2_t d, const hitbox_t *hb,
 double sweep_circle_touch_clear(vec2_t c, double r, vec2_t d,
     const hitbox_t *hb)
 {
-    contact_t best = {INFINITY, {0.0, 0.0}, false, 0.0, 0};
+    contact_t best = {INFINITY, {0.0, 0.0}, false, 0.0, 0, false};
 
     circle_faces(c, r, d, hb, NULL, 0.0, &best);
     circle_vertices(c, r, d, hb, NULL, 0.0, &best);

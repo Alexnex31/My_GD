@@ -230,6 +230,35 @@ static void try_circle(sim_t *s, size_t i, vec2_t d, event_t *out)
 }
 
 /*
+** The circle already inside a shape, which no sweep sees: a player that grew
+** (10.4) or changed mode, or a tick's last leg (MAX_CONTACTS), can put it
+** there. The face it is least deep in is its way out. When that face is one
+** of the circle's, a slope or a ceiling, a move going deeper into it meets it
+** now: the player is put back out of it (push_out) and the contact acts as
+** any other. A wall is still the inner box's, and so is a flat top: the
+** step-up lifts the player onto it (G.7).
+*/
+static void try_circle_inside(sim_t *s, size_t i, vec2_t d, event_t *out)
+{
+    const player_t *p = &s->st.player;
+    const hitbox_t *h = &s->lvl.objects[i].hitbox;
+    int f = 0;
+    contact_t c;
+
+    for (int k = 1; k < h->nverts; k++)
+        if (dot(h->face_n[k], p->pos) - h->face_off[k]
+            > dot(h->face_n[f], p->pos) - h->face_off[f])
+            f = k;
+    if (!circle_face_ok(h, f, p->gravity_dir)
+        || fabs(h->face_n[f].y) < FLOOR_MIN_DOT)
+        return;                              /* a wall: the inner box decides */
+    if (dot(h->face_n[f], d) >= -CONTACT_SKIN)
+        return;                              /* along it, or out of it */
+    c = (contact_t){0.0, h->face_n[f], false, h->face_off[f], (long)i, true};
+    keep(out, &c);
+}
+
+/*
 ** Both shapes against one object. The circle is inscribed in the square, so
 ** a square that doesn't overlap the shape proves the circle doesn't either:
 ** the circle's own distance test is needed only in the rare case where the
@@ -247,8 +276,10 @@ static void try_shapes(sim_t *s, size_t i, vec2_t d, event_t *out)
     in_square = overlap_box_poly(p->pos, half, h);
     if (!in_square)
         try_square(s, i, d, out);            /* inside it: the inner box decides */
-    if (in_square && overlap_circle_poly(p->pos, half, h))
+    if (in_square && overlap_circle_poly(p->pos, half, h)) {
+        try_circle_inside(s, i, d, out);
         return;
+    }
     try_circle(s, i, d, out);
 }
 
@@ -413,13 +444,40 @@ static void first_event(sim_t *s, vec2_t d, vec2_t vel, bool steps,
         try_steps(s, d, vel, out);           /* contacts first, then steps (G.9) */
 }
 
-static void settle(player_t *p, const contact_t *c, double half)
+/* Where a surface would be crossed (4.3): past its rest position. */
+static bool past_a_surface(const sim_t *s, double y)
 {
+    double half = player_mode(&s->st.player)->half;
+    surface_t surf[3];
+    int n = current_surfaces(s, surf);
+
+    for (int k = 0; k < n; k++)
+        if ((y - (surf[k].y - surf[k].side * half)) * surf[k].side > 0.0)
+            return true;
+    return false;
+}
+
+/*
+** The circle, a skin off the face it met. Never across a surface (4.3): a
+** player held between the two, which push_out couldn't move, stays put.
+*/
+static void skin_off(sim_t *s, const contact_t *c)
+{
+    double y = s->st.player.pos.y + c->normal.y * CONTACT_SKIN;
+
+    if (!past_a_surface(s, y))
+        s->st.player.pos.y = y;
+}
+
+static void settle(sim_t *s, const contact_t *c, double half)
+{
+    player_t *p = &s->st.player;
+
     if (c->flat) {                           /* exactly on the face's own line */
         p->pos.y = (c->offset + half) * c->normal.y;
         return;
     }
-    p->pos.y += c->normal.y * CONTACT_SKIN;  /* the circle, a skin off a slope */
+    skin_off(s, c);                          /* the circle, a skin off a slope */
 }
 
 /* Supported: the player slides along the surface at its own rise speed. */
@@ -429,7 +487,7 @@ static void land(sim_t *s, const contact_t *c, vec2_t *vel)
     double rise = vel->x * (c->normal.x / c->normal.y) * p->gravity_dir;
 
     log_debug(s, DBG_LAND, c->normal);
-    settle(p, c, player_mode(p)->half);
+    settle(s, c, player_mode(p)->half);
     p->grounded = true;
     p->support_normal = c->normal;
     p->surface_rise = rise;
@@ -453,7 +511,7 @@ static void head_hit(sim_t *s, const contact_t *c, vec2_t *vel)
     }
     e = e < 0.0 ? 0.0 : e;
     p->boost_ticks = 0;                      /* a robot's rise ends on what stops it */
-    p->pos.y += c->normal.y * CONTACT_SKIN;
+    skin_off(s, c);
     p->vy = p->vy > PER_TICK(BOUNCE_MIN_SPEED) ? -p->vy * e : 0.0;
     if (p->vy > follow)
         p->vy = follow;                      /* follow a ceiling that comes down */
@@ -470,11 +528,37 @@ static void pass_into(sim_t *s, const contact_t *c)
     }
 }
 
+/*
+** A slope or a ceiling the circle is already in (try_circle_inside): the
+** player goes straight out of it, up or down, until the circle touches it. It
+** is a leg checked like a step's lift (G.7), and then the contact acts as any
+** other: it lands, or hits its head. Where that would take it past a surface,
+** it stays where it is (4.3), and the contact still acts. False when it died.
+*/
+static bool push_out(sim_t *s, const contact_t *c)
+{
+    player_t *p = &s->st.player;
+    double half = player_mode(p)->half;
+    double y = (c->offset + half - c->normal.x * p->pos.x) / c->normal.y;
+    vec2_t move = {0.0, y - p->pos.y};
+    double death;
+
+    if (past_a_surface(s, y))
+        return true;
+    death = fmin(leg_death_time(s, move), circle_lift_death(s, move));
+    if (!finish_leg(s, move, death, 1.0, advance_y))
+        return false;
+    p->pos.y = y;                            /* exact, like a step's landing */
+    return true;
+}
+
 static void respond(sim_t *s, const contact_t *c, vec2_t *vel)
 {
     const player_t *p = &s->st.player;
     double up_dot = -c->normal.y * p->gravity_dir;
 
+    if (c->inside && !push_out(s, c))
+        return;
     if (up_dot >= FLOOR_MIN_DOT)
         land(s, c, vel);
     else if (up_dot <= -FLOOR_MIN_DOT)

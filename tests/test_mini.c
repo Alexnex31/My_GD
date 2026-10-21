@@ -306,6 +306,79 @@ static void test_grow_by_a_block(void)
 }
 
 /*
+** Growing back on a slope puts the circle 8 px inside it: the player is
+** lifted out onto it and keeps climbing, where it would fall through it and
+** die if a shape it is in were ignored. It ends where a full-size cube does.
+*/
+static void test_grow_on_a_slope(void)
+{
+    const char *slope = "slope 500 750 2 w=4\nblock 700 750 2 w=40\n";
+    char text[256];
+    double full = 0.0;
+    sim_t s;
+
+    for (int mini = 0; mini < 2; mini++) {
+        snprintf(text, sizeof(text), "%s%s%s", mini ? MINI : "", slope,
+            mini ? "mini 560 760 1 off\n" FAR : FAR);
+        load(&s, text);
+        while (s.st.player.alive && s.st.tick < 200)
+            sim_tick(&s, NONE);
+        CHECK(s.st.player.alive && !s.st.player.mini);
+        CHECK(s.st.player.grounded);
+        if (!mini)
+            full = s.st.player.pos.y;
+        else
+            CHECK(s.st.player.pos.y == full);
+        sim_free(&s);
+    }
+}
+
+/*
+** A mini ship riding a ceiling grows back 25 px into it: it is pushed back
+** down out of it and keeps sliding along it, holding, instead of rising
+** through it until its inner box dies.
+*/
+static void test_grow_under_a_ceiling(void)
+{
+    sim_t s;
+
+    load(&s, "start_gamemode ship\nstart_size mini\n"
+        "block 600 400 2 w=40\nmini 1400 450 1 off\n" FAR);
+    sim_tick(&s, PRESS);
+    while (s.st.player.alive && s.st.player.pos.x < 2000.0)
+        sim_tick(&s, HELD);
+    CHECK(s.st.player.alive && !s.st.player.mini);
+    CHECK(fabs(s.st.player.pos.y - (500.0 + PLAYER_HALF)) < 0.01);
+    sim_free(&s);
+}
+
+/*
+** Under a ceiling 75 px over the ground, a cube or a ship grows back into it
+** with its inner box still clear. The ground stops it from being pushed down:
+** the cube walks on, 25 px into the ceiling, which only a move deeper into it
+** would meet. The ship holds and meets it every tick, where it stays: never
+** a skin into the ground.
+*/
+static void test_grow_under_a_low_ceiling(void)
+{
+    const char *level = "block 700 675 2 w=20\nmini 900 800 1 off\n" FAR;
+    char text[256];
+    sim_t s;
+
+    for (int ship = 0; ship < 2; ship++) {
+        snprintf(text, sizeof(text), "%s%s%s", MINI,
+            ship ? "start_gamemode ship\n" : "", level);
+        load(&s, text);
+        while (s.st.player.alive && s.st.player.pos.x < 1600.0)
+            sim_tick(&s, ship && s.st.player.pos.x > 1000.0 ? HELD : NONE);
+        CHECK(s.st.player.alive && !s.st.player.mini);
+        CHECK(s.st.player.pos.y == GROUND_Y - PLAYER_HALF);
+        CHECK(ship || s.st.player.grounded);
+        sim_free(&s);
+    }
+}
+
+/*
 ** The jump zone is the one of the size the tick ends with: grown over a
 ** block it now reaches, the player may jump on that same tick (4.3).
 */
@@ -445,6 +518,9 @@ void test_mini(void)
     test_shrink_leaves_the_surface();
     test_grow_in_a_corridor();
     test_grow_by_a_block();
+    test_grow_on_a_slope();
+    test_grow_under_a_ceiling();
+    test_grow_under_a_low_ceiling();
     test_jump_zone_after_growing();
     test_tunnel();
     test_state();

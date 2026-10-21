@@ -1332,6 +1332,7 @@ typedef struct contact {
     bool flat;           /* the square met the shape's top or bottom (y axis) */
     double offset;       /* the face's line: normal . point = offset          */
     long surface;        /* object index, or SURF_GROUND / SURF_CEIL / SURF_FLOOR */
+    bool inside;         /* the circle was already in the shape (4.4)          */
 } contact_t;
 
 typedef enum event_kind { EV_NONE, EV_CONTACT, EV_STEP } event_kind_t;
@@ -1479,7 +1480,8 @@ static void move_and_collide(sim_t *s)
   - the **circle** against every face and corner that faces the player's ceiling side, and the corridor ceiling, for **head hits**.
 
   It **skips objects the tested shape already overlaps** at the start of the leg (the player is inside them, not resting on them), and the objects passed into as walls earlier in the tick: those are blocks the player is going into from the side; the inner box and the step-up decide about them. A floor the player rests on is only touched, not overlapped, so it keeps holding the player up. Surfaces are never skipped (4.3): they can't be crossed.
-- The rest of the move continues after each event with the corrected velocity, so one tick can land on a slope and slide along it, or land and then bump a ceiling. Horizontal movement is never reduced: a living player always covers exactly `vx` per tick, and `distance` stays exact. If the contact budget runs out, the rest of the move is done horizontally only, which keeps `distance` exact; if the player really is squeezed, the inner box kills it.
+  *(As built: one exception. A circle already inside a shape whose least-deep face is a slope or a ceiling, and moving deeper into it, meets it at once: G.9's "inside" rule.)*
+- The rest of the move continues after each event with the corrected velocity, so one tick can land on a slope and slide along it, or land and then bump a ceiling. Horizontal movement is never reduced: a living player always covers exactly `vx` per tick, and `distance` stays exact. If the contact budget runs out, the rest of the move is done horizontally only, which keeps `distance` exact; if the player really is squeezed, the inner box kills it. *(As built: that last leg tests no contact, so it can leave the circle inside a slope or a ceiling; the next tick's "inside" rule (G.9) meets it there, where it used to be ignored until the inner box died.)*
 - `surface_rise` isn't reset at the start of the tick: it keeps the rise speed of the surface that supported the player at the end of the last tick, so a step (below) early in the tick is judged against the surface the player is actually riding. `land` updates it, and it's set to 0 at the end of the tick if nothing supports the player then.
 
 **Contact response.** It depends on how the surface faces the player's "up" (`(0, -gravity_dir)`):
@@ -3398,7 +3400,7 @@ s->legs += 1;                                  /* path position = leg index + fr
 
 `crossed_surface(s)`: `pos.y > GROUND_Y`, or `pos.y > bounds.bottom`, or `pos.y < bounds.top` while the corridor is active. It can't happen (G.5); it's the safety net of 4.3.
 
-*(As built: every rule that reads the surfaces, `try_surfaces`, `crossed_surface`, `far_side`, `lift_hits_surface`, `zone_surface` and `stay_off_the_surfaces`, reads them from one list, `current_surfaces(s, out)`: the ground, then the corridor's floor and ceiling while one is active, each as a line `y` and the side it is solid on. A new surface is added there once.)*
+*(As built: every rule that reads the surfaces, `try_surfaces`, `crossed_surface`, `far_side`, `lift_hits_surface`, `zone_surface`, `stay_off_the_surfaces` and `past_a_surface`, reads them from one list, `current_surfaces(s, out)`: the ground, then the corridor's floor and ceiling while one is active, each as a line `y` and the side it is solid on. A new surface is added there once.)*
 
 ### G.9 `first_event`: which shape tests which face
 
@@ -3444,6 +3446,8 @@ So the corner between a tilted face and a flat one is **not** a support candidat
 
 - it's in `s->passed` (the player already went into it as a wall this tick), or
 - that **shape** already overlaps it (`overlap_box_poly` / `overlap_circle_poly`, G.3 and G.4): the player is inside it, so the inner box and the step-up decide. It's per shape: a square clipped into a block's side doesn't stop the circle from taking a head hit on that same block.
+
+**Inside (as built).** Skipping a shape the circle is in made every way into one a case of its own: the ground and the corridor had `stay_off_the_surfaces`, flat tops the step-up, and nothing else. A mini cube growing back on a slope, a mini ship growing under a ceiling, or a tick's last leg past the contact budget left the circle in a slope or a ceiling, which was then ignored until the inner box died. So when the circle is already in a shape, `try_circle_inside` looks at the face it is least deep in (the largest `dot(n, c) - offset`). When that face is the circle's (`circle_face_ok`: a slope or a ceiling) and not a wall (steeper than 50°), and the leg goes deeper into it (`dot(n, d) < -CONTACT_SKIN`), it is a contact **now** (`t = 0`, `inside` set). `respond` then puts the player straight out of it along y, to where the circle touches that face's line (`push_out`, a leg checked like a step's lift: what the inner box or the circle runs into on the way kills), and the contact acts as any other: a landing, or a head hit. A surface in the way stops the push, never the contact: the player stays put, and the skin a contact adds is not added across a surface either (`skin_off`). A wall stays the inner box's, and a flat top the step-up's.
 
 Resting on a face is touching, not overlapping (3.0), so a supported player is never skipped by its own floor.
 
@@ -3706,6 +3710,8 @@ The first version moves a cube on the ground and on block tops. No circle, no sl
 | `static void try_square(sim_t *s, size_t i, vec2_t d, event_t *out)` | the square's filter | G.9 |
 | `static void try_surfaces(sim_t *s, vec2_t d, event_t *out)` | ground, corridor floor and ceiling | G.5, G.9 |
 | `static void first_event(sim_t *s, vec2_t d, vec2_t vel, bool steps, event_t *out)` | the earliest event | G.9 |
+| `static void try_circle_inside(sim_t *s, size_t i, vec2_t d, event_t *out)` | a slope or ceiling the circle is already in | G.9 |
+| `static bool push_out(sim_t *s, const contact_t *c)` | out of it along y, checked like a lift | G.9 |
 | `int current_surfaces(const sim_t *s, surface_t out[3])` | the ground and the corridor's boundaries, one list | G.5 |
 | `static void settle(player_t *p, const contact_t *c, double half)` | exact placement | 4.4 |
 | `static void land(player_t *p, const contact_t *c, vec2_t *vel)` | support, `surface_rise` | 4.4 |
