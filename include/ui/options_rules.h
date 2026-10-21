@@ -15,12 +15,18 @@
 ** captured input does to the bindings, which window sizes are offered.
 */
 
-/* The Controls rows: 6 jump slots, then the action keys (5.2). */
+/*
+** The Controls rows: 6 jump slots, then the action keys, the keys that act
+** in a level (5.2). Each group is a page of its own.
+*/
 enum {
     SLOT_JUMP = 0,
     SLOT_RESTART = BINDINGS_MAX,
     SLOT_CHECKPOINT,
     SLOT_REMOVE_CHECKPOINT,
+    SLOT_DEBUG_OVERLAY,
+    SLOT_PREVIOUS_START,
+    SLOT_NEXT_START,
     NB_SLOTS
 };
 

@@ -36,6 +36,12 @@ typedef enum options_dialog {
     #define OPT_LABEL_X 560.0f
     #define OPT_ROW_Y 200.0f
     #define OPT_ROW_STEP 100.0f
+    #define OPT_ROW_RIGHT 1780.0f     /* where the rows' widgets end         */
+    #define OPT_PAGE_Y 150.0f         /* a paged section's Page row ...       */
+    #define OPT_PAGE_LINE_Y 240.0f    /* ... the line under it ...            */
+    #define OPT_PAGED_Y 265.0f        /* ... and its first row                */
+    #define OPT_PAGED_STEP 80.0f
+    #define OPT_PAGES_MAX 8
 
 /*
 ** The options scene (FEATURES 5). The widgets point at the ints below; each
@@ -65,9 +71,11 @@ typedef struct option_menu {
     int vsync;
     int fps;
     binding_t slots[NB_SLOTS];
+    int controls_page;            /* 0 the jump inputs, 1 the level's keys  */
     int editor_page;              /* which of the editor's actions are rows */
     ed_key_t page_keys[ED_KEY_PAGE_MAX];   /* row 1 + i is page_keys[i]     */
-    const char *page_names[ED_KEY_PAGES];
+    char page_text[OPT_PAGES_MAX][48];   /* "Page 2 of 6: Move"          */
+    const char *page_names[OPT_PAGES_MAX];
     const char **song_titles;
     window_sizes_t sizes;
     options_dialog_t dialog;
@@ -79,7 +87,7 @@ typedef struct option_menu {
     int64_t notice_until_ms;
     bool pending_leave;
     bool pending_display;
-    bool pending_rows;            /* another page of the Editor section     */
+    bool pending_rows;            /* another page of Controls or Editor     */
     int pending_section;          /* -1 none                                */
     options_dialog_t pending_dialog;
     int pending_answer;           /* 0 none, 1 the first button, 2 the second */

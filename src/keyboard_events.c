@@ -152,10 +152,6 @@ static void playing_key(level_t **level, gd_t *gd, sfKeyCode key)
         return go_back_playing_level_list(gd, level);
     if (key == sfKeyEscape)
         return level_pause(*level, gd);
-    if (key == sfKeyF3)
-        gd->debug_overlay = !gd->debug_overlay;
-    if (key == sfKeyA || key == sfKeyE)      /* the start positions (11.8) */
-        level_change_start(*level, gd, key == sfKeyE ? 1 : -1);
 }
 
 /* While the pause menu is open, every event is its own. */
@@ -201,6 +197,12 @@ void keyboard_events_playing(level_t **level, gd_t *gd)
             practice_place(*level);          /* practice only (13.1) */
         if (input_event_is(gd->event, gd->settings.remove_checkpoint_key))
             practice_remove(*level);
+        if (input_event_is(gd->event, gd->settings.debug_overlay_key))
+            gd->debug_overlay = !gd->debug_overlay;
+        if (input_event_is(gd->event, gd->settings.previous_start_key))
+            level_change_start(*level, gd, -1);  /* start positions (11.8) */
+        if (input_event_is(gd->event, gd->settings.next_start_key))
+            level_change_start(*level, gd, 1);
     }
     if (*level != NULL && (*level)->paused)
         pause_act(level, gd);

@@ -41,6 +41,9 @@ typedef struct settings {
     binding_t restart_key;        /* BIND_NONE when unbound                  */
     binding_t checkpoint_key;
     binding_t remove_checkpoint_key;
+    binding_t debug_overlay_key;  /* the hitboxes and the tick's numbers (9.6) */
+    binding_t previous_start_key; /* the start positions (11.8)              */
+    binding_t next_start_key;
     int audio_offset_ms;          /* -300-300 (4.8)                          */
     binding_t editor_keys[ED_KEY_COUNT];   /* combinations, BIND_NONE unbound */
     char icons[MODE_COUNT][SETTING_FILE_MAX];   /* a file in res/icons/<mode>/:

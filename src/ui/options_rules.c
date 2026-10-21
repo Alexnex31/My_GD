@@ -19,6 +19,9 @@ void slots_from_settings(const settings_t *s, binding_t slots[NB_SLOTS])
     slots[SLOT_RESTART] = s->restart_key;
     slots[SLOT_CHECKPOINT] = s->checkpoint_key;
     slots[SLOT_REMOVE_CHECKPOINT] = s->remove_checkpoint_key;
+    slots[SLOT_DEBUG_OVERLAY] = s->debug_overlay_key;
+    slots[SLOT_PREVIOUS_START] = s->previous_start_key;
+    slots[SLOT_NEXT_START] = s->next_start_key;
 }
 
 void slots_to_settings(settings_t *s, const binding_t slots[NB_SLOTS])
@@ -31,6 +34,9 @@ void slots_to_settings(settings_t *s, const binding_t slots[NB_SLOTS])
     s->restart_key = slots[SLOT_RESTART];
     s->checkpoint_key = slots[SLOT_CHECKPOINT];
     s->remove_checkpoint_key = slots[SLOT_REMOVE_CHECKPOINT];
+    s->debug_overlay_key = slots[SLOT_DEBUG_OVERLAY];
+    s->previous_start_key = slots[SLOT_PREVIOUS_START];
+    s->next_start_key = slots[SLOT_NEXT_START];
 }
 
 /*
@@ -97,16 +103,16 @@ rebind_result_t editor_rebind(binding_t keys[ED_KEY_COUNT], int k, binding_t b,
     return *other >= 0 ? REBIND_SWAPPED : REBIND_SET;
 }
 
+static const char *const ACTION_NAMES[NB_SLOTS - SLOT_RESTART] = {
+    "Restart", "Place checkpoint", "Remove checkpoint", "Debug overlay",
+    "Previous start position", "Next start position"};
+
 void slot_name(int slot, char *buf, size_t size)
 {
     if (slot < SLOT_RESTART)
         snprintf(buf, size, "Jump %d", slot - SLOT_JUMP + 1);
-    else if (slot == SLOT_RESTART)
-        snprintf(buf, size, "%s", "Restart");
-    else if (slot == SLOT_CHECKPOINT)
-        snprintf(buf, size, "%s", "Place checkpoint");
     else
-        snprintf(buf, size, "%s", "Remove checkpoint");
+        snprintf(buf, size, "%s", ACTION_NAMES[slot - SLOT_RESTART]);
 }
 
 static void add_size(window_sizes_t *ws, int w, int h)

@@ -82,6 +82,9 @@ void free_option_menu(option_m_t *om)
     free(om);
 }
 
+/* Under a paged section's Page row: the rows below are that page's. */
+static const sfColor PAGE_LINE = {80, 220, 120, 255};
+
 static void draw_line(option_m_t *om, const char *s, float x, float y)
 {
     sfText_setUnicodeString(om->text, utf8_to_utf32(s));
@@ -99,6 +102,9 @@ void print_option_menu(option_m_t *om, gd_t *gd)
         draw_line(om, "never the game's speed.", OPT_LABEL_X, 690.0f);
     }
     ui_draw(gd, &om->rows);
+    if (om->section == SEC_CONTROLS || om->section == SEC_EDITOR)
+        ui_box(gd, (ui_rect_t){OPT_LABEL_X, OPT_PAGE_LINE_Y,
+            OPT_ROW_RIGHT - OPT_LABEL_X, 4.0f}, PAGE_LINE, PAGE_LINE);
     options_draw_dialog(om);
     if (ui_now_ms() < om->notice_until_ms)
         draw_line(om, om->notice, OPT_LABEL_X, 1010.0f);

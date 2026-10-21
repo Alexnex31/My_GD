@@ -86,8 +86,8 @@ The main menu has Options, Play and Editor, Credits in one corner (every song wi
 | Practice: place / remove a checkpoint (a death goes back to the last one; only the practice best counts) | `Z` / `X` (`checkpoint_key`, `remove_checkpoint_key`) |
 | Skip to the end screen while the player flies to the wall, then back to the level list | `Escape` |
 | Restart the attempt | `R` (`restart_key`) |
-| Previous / next start position (no best and no completion from one) | `A` / `E` |
-| Debug overlay (hitboxes, contacts, tick, speeds) | `F3` |
+| Previous / next start position (no best and no completion from one) | `A` / `E` (`previous_start_key`, `next_start_key`) |
+| Debug overlay (hitboxes, contacts, tick, speeds) | `F3` (`debug_overlay_key`) |
 
 The keys are rebindable in `save/settings.txt`, written with the defaults the first time the game quits. Every key is `key=value`, one per line:
 
@@ -107,7 +107,7 @@ editor_redo=Ctrl+Shift+Z   # the editor's: a key with Ctrl, Shift or Alt
 ```
 
 - **Key names** are SFML's: `A`–`Z`, `Num0`–`Num9`, `Space`, `Up`, `LShift`, `F1`–`F15`, `Numpad0`–`Numpad9` and the rest of `sfKeyCode`; `MouseLeft`, `MouseRight`, `MouseMiddle`; `Joy0`–`Joy15`. Case doesn't matter. Up to 6 jump inputs.
-- An empty `restart_key=` unbinds it. `Escape` can't be bound, and a key can't both jump and restart.
+- An empty `restart_key=` unbinds it, and the same goes for the other keys that act in a level (`checkpoint_key`, `remove_checkpoint_key`, `debug_overlay_key`, `previous_start_key`, `next_start_key`). `Escape` can't be bound, a key can't both jump and act, and two of them can't share a key. In the options they are the Controls section's second page, Level keys.
 - The editor's shortcuts are `editor_<action>=` lines, one each: a key, with `Ctrl+`, `Shift+` and `Alt+` before it in any order, never a mouse button, `Escape` or a modifier alone. Two actions with the same combination: the one the game writes second goes back to its default (or is left unbound if that's taken too), whatever the order of the lines. The game's keys take no modifiers.
 - An invalid value keeps its default, with a warning naming the line. Unknown keys are kept and written back; comments aren't.
 - If the file exists but can't be read, the game uses the defaults and never overwrites it. The same goes for `save/progress.txt`: an unreadable one is left alone, and that session's progress isn't saved.
@@ -118,7 +118,7 @@ The full list is in `FEATURES.md` 2.2. The **options screen** (the main menu's o
 
 - **Sections:** Audio, Gameplay, Controls, Editor, Display and Data, switched with `Tab` / `Shift+Tab` or a click. `Up`/`Down` move through the rows, `Left`/`Right` change a value, `Enter` activates, `Escape` goes back and saves what changed.
 - **Audio:** music and effects volume (changing the effects volume plays a click at it), the menu's song, and the audio offset. **Calibrate** plays a click twice a second with a square that lights on the beat: move the offset until the click is heard as the square lights, more if it comes late.
-- **Controls:** activate a row, then press any key, mouse button or gamepad button. `Escape` or the Cancel button cancels, `Backspace` or the Clear button clears, a click outside the prompt cancels. An input another row has swaps the two rows, and the last key or mouse button that jumps can't be removed (gamepads aren't read for jumps yet).
+- **Controls:** two pages, Jump and Level keys (restart, checkpoints, the debug overlay, start positions), switched by the Page row. Activate a row, then press any key, mouse button or gamepad button. `Escape` or the Cancel button cancels, `Backspace` or the Clear button clears, a click outside the prompt cancels. An input another row has swaps the two rows, and the last key or mouse button that jumps can't be removed (gamepads aren't read for jumps yet).
 - **Editor:** the editor's shortcuts, a page at a time (the Page row chooses which: Edit, Move, Blocks and turns, Play, View, Palette). Each is a whole combination: hold Ctrl, Shift or Alt, then press the key, and the prompt takes them together, so `S` and `Ctrl+S` are two shortcuts. Only keys: the mouse buttons are the canvas's, and `Escape` always cancels. A combination another action has swaps the two; the game's keys are another matter, so `R` can restart a level and turn in the editor.
 - **Display:** a new fullscreen setting or window size asks to be kept, and reverts by itself after 10 s, so an unsupported mode fixes itself. It is saved only once kept: closing the game during the countdown keeps the old one.
 - **Data:** Reset progress asks first, and keeps the old file as `save/progress.txt.bak` (a reset of an empty store leaves the last `.bak` alone). Open save folder opens `save/` and prints its path.

@@ -82,11 +82,17 @@ static void toggle_changed(void *ctx, widget_t *w)
         s->show_attempts = *w->value;
 }
 
+/* The first slot on the Controls page shown: row 1 + i is slot first + i. */
+static int controls_first(const option_m_t *om)
+{
+    return om->controls_page == 0 ? SLOT_JUMP : SLOT_RESTART;
+}
+
 /* A captured input (5.5): swaps, clears, or is refused, with a notice. */
 static void slot_captured(void *ctx, widget_t *w, binding_t b)
 {
     option_m_t *om = ctx;
-    int slot = (int)(w - om->row_widgets);
+    int slot = controls_first(om) + (int)(w - om->row_widgets) - 1;
     int other = -1;
     char a[32];
     char c[32];
@@ -133,7 +139,7 @@ static void editor_key_captured(void *ctx, widget_t *w, binding_t b)
     options_notice(om, text);
 }
 
-static void editor_page_changed(void *ctx, widget_t *w)
+static void page_changed(void *ctx, widget_t *w)
 {
     (void)w;
     ((option_m_t *)ctx)->pending_rows = true;   /* the rows, after the events */
@@ -224,20 +230,57 @@ static int gameplay_rows(option_m_t *om, widget_t *r)
     return 3;
 }
 
+/*
+** The Page row of a section whose rows don't all fit: as wide as the rows,
+** with no label, above a line (print_option_menu), so it reads as the
+** section's pages and not as one more row of them. The rows under it are
+** placed by place_paged.
+*/
+static void page_row(option_m_t *om, widget_t *r, int *value, int count,
+    const char *const *names)
+{
+    for (int i = 0; i < count && i < OPT_PAGES_MAX; i++) {
+        snprintf(om->page_text[i], sizeof(om->page_text[i]),
+            "Page %d of %d: %s", i + 1, count, names[i]);
+        om->page_names[i] = om->page_text[i];
+    }
+    *r = row(0, W_CYCLER, NULL, value);
+    r->bounds = (ui_rect_t){OPT_LABEL_X, OPT_PAGE_Y,
+        OPT_ROW_RIGHT - OPT_LABEL_X, 70.0f};
+    r->max = count - 1;
+    r->choices = om->page_names;
+    r->on_change = page_changed;
+}
+
+static void place_paged(widget_t *r, int n)
+{
+    for (int i = 1; i <= n; i++)
+        r[i].bounds.y = OPT_PAGED_Y + OPT_PAGED_STEP * (float)(i - 1);
+}
+
+/*
+** Two pages, as they don't all fit: the jump inputs, then the keys that act
+** in a level. A capture still swaps across both (5.5).
+*/
 static int controls_rows(option_m_t *om, widget_t *r)
 {
     static const char *const LABELS[NB_SLOTS] = {"Jump 1", "Jump 2",
         "Jump 3", "Jump 4", "Jump 5", "Jump 6", "Restart", "Place checkpoint",
-        "Remove checkpoint"};
+        "Remove checkpoint", "Debug overlay", "Previous start position",
+        "Next start position"};
+    static const char *const PAGES[2] = {"Jump", "Level keys"};
+    int first = controls_first(om);
+    int n = (om->controls_page == 0 ? SLOT_RESTART : NB_SLOTS) - first;
 
     slots_from_settings(&om->gd->settings, om->slots);
-    for (int i = 0; i < NB_SLOTS; i++) {
-        r[i] = row(i, W_KEYBIND, LABELS[i], NULL);
-        r[i].binding = &om->slots[i];
-        r[i].on_capture = slot_captured;
-        r[i].bounds.y = OPT_ROW_Y - 40.0f + 90.0f * (float)i;   /* 9 rows fit */
+    page_row(om, &r[0], &om->controls_page, 2, PAGES);
+    for (int i = 0; i < n; i++) {
+        r[1 + i] = row(1 + i, W_KEYBIND, LABELS[first + i], NULL);
+        r[1 + i].binding = &om->slots[first + i];
+        r[1 + i].on_capture = slot_captured;
     }
-    return NB_SLOTS;
+    place_paged(r, n);
+    return 1 + n;
 }
 
 /*
@@ -247,21 +290,18 @@ static int controls_rows(option_m_t *om, widget_t *r)
 static int editor_rows(option_m_t *om, widget_t *r)
 {
     int n = ed_key_page_list(om->editor_page, om->page_keys);
+    const char *names[ED_KEY_PAGES];
 
     for (int i = 0; i < ED_KEY_PAGES; i++)
-        om->page_names[i] = ed_key_page_name(i);
-    r[0] = row(0, W_CYCLER, "Page", &om->editor_page);
-    r[0].max = ED_KEY_PAGES - 1;
-    r[0].choices = om->page_names;
-    r[0].on_change = editor_page_changed;
+        names[i] = ed_key_page_name(i);
+    page_row(om, &r[0], &om->editor_page, ED_KEY_PAGES, names);
     for (int i = 0; i < n; i++) {
         r[1 + i] = row(1 + i, W_KEYBIND, ed_key_label(om->page_keys[i]), NULL);
         r[1 + i].binding = &om->gd->settings.editor_keys[om->page_keys[i]];
         r[1 + i].on_capture = editor_key_captured;
         r[1 + i].combo = true;
     }
-    for (int i = 0; i <= n; i++)
-        r[i].bounds.y = OPT_ROW_Y - 50.0f + 85.0f * (float)i;   /* 10 fit */
+    place_paged(r, n);                       /* ED_KEY_PAGE_MAX rows fit */
     return 1 + n;
 }
 

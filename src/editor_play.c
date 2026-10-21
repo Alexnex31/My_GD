@@ -34,13 +34,25 @@ static int wanted_start(const editor_t *ed)
     return before != 0 ? before : (rank > 0 ? 1 : 0);
 }
 
-/* Not over a notice of the level's own: "Song missing" says more (4.4). */
-static void banner(level_t *lv)
+/*
+** Not over a notice of the level's own: "Song missing" says more (4.4). The
+** start positions' keys are named as they are bound, when they are.
+*/
+static void banner(level_t *lv, const settings_t *s)
 {
+    char prev[BINDING_NAME_MAX];
+    char next[BINDING_NAME_MAX];
+    char text[160];
+
     if (lv->notice_left > 0.0f)
         return;
-    sfText_setUnicodeString(lv->notice_text, utf8_to_utf32(
-        "Playtest - Escape: back to the editor - A / E: start positions"));
+    binding_format(s->previous_start_key, prev, sizeof(prev));
+    binding_format(s->next_start_key, next, sizeof(next));
+    snprintf(text, sizeof(text), "Playtest - Escape: back to the editor%s%s%s"
+        "%s%s", prev[0] || next[0] ? " - " : "", prev,
+        prev[0] && next[0] ? " / " : "", next,
+        prev[0] || next[0] ? ": start positions" : "");
+    sfText_setUnicodeString(lv->notice_text, utf8_to_utf32(text));
     lv->notice_left = 4.0f;
 }
 
@@ -60,7 +72,7 @@ void editor_playtest(editor_t *ed, gd_t *gd, bool from_start_position)
     ed_doc_free(&doc);
     editor_mouse_cancel(ed);                 /* nothing half done under it */
     ed->repeating = false;
-    banner(ed->play);
+    banner(ed->play, &gd->settings);
 }
 
 /* The path it took is kept, and the canvas goes to where it ended. */
@@ -90,14 +102,21 @@ void editor_play_stop(editor_t *ed, gd_t *gd)
     music_menu(gd);
 }
 
-static void play_key(editor_t *ed, gd_t *gd, sfKeyCode k)
+/* Escape stops it; the level's keys act as in the game (6.5, 9.6, 11.8). */
+static void play_input(editor_t *ed, gd_t *gd, const sfEvent *ev)
 {
-    if (k == sfKeyEscape)
+    const settings_t *s = &gd->settings;
+
+    if (ev->type == sfEvtKeyPressed && ev->key.code == sfKeyEscape)
         return editor_play_stop(ed, gd);
-    if (k == sfKeyF3)
+    if (input_event_is(ev, s->debug_overlay_key))
         gd->debug_overlay = !gd->debug_overlay;
-    if (k == sfKeyA || k == sfKeyE)
-        level_change_start(ed->play, gd, k == sfKeyE ? 1 : -1);
+    if (input_event_is(ev, s->previous_start_key))
+        level_change_start(ed->play, gd, -1);
+    if (input_event_is(ev, s->next_start_key))
+        level_change_start(ed->play, gd, 1);
+    if (input_event_is(ev, s->restart_key))
+        level_restart(ed->play, gd);
 }
 
 void editor_play_events(editor_t *ed, gd_t *gd)
@@ -114,10 +133,7 @@ void editor_play_events(editor_t *ed, gd_t *gd)
             return editor_notice(ed, "Playtest stopped: the window lost the "
                 "focus");
         }
-        if (ev->type == sfEvtKeyPressed)
-            play_key(ed, gd, ev->key.code);
-        if (ed->play != NULL && input_event_is(ev, gd->settings.restart_key))
-            level_restart(ed->play, gd);
+        play_input(ed, gd, ev);
     }
     if (ed->play != NULL && ed->play->playtest_over)
         editor_play_stop(ed, gd);

@@ -245,6 +245,8 @@ value   = any chars up to end of line
 | `restart_key` | binding name, or empty for unbound | not a jump binding, not Escape | `R` | level (PLAN 6.5) |
 | `checkpoint_key` | binding name, or empty | not a jump binding, not Escape, not `restart_key` | `Z` | practice (PLAN 13.1) |
 | `remove_checkpoint_key` | binding name, or empty | not a jump binding, not Escape, not an earlier action key | `X` | practice |
+| `debug_overlay_key` | binding name, or empty | the same | `F3` | the debug overlay (PLAN 9.6), in a level and a playtest |
+| `previous_start_key`, `next_start_key` | binding name, or empty | the same | `A`, `E` | start positions (11.8), in a level and a playtest |
 | `audio_offset_ms` | int | −300–300 | 0 | music sync (4.8) |
 | `editor_<action>` (45 of them: `editor_save`, `editor_undo`, … `editor_entry_9`) | a combination: a key name with `Ctrl+`, `Shift+`, `Alt+` before it in any order (written in that order), or empty | a key, never a mouse or gamepad button, never `Escape` or a modifier alone; no two actions alike | 11.6's table (`include/sim/editor_keys.h`) | editor (11.6) |
 | `icon_<mode>` (8 of them: `icon_cube`, `icon_ship`, `icon_ball`, `icon_ufo`, `icon_wave`, `icon_robot`, `icon_spider`, `icon_swing`) | file name in `res/icons/<mode>/` | a plain name, as `menu_song`; whether it exists is checked when it's drawn (3.8) | `player_icon.png`, `ship_icon.png`, then `<mode>_icon.png` | the player's icon (3.8) |
@@ -255,7 +257,7 @@ value   = any chars up to end of line
 2. Read line by line; spaces around the key and the value are trimmed, `#` lines and blank lines skipped. For each `pair`, find the key in a table; parse; validate against the range; if invalid, keep the default and log `save/settings.txt:7: fps_limit=75 invalid, using 0`. A key given twice: the last one wins. A line that isn't `key=value` with a `[a-z0-9_]+` key is logged and dropped. The file is read whole, so a line is never cut, however long (a long comment never applies the key at its end).
 3. Unknown keys: **keep them** in a list of raw lines and write them back unchanged on save. A newer version's settings survive being opened by an older build.
 4. Missing file: defaults, no warning. Unreadable file (no read permission, a read error, not a regular file): defaults, one warning, and the file is **never overwritten** (`unreadable`), so a permission problem can't turn into lost settings.
-5. Then the action keys, in table order (`restart_key`, `checkpoint_key`, `remove_checkpoint_key`): one that is also a jump binding, or the same as an earlier action key, falls back to its default, or is left unbound if the default is taken too; logged. This runs after the whole file, so the order of the lines doesn't matter.
+5. Then the action keys, in table order (`restart_key`, `checkpoint_key`, `remove_checkpoint_key`, `debug_overlay_key`, `previous_start_key`, `next_start_key`): one that is also a jump binding, or the same as an earlier action key, falls back to its default, or is left unbound if the default is taken too; logged. This runs after the whole file, so the order of the lines doesn't matter.
 6. Then the editor's, the same way among themselves only (they act in another scene than the game's keys): one with the combination of an earlier one falls back to its default, or is left unbound if another action has that. The game's bindings take no modifiers: `restart_key=Ctrl+R` is invalid.
 
 Binding names are SFML's, any case: `A`–`Z`, `Num0`–`Num9`, `Space`, `Up`, `F1`–`F15`, `Numpad0`–`Numpad9` and every other `sfKeyCode` name; `MouseLeft`, `MouseRight`, `MouseMiddle`; `Joy0`–`Joy15`. They live in `include/sim/binding.h` as an X-macro list in `sfKeyCode`'s order, and `input.c` checks each one against `sfKey<name>` with a `_Static_assert`, so the stored codes are SFML's without a translation table. Gamepad buttons are read and saved, but not polled yet: SFML refreshes joysticks while the main thread reads its events, which the input thread (1.3) can't share.
@@ -732,9 +734,11 @@ Keyboard: Up/Down move through rows, Tab / Shift+Tab switch sections, Left/Right
 | Gameplay | Show percentage | toggle | `show_percent` | next frame |
 | Gameplay | Show progress bar | toggle | `show_progress_bar` | next frame |
 | Gameplay | Show attempts | toggle | `show_attempts` | next frame |
-| Controls | Jump 1–6 | 6 capture rows ("—" when empty); keys, mouse buttons and gamepad buttons | `jump_bindings` | on capture |
-| Controls | Restart | capture | `restart_key` | on capture |
-| Controls | Place / remove checkpoint | 2 capture rows | `checkpoint_key`, `remove_checkpoint_key` | on capture |
+| Controls | Page | cycler: Jump, Level keys *(2026-10-21: the rows no longer fit on one)*. Like the Editor's, it is as wide as the rows, reads "Page 1 of 2: Jump", and a line sets it apart from them | — | the rows below become that page's |
+| Controls | Jump 1–6 (page Jump) | 6 capture rows ("—" when empty); keys, mouse buttons and gamepad buttons | `jump_bindings` | on capture |
+| Controls | Restart (page Level keys) | capture | `restart_key` | on capture |
+| Controls | Place / remove checkpoint (page Level keys) | 2 capture rows | `checkpoint_key`, `remove_checkpoint_key` | on capture |
+| Controls | Debug overlay, previous / next start position (page Level keys) | 3 capture rows | `debug_overlay_key`, `previous_start_key`, `next_start_key` | on capture |
 | Editor | Page | cycler: Edit, Move, Blocks and turns, Play, View, Palette | — | the rows below become that page's |
 | Editor | one row per action of the page (9 at most) | combination capture (5.5) | `editor_<action>` | on capture |
 | Display | Fullscreen | toggle | `fullscreen` | 5.4, with confirmation |
@@ -1776,7 +1780,7 @@ Every action is bound to a **combination**: a key with its own Ctrl, Shift and A
 | F1 | The list of every key, as bound | |
 | 1–9 (the number row) | Palette entry 1 to 9 | |
 | Escape (fixed) | Close the key list / cancel drag / drop the selection / leave (asks if dirty) | |
-| F3 (fixed, in a playtest) | Hitboxes (PLAN 9.6) | |
+| F3, A / E (in a playtest) | Hitboxes (PLAN 9.6); start positions (11.8). They are the game's keys, rebound in Controls (`debug_overlay_key`, `previous_start_key`, `next_start_key`), as the restart key is | |
 
 Keyboard shortcuts don't fire while a text field has focus (level name, typed coordinates).
 
@@ -1981,8 +1985,8 @@ Show counts in the toolbar; clicking cycles the camera through the flagged objec
 ### 11.13e As built: E5
 
 - **`sim_reset_at(sim, start)`** (`src/sim/sim.c`, tested in `tests/test_start.c`) begins an attempt at a start position: the run is put at the tick that x is reached at the start's speed, rounded down, so the player is on the tick grid (at most one tick's travel before the x asked for) and the percentage and the music know where they are. The mode, gravity and speed are the start's; a corridor mode opens its corridor around it; interactive objects wholly behind it are spent. `sim_reset` is `sim_reset_at` with the level's own start, and gives bit for bit what it gave before.
-- **In the game**, A and E go to the previous and the next entry of the list (the level's start, then its start positions in the file's order, going round) and begin an attempt there at once. An attempt from a start position is an attempt: it adds to the attempt counter and the text in the world still reads "Attempt n". It records no best and no completion, and the end screen then says so ("End reached", "From a start position: it doesn't count") instead of "Level complete, 100%". A short notice shows which start it is, `<1/2>` for the first of two, `<0/2>` for the level's own. The song starts where that x is in it.
-- **Playtest** (`src/editor_play.c`): Enter plays the level as it is now, saved or not, from its start; Shift+Enter from a start position: the selected one, or else the last one at or before the middle of the canvas, or else the first. It is the game's own level scene (`level_start_doc`, `level_frame`), built from the editor's document, so it can't differ from the game. Nothing is recorded. A and E work in it too; the restart key restarts.
+- **In the game**, A and E (`previous_start_key`, `next_start_key`, rebindable since 2026-10-21) go to the previous and the next entry of the list (the level's start, then its start positions in the file's order, going round) and begin an attempt there at once. An attempt from a start position is an attempt: it adds to the attempt counter and the text in the world still reads "Attempt n". It records no best and no completion, and the end screen then says so ("End reached", "From a start position: it doesn't count") instead of "Level complete, 100%". A short notice shows which start it is, `<1/2>` for the first of two, `<0/2>` for the level's own. The song starts where that x is in it.
+- **Playtest** (`src/editor_play.c`): Enter plays the level as it is now, saved or not, from its start; Shift+Enter from a start position: the selected one, or else the last one at or before the middle of the canvas, or else the first. It is the game's own level scene (`level_start_doc`, `level_frame`), built from the editor's document, so it can't differ from the game. Nothing is recorded. The start keys and the overlay's work in it too, as bound, and its banner names the start keys as they are bound; the restart key restarts.
 - **Leaving it:** Escape or a death (after the usual explosion) go back to the editor, with the canvas centered where the player was and a notice ("died at 43%"). Reaching the level's end ends nothing, unlike 11.9's step 6: the player runs on past it, at 100%, until it dies or Escape is pressed.
 - **The path:** the player's position every fourth tick of the last attempt, drawn as a line on the canvas until the level is edited (the history counts its edits, undo and redo included).
 - **Checked in a window:** playtests from the start and from start positions, A/E in a playtest and in the game, and the progress file after attempts from start positions (one attempt and a best of 18% recorded, from the real start, while the others reached 49% to 90%). And, for E5's "done when" (2026-10-21), a start position inside a ship section: `start 3000 500 ship` in level 7, played with Shift+Enter, starts as a ship in its corridor and turns back into a cube at the portal at 4000.

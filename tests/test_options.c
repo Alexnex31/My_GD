@@ -35,6 +35,13 @@ static void test_slots_round_trip(void)
     CHECK(binding_equal(slots[0], SPACE) && binding_equal(slots[1], UP));
     CHECK(slots[4].kind == BIND_NONE && slots[5].kind == BIND_NONE);
     CHECK(binding_equal(slots[SLOT_RESTART], R));
+    CHECK(binding_equal(slots[SLOT_DEBUG_OVERLAY],
+        (binding_t){BIND_KEY, KEY_F3, 0}));
+    slots[SLOT_NEXT_START] = W;
+    slots_to_settings(&s, slots);
+    CHECK(binding_equal(s.next_start_key, W));
+    CHECK(binding_equal(s.previous_start_key, (binding_t){BIND_KEY, KEY_A, 0}));
+    slots[SLOT_NEXT_START] = (binding_t){BIND_KEY, KEY_E, 0};
     slots[1] = NONE;
     slots[5] = W;                            /* a gap: packed on the way back */
     slots_to_settings(&s, slots);
@@ -59,6 +66,10 @@ static void test_rebind(void)
     CHECK(other == 0);
     CHECK(binding_equal(slots[SLOT_RESTART], SPACE));
     CHECK(binding_equal(slots[0], R));        /* R moved to Jump 1 */
+    CHECK(rebind(slots, SLOT_PREVIOUS_START, (binding_t){BIND_KEY, KEY_E, 0},
+        &other) == REBIND_SWAPPED && other == SLOT_NEXT_START);
+    CHECK(binding_equal(slots[SLOT_NEXT_START], (binding_t){BIND_KEY, KEY_A,
+        0}));                                 /* A and E traded places */
     CHECK(rebind(slots, 1, NONE, &other) == REBIND_CLEARED);
     CHECK(slots[1].kind == BIND_NONE);
     for (int i = 0; i < BINDINGS_MAX; i++)
@@ -123,6 +134,10 @@ static void test_slot_names(void)
     CHECK(strcmp(name, "Restart") == 0);
     slot_name(SLOT_REMOVE_CHECKPOINT, name, sizeof(name));
     CHECK(strcmp(name, "Remove checkpoint") == 0);
+    slot_name(SLOT_DEBUG_OVERLAY, name, sizeof(name));
+    CHECK(strcmp(name, "Debug overlay") == 0);
+    slot_name(NB_SLOTS - 1, name, sizeof(name));
+    CHECK(strcmp(name, "Next start position") == 0);
 }
 
 /* Only the sizes that fit; a size from the file is offered too (5.2). */

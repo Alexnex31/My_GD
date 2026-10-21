@@ -63,6 +63,10 @@ static const setting_def_t DEFS[] = {
     {"checkpoint_key", ST_BINDING, FIELD(checkpoint_key), 0, 0, NULL},
     {"remove_checkpoint_key", ST_BINDING, FIELD(remove_checkpoint_key), 0, 0,
         NULL},
+    {"debug_overlay_key", ST_BINDING, FIELD(debug_overlay_key), 0, 0, NULL},
+    {"previous_start_key", ST_BINDING, FIELD(previous_start_key), 0, 0,
+        NULL},
+    {"next_start_key", ST_BINDING, FIELD(next_start_key), 0, 0, NULL},
     {"audio_offset_ms", ST_INT, FIELD(audio_offset_ms), -300, 300, NULL},
     ED_KEY_LIST(ED_KEY_SETTING)
     {"icon_cube", ST_FILE, FIELD(icons[MODE_CUBE]), 0, 0, NULL},
@@ -80,6 +84,7 @@ static const setting_def_t DEFS[] = {
 /* The keys that act in a level, checked against the jump in this order. */
 static const size_t ACTION_KEYS[] = {
     FIELD(restart_key), FIELD(checkpoint_key), FIELD(remove_checkpoint_key),
+    FIELD(debug_overlay_key), FIELD(previous_start_key), FIELD(next_start_key),
 };
 
 #define NB_ACTION_KEYS (sizeof(ACTION_KEYS) / sizeof(ACTION_KEYS[0]))
@@ -103,6 +108,9 @@ void settings_defaults(settings_t *s)
         .restart_key = {BIND_KEY, KEY_R, 0},
         .checkpoint_key = {BIND_KEY, KEY_Z, 0},
         .remove_checkpoint_key = {BIND_KEY, KEY_X, 0},
+        .debug_overlay_key = {BIND_KEY, KEY_F3, 0},
+        .previous_start_key = {BIND_KEY, KEY_A, 0},
+        .next_start_key = {BIND_KEY, KEY_E, 0},
         .icons = {[MODE_CUBE] = "player_icon.png",
             [MODE_SHIP] = "ship_icon.png", [MODE_UFO] = "ufo_icon.png",
             [MODE_WAVE] = "wave_icon.png", [MODE_BALL] = "ball_icon.png",

@@ -169,6 +169,23 @@ static void test_action_keys(void)
     CHECK(nb_logged == 0);
     CHECK(binding_equal(s.restart_key, (binding_t){BIND_MOUSE, MOUSE_Right, 0}));
     settings_free(&s);
+    load(&s, "");                                    /* the level's other keys */
+    CHECK(binding_equal(s.debug_overlay_key, (binding_t){BIND_KEY, KEY_F3, 0}));
+    CHECK(binding_equal(s.previous_start_key, (binding_t){BIND_KEY, KEY_A, 0}));
+    CHECK(binding_equal(s.next_start_key, (binding_t){BIND_KEY, KEY_E, 0}));
+    settings_free(&s);
+    load(&s, "next_start_key=R\ndebug_overlay_key=Ctrl+F3\n");
+    CHECK(binding_equal(s.next_start_key, (binding_t){BIND_KEY, KEY_E, 0}));
+    CHECK(strstr(logged, "next_start_key=R is already used") != NULL);
+    CHECK(binding_equal(s.debug_overlay_key, (binding_t){BIND_KEY, KEY_F3, 0}));
+    settings_free(&s);
+    load(&s, "previous_start_key=Left\nnext_start_key=Right\n"
+        "debug_overlay_key=\n");
+    CHECK(nb_logged == 0 && s.debug_overlay_key.kind == BIND_NONE);
+    CHECK(binding_equal(s.previous_start_key, (binding_t){BIND_KEY, KEY_Left,
+        0}));
+    CHECK(binding_equal(s.next_start_key, (binding_t){BIND_KEY, KEY_Right, 0}));
+    settings_free(&s);
 }
 
 /* Saved and read back, every value is the same, unknown keys included. */
@@ -196,6 +213,7 @@ static void test_round_trip(void)
     CHECK(strstr(read_file(), "icon_cube=player_icon.png\n") != NULL);
     CHECK(strstr(read_file(), "future_thing=3\n") != NULL);
     CHECK(strstr(read_file(), "remove_checkpoint_key=\n") != NULL);
+    CHECK(strstr(read_file(), "next_start_key=E\n") != NULL);
     CHECK(strstr(read_file(), "jump_bindings=Numpad0,MouseMiddle\n") != NULL);
     CHECK(strstr(read_file(), "not a pair") == NULL);
     CHECK(settings_load(&back, path, capture) == 0);
